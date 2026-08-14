@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1020">
+<title>CHAIN BLAST — ブロックパズル</title>
+<link rel="preconnect" href="data:">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b1020'/><rect x='5' y='5' width='9' height='9' rx='2' fill='%232ec4ff'/><rect x='18' y='5' width='9' height='9' rx='2' fill='%23ff6ad5'/><rect x='5' y='18' width='9' height='9' rx='2' fill='%23ffe14d'/><rect x='18' y='18' width='9' height='9' rx='2' fill='%233ddc84'/></svg>">
+</head>
+<body>
+
+<div id="app">
+
+  <header id="hud">
+    <div class="hud-row">
+      <div class="stat stat-score">
+        <span class="stat-label">SCORE</span>
+        <span class="stat-value" id="score">0</span>
+      </div>
+      <div class="stat stat-best">
+        <span class="stat-label">BEST</span>
+        <span class="stat-value" id="best">0</span>
+      </div>
+      <button id="btn-sound" class="icon-btn" title="サウンド切替" aria-label="サウンド切替">🔊</button>
+      <button id="btn-restart" class="icon-btn" title="リスタート" aria-label="リスタート">↻</button>
+    </div>
+
+    <div class="hud-row hud-row-sub">
+      <div class="level-box">
+        <span class="level-tag">Lv <b id="level">1</b></span>
+        <div class="level-bar"><i id="level-fill"></i></div>
+      </div>
+      <div id="combo-badge" class="combo-badge">COMBO <b id="combo">0</b></div>
+    </div>
+  </header>
+
+  <main id="stage">
+    <div id="board-wrap">
+      <div id="board" role="grid" aria-label="ゲーム盤"></div>
+      <div id="fx"></div>
+      <div id="toast"></div>
+    </div>
+  </main>
+
+  <section id="powerups" aria-label="パワーアップ">
+    <button class="pw" data-tool="hammer" title="ハンマー: ブロックを1つ壊す">
+      <span class="pw-icon">🔨</span><span class="pw-count" id="pw-hammer">0</span>
+    </button>
+    <button class="pw" data-tool="bomb" title="ボム: 3×3を壊す">
+      <span class="pw-icon">💣</span><span class="pw-count" id="pw-bomb">0</span>
+    </button>
+    <button class="pw" data-tool="shuffle" title="シャッフル: 手持ちを引き直す">
+      <span class="pw-icon">🎲</span><span class="pw-count" id="pw-shuffle">0</span>
+    </button>
+    <div class="charge">
+      <span class="charge-label">CHARGE</span>
+      <div class="charge-bar"><i id="charge-fill"></i></div>
+    </div>
+  </section>
+
+  <section id="tray" aria-label="手持ちピース">
+    <div class="slot" data-slot="0"></div>
+    <div class="slot" data-slot="1"></div>
+    <div class="slot" data-slot="2"></div>
+  </section>
+
+  <p id="hint">ピースをドラッグして配置 — タップで選んでからマス目をタップでもOK</p>
+
+  <details id="help">
+    <summary>あそびかた / 特殊ブロック</summary>
+    <ul>
+      <li><b>基本</b>：3つのピースを盤面に置き、縦か横の1列を埋めると消える。置ける場所が無くなったら終了。</li>
+      <li><b>💣 ボム</b>：ライン消しに巻き込むと周囲3×3を爆破。<b>連鎖</b>する。</li>
+      <li><b>⭐ スター</b>：消えると縦横1列をまるごと消す。<b>連鎖</b>する。</li>
+      <li><b>🪨 ストーン</b>：レベルが上がると出現。2回ライン消しに巻き込むと壊れる。</li>
+      <li><b>COMBO</b>：ライン消しのたび倍率アップ（最大 ×5）。消せなかったターンは 1 段下がるだけなので粘れる。</li>
+      <li><b>単色ライン</b>：同じ色だけで揃えると <b>PERFECT COLOR</b> で大量得点。</li>
+      <li><b>CHARGE</b>：消したマスでゲージが溜まり、パワーアップを獲得。</li>
+    </ul>
+  </details>
+</div>
+
+<div id="overlay" class="hidden">
+  <div class="panel">
+    <h2 id="ov-title">GAME OVER</h2>
+    <p id="ov-sub">置ける場所がありません</p>
+    <div class="ov-stats">
+      <div><span>SCORE</span><b id="ov-score">0</b></div>
+      <div><span>BEST</span><b id="ov-best">0</b></div>
+      <div><span>LINES</span><b id="ov-lines">0</b></div>
+    </div>
+    <div class="ov-actions">
+      <button id="ov-rescue" class="btn btn-ghost">🛟 レスキュー（1回だけ）</button>
+      <button id="ov-again" class="btn btn-primary">もう一度あそぶ</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/pieces.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
