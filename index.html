@@ -7,16 +7,14 @@
 <style>
   :root {
     --bg: #0b1020;
-    --panel: #141c33;
     --accent: #ffcc4d;
-    --danger: #ff5d5d;
     --text: #e9eefb;
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
     padding: 0;
-    height: 100%;
+    min-height: 100%;
     background: var(--bg);
     color: var(--text);
     font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, system-ui, sans-serif;
@@ -28,7 +26,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 10px;
     padding: 12px;
   }
   h1 {
@@ -56,11 +54,12 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    padding: 20px;
+    gap: 12px;
+    padding: 18px;
     text-align: center;
-    background: rgba(6, 10, 22, 0.82);
+    background: rgba(6, 10, 22, 0.86);
     border-radius: 12px;
+    overflow-y: auto;
   }
   #overlay.hidden { display: none; }
   #overlay h2 {
@@ -70,10 +69,20 @@
   }
   #overlay p {
     margin: 0;
-    font-size: 14px;
-    line-height: 1.7;
+    font-size: 13px;
+    line-height: 1.75;
     color: #b9c4e6;
   }
+  #overlay .legend {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    font-size: 12px;
+    color: #b9c4e6;
+    text-align: left;
+    margin: 0 auto;
+  }
+  #overlay .legend b { color: #e9eefb; }
   button {
     font: inherit;
     font-weight: 700;
@@ -81,14 +90,31 @@
     background: var(--accent);
     border: none;
     border-radius: 999px;
-    padding: 12px 28px;
+    padding: 11px 26px;
     cursor: pointer;
   }
   button:active { transform: translateY(1px); }
+  #controls {
+    display: flex;
+    gap: 10px;
+    width: min(100%, 480px);
+  }
+  #controls button {
+    flex: 1;
+    background: #223056;
+    color: var(--text);
+    padding: 14px 0;
+    font-size: 15px;
+    border-radius: 12px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #jumpBtn { background: #2f6ea8; }
   #hint {
     font-size: 12px;
     color: #7d89b3;
     text-align: center;
+    line-height: 1.6;
   }
 </style>
 </head>
@@ -98,16 +124,19 @@
   <canvas id="game" width="480" height="720"></canvas>
   <div id="overlay">
     <h2 id="title">ボムよけゲーム</h2>
-    <p id="desc">
-      上から降ってくる爆弾をよけよう。<br>
-      ★アイテムを取るとボーナス点。<br>
-      <br>
-      ← → キー / A・D キー / ドラッグで移動
-    </p>
+    <p id="desc"></p>
     <button id="startBtn">スタート</button>
   </div>
 </div>
-<div id="hint">操作: ← → キー、またはタッチでドラッグ　/　P で一時停止</div>
+<div id="controls">
+  <button id="leftBtn">◀</button>
+  <button id="jumpBtn">ジャンプ</button>
+  <button id="rightBtn">▶</button>
+</div>
+<div id="hint">
+  移動: ← → / A・D / ドラッグ　　ジャンプ: スペース・↑・W（空中でもう一度で2段ジャンプ）<br>
+  一時停止: P
+</div>
 
 <script>
 (() => {
@@ -124,43 +153,89 @@
   const H = canvas.height;
   const GROUND = H - 40;
 
-  const STATE = { READY: 0, PLAYING: 1, OVER: 2, PAUSED: 3 };
+  // 難易度倍率。1 で従来、3 で 3 倍。ここだけ変えれば全体の強さが変わる。
+  const DIFFICULTY_SCALE = 3;
 
+  const GRAVITY = 2000;
+  const JUMP_V = -680;
+  const MAX_JUMPS = 2;
+  const MAX_LIVES = 5;
+
+  const STATE = { READY: 0, PLAYING: 1, OVER: 2, PAUSED: 3 };
   const HISCORE_KEY = "bombDodgeHiScore";
   let hiScore = Number(localStorage.getItem(HISCORE_KEY) || 0);
 
   const player = {
     x: W / 2,
-    y: GROUND,
+    y: GROUND,      // 足元の座標
     w: 34,
     h: 40,
     speed: 560,
     vx: 0,
+    vy: 0,
+    onGround: true,
+    jumps: MAX_JUMPS,
     lives: 3,
-    invuln: 0,
+    invuln: 0,      // 被弾後の無敵（点滅）
+    shield: 0,      // アイテムのシールド
   };
 
   let state = STATE.READY;
   let bombs = [];
   let items = [];
+  let blasts = [];
   let particles = [];
+  let popups = [];
   let score = 0;
   let scoreAcc = 0;
   let elapsed = 0;
   let spawnTimer = 0;
   let itemTimer = 0;
+  let slowMo = 0;
   let shake = 0;
   let lastTime = 0;
 
   const keys = new Set();
   let pointerX = null;
+  let jumpQueued = false;
+  let btnDir = 0;
+
+  // ---------- アイテム定義 ----------
+  const ITEM_TYPES = [
+    { key: "star",   color: "#7ef0c0", weight: 30, label: "+100",    apply: () => { score += 100; } },
+    { key: "gem",    color: "#ffd166", weight: 20, label: "+300",    apply: () => { score += 300; } },
+    { key: "heart",  color: "#ff6b8a", weight: 12, label: "ライフ+1", apply: () => {
+        if (player.lives < MAX_LIVES) player.lives += 1;
+        else score += 200;
+      } },
+    { key: "shield", color: "#7cc4ff", weight: 20, label: "シールド", apply: () => { player.shield = Math.max(player.shield, 6); } },
+    { key: "clock",  color: "#c89bff", weight: 18, label: "スロー",   apply: () => { slowMo = Math.max(slowMo, 5); } },
+  ];
+  const TOTAL_WEIGHT = ITEM_TYPES.reduce((s, t) => s + t.weight, 0);
+
+  function pickItemType() {
+    let r = Math.random() * TOTAL_WEIGHT;
+    for (const t of ITEM_TYPES) {
+      r -= t.weight;
+      if (r <= 0) return t;
+    }
+    return ITEM_TYPES[0];
+  }
 
   // ---------- 入力 ----------
+  function requestJump() {
+    if (state === STATE.PLAYING) jumpQueued = true;
+    else if (state === STATE.PAUSED) togglePause();
+    else startGame();
+  }
+
   window.addEventListener("keydown", (e) => {
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
-    keys.add(e.key.toLowerCase());
-    if (e.key.toLowerCase() === "p") togglePause();
-    if (e.key === " " && state !== STATE.PLAYING) startGame();
+    const k = e.key.toLowerCase();
+    if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "w"].includes(k)) e.preventDefault();
+    if (e.repeat) return;
+    keys.add(k);
+    if (k === "p") togglePause();
+    if (k === " " || k === "arrowup" || k === "w") requestJump();
   });
   window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
@@ -179,6 +254,16 @@
   canvas.addEventListener("pointerup", releasePointer);
   canvas.addEventListener("pointercancel", releasePointer);
 
+  const holdButton = (el, onDown, onUp) => {
+    el.addEventListener("pointerdown", (e) => { e.preventDefault(); onDown(); });
+    for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+      el.addEventListener(ev, () => onUp && onUp());
+    }
+  };
+  holdButton(document.getElementById("leftBtn"), () => { btnDir = -1; }, () => { btnDir = 0; });
+  holdButton(document.getElementById("rightBtn"), () => { btnDir = 1; }, () => { btnDir = 0; });
+  holdButton(document.getElementById("jumpBtn"), requestJump);
+
   startBtn.addEventListener("click", () => {
     if (state === STATE.PAUSED) togglePause();
     else startGame();
@@ -188,17 +273,26 @@
   function startGame() {
     bombs = [];
     items = [];
+    blasts = [];
     particles = [];
+    popups = [];
     score = 0;
     scoreAcc = 0;
     elapsed = 0;
     spawnTimer = 0;
-    itemTimer = 2;
+    itemTimer = 1.5;
+    slowMo = 0;
     shake = 0;
+    jumpQueued = false;
     player.x = W / 2;
+    player.y = GROUND;
     player.vx = 0;
+    player.vy = 0;
+    player.onGround = true;
+    player.jumps = MAX_JUMPS;
     player.lives = 3;
     player.invuln = 0;
+    player.shield = 0;
     state = STATE.PLAYING;
     overlay.classList.add("hidden");
   }
@@ -233,31 +327,58 @@
     overlay.classList.remove("hidden");
   }
 
-  // ---------- 難易度 ----------
-  const difficulty = () => Math.min(1, elapsed / 90);
-  const spawnInterval = () => 0.62 - 0.45 * difficulty();
-  const bombSpeed = () => 130 + 260 * difficulty();
+  const READY_DESC = `
+    上から降ってくる爆弾をよけよう。<br>
+    <b style="color:#ff6b5d">赤い爆弾</b>は着地すると爆発する。ジャンプでよけろ！<br><br>
+    <span class="legend">
+      <span style="color:#7ef0c0">★ スター</span><span>+100点</span>
+      <span style="color:#ffd166">◆ ジェム</span><span>+300点</span>
+      <span style="color:#ff6b8a">♥ ハート</span><span>ライフ+1</span>
+      <span style="color:#7cc4ff">🛡 シールド</span><span>6秒間無敵</span>
+      <span style="color:#c89bff">◷ スロー</span><span>5秒間ゆっくり</span>
+    </span>
+  `;
+
+  // ---------- 難易度（DIFFICULTY_SCALE 倍） ----------
+  // 進行そのものが SCALE 倍速く、出現頻度と落下速度の上限も引き上がる。
+  const difficulty = () => Math.min(1, (elapsed * DIFFICULTY_SCALE) / 90);
+  const rateBoost = 1 + (DIFFICULTY_SCALE - 1) * 0.35;
+  const speedBoost = 1 + (DIFFICULTY_SCALE - 1) * 0.18;
+  const spawnInterval = () => (0.62 - 0.45 * difficulty()) / rateBoost;
+  const bombSpeed = () => (130 + 260 * difficulty()) * speedBoost;
+  const redChance = () => 0.16 + 0.24 * difficulty();
 
   function spawnBomb() {
-    const r = 12 + Math.random() * 8;
+    const red = Math.random() < redChance();
+    const r = red ? 15 + Math.random() * 6 : 12 + Math.random() * 8;
     bombs.push({
       x: r + Math.random() * (W - r * 2),
       y: -r,
       r,
-      vy: bombSpeed() * (0.85 + Math.random() * 0.4),
+      red,
+      vy: bombSpeed() * (0.85 + Math.random() * 0.4) * (red ? 0.9 : 1),
       vx: (Math.random() - 0.5) * 60 * difficulty(),
       spin: Math.random() * Math.PI * 2,
     });
   }
 
   function spawnItem() {
+    const type = pickItemType();
     items.push({
-      x: 16 + Math.random() * (W - 32),
+      x: 18 + Math.random() * (W - 36),
       y: -14,
-      r: 11,
+      r: 12,
       vy: 110 + 60 * Math.random(),
       t: 0,
+      type,
     });
+  }
+
+  function addBlast(x, y, radius) {
+    blasts.push({ x, y, r: 0, maxR: radius, t: 0, grow: 0.26, life: 0.5, hit: false });
+    burst(x, y, "#ff9d3d", 26);
+    burst(x, y, "#ffd166", 14);
+    shake = Math.max(shake, 1);
   }
 
   function burst(x, y, color, count) {
@@ -276,25 +397,65 @@
     }
   }
 
+  function popup(x, y, text, color) {
+    popups.push({ x, y, text, color, life: 0.9 });
+  }
+
+  // プレイヤーの矩形（当たり判定）
+  const playerRect = () => ({
+    l: player.x - player.w / 2,
+    r: player.x + player.w / 2,
+    t: player.y - player.h,
+    b: player.y,
+  });
+
+  function circleHitsPlayer(cx, cy, cr) {
+    const rc = playerRect();
+    const nx = Math.max(rc.l, Math.min(cx, rc.r));
+    const ny = Math.max(rc.t, Math.min(cy, rc.b));
+    const dx = cx - nx;
+    const dy = cy - ny;
+    return dx * dx + dy * dy < cr * cr;
+  }
+
+  // 被弾処理。true を返したらゲームオーバー
+  function damagePlayer() {
+    if (player.shield > 0) return false;
+    if (player.invuln > 0) return false;
+    player.lives -= 1;
+    player.invuln = 1.6;
+    shake = 1;
+    if (player.lives <= 0) {
+      burst(player.x, player.y - player.h / 2, "#ffcc4d", 44);
+      gameOver();
+      return true;
+    }
+    return false;
+  }
+
   // ---------- 更新 ----------
   function update(dt) {
     elapsed += dt;
-    // 生存スコアは端数を持ち越して加算する（毎フレーム丸めると 0 になるため）
     scoreAcc += dt * 20;
     const gained = Math.floor(scoreAcc);
     score += gained;
     scoreAcc -= gained;
 
-    // プレイヤー移動
-    let dir = 0;
+    if (player.shield > 0) player.shield = Math.max(0, player.shield - dt);
+    if (slowMo > 0) slowMo = Math.max(0, slowMo - dt);
+    if (player.invuln > 0) player.invuln -= dt;
+    if (shake > 0) shake = Math.max(0, shake - dt * 3);
+
+    const bombScale = slowMo > 0 ? 0.42 : 1;
+
+    // ----- 横移動 -----
+    let dir = btnDir;
     if (keys.has("arrowleft") || keys.has("a")) dir -= 1;
     if (keys.has("arrowright") || keys.has("d")) dir += 1;
+    dir = Math.max(-1, Math.min(1, dir));
 
     if (pointerX !== null) {
-      const diff = pointerX - player.x;
-      // dt で割ることで「1 フレームで届く距離」を上限速度まで出す。
-      // 行き過ぎて振動しないよう、残り距離ぶんに丸める。
-      const want = diff / dt;
+      const want = (pointerX - player.x) / dt;
       player.vx = Math.max(-player.speed, Math.min(player.speed, want));
     } else {
       player.vx = dir * player.speed;
@@ -302,78 +463,107 @@
     player.x += player.vx * dt;
     player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x));
 
-    if (player.invuln > 0) player.invuln -= dt;
-    if (shake > 0) shake = Math.max(0, shake - dt * 3);
+    // ----- ジャンプ / 重力 -----
+    if (jumpQueued) {
+      jumpQueued = false;
+      if (player.jumps > 0) {
+        player.vy = JUMP_V;
+        player.jumps -= 1;
+        player.onGround = false;
+        // 2段ジャンプは強めのエフェクトで分かるように
+        burst(player.x, player.y, "#9fe6ff", player.jumps === 0 ? 10 : 6);
+      }
+    }
+    player.vy += GRAVITY * dt;
+    player.y += player.vy * dt;
+    if (player.y >= GROUND) {
+      player.y = GROUND;
+      player.vy = 0;
+      if (!player.onGround) player.onGround = true;
+      player.jumps = MAX_JUMPS;
+    }
 
-    // 出現
+    // ----- 出現 -----
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
       spawnBomb();
       spawnTimer = spawnInterval();
-      // 後半は同時出現
-      if (Math.random() < difficulty() * 0.5) spawnBomb();
+      if (Math.random() < difficulty() * 0.5 * rateBoost) spawnBomb();
     }
     itemTimer -= dt;
     if (itemTimer <= 0) {
       spawnItem();
-      itemTimer = 5 + Math.random() * 5;
+      itemTimer = 3.5 + Math.random() * 3.5;
     }
 
-    // 爆弾
-    const px = player.x;
-    const py = player.y - player.h / 2;
+    // ----- 爆弾 -----
     for (let i = bombs.length - 1; i >= 0; i--) {
       const b = bombs[i];
-      b.y += b.vy * dt;
-      b.x += b.vx * dt;
+      b.y += b.vy * bombScale * dt;
+      b.x += b.vx * bombScale * dt;
       b.spin += dt * 4;
       if (b.x < b.r || b.x > W - b.r) b.vx *= -1;
 
-      // 地面に落ちて爆発
-      if (b.y - b.r > GROUND + 10) {
-        burst(b.x, GROUND, "#ff9d3d", 8);
+      // 着地
+      if (b.y + b.r >= GROUND) {
         bombs.splice(i, 1);
-        score += 5;
+        if (b.red) {
+          // 赤い爆弾は着弾して爆発する
+          addBlast(b.x, GROUND, 52 + b.r * 1.6);
+        } else {
+          burst(b.x, GROUND, "#ff9d3d", 8);
+          score += 5;
+        }
         continue;
       }
 
-      // 当たり判定（円 vs 矩形の近似）
-      if (player.invuln <= 0) {
-        const nx = Math.max(px - player.w / 2, Math.min(b.x, px + player.w / 2));
-        const ny = Math.max(py - player.h / 2, Math.min(b.y, py + player.h / 2));
-        const dx = b.x - nx;
-        const dy = b.y - ny;
-        if (dx * dx + dy * dy < b.r * b.r) {
+      // 直撃
+      if (player.invuln <= 0 || player.shield > 0) {
+        if (circleHitsPlayer(b.x, b.y, b.r)) {
           bombs.splice(i, 1);
-          burst(b.x, b.y, "#ff5d5d", 26);
-          player.lives -= 1;
-          player.invuln = 1.6;
-          shake = 1;
-          if (player.lives <= 0) {
-            burst(px, py, "#ffcc4d", 40);
-            gameOver();
+          if (b.red) addBlast(b.x, b.y, 46 + b.r * 1.4);
+          else burst(b.x, b.y, "#ff5d5d", 26);
+          if (player.shield > 0) {
+            popup(player.x, player.y - player.h - 12, "ガード!", "#7cc4ff");
+          } else if (damagePlayer()) {
             return;
           }
         }
       }
     }
 
-    // アイテム
+    // ----- 爆風 -----
+    for (let i = blasts.length - 1; i >= 0; i--) {
+      const bl = blasts[i];
+      bl.t += dt;
+      bl.r = bl.maxR * Math.min(1, bl.t / bl.grow);
+      if (bl.t > bl.grow + bl.life) { blasts.splice(i, 1); continue; }
+      // 広がっている間だけ判定。ジャンプで上に逃げれば当たらない。
+      if (!bl.hit && bl.t <= bl.grow + 0.05 && circleHitsPlayer(bl.x, bl.y, bl.r)) {
+        bl.hit = true;
+        if (player.shield > 0) {
+          popup(player.x, player.y - player.h - 12, "ガード!", "#7cc4ff");
+        } else if (damagePlayer()) {
+          return;
+        }
+      }
+    }
+
+    // ----- アイテム -----
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       it.y += it.vy * dt;
       it.t += dt;
       if (it.y - it.r > H) { items.splice(i, 1); continue; }
-      const dx = it.x - px;
-      const dy = it.y - py;
-      if (Math.hypot(dx, dy) < it.r + Math.max(player.w, player.h) / 2) {
+      if (circleHitsPlayer(it.x, it.y, it.r + 4)) {
         items.splice(i, 1);
-        score += 100;
-        burst(it.x, it.y, "#7ef0c0", 18);
+        it.type.apply();
+        popup(it.x, it.y - 10, it.type.label, it.type.color);
+        burst(it.x, it.y, it.type.color, 18);
       }
     }
 
-    // パーティクル
+    // ----- パーティクル / ポップアップ -----
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.life -= dt;
@@ -381,6 +571,12 @@
       p.vy += 500 * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
+    }
+    for (let i = popups.length - 1; i >= 0; i--) {
+      const q = popups[i];
+      q.life -= dt;
+      q.y -= 34 * dt;
+      if (q.life <= 0) popups.splice(i, 1);
     }
   }
 
@@ -404,7 +600,6 @@
     }
     ctx.globalAlpha = 1;
 
-    // 地面
     const g = ctx.createLinearGradient(0, GROUND, 0, H);
     g.addColorStop(0, "#243158");
     g.addColorStop(1, "#131a30");
@@ -418,43 +613,44 @@
     ctx.stroke();
   }
 
-  // 見た目だけのパラメータ。当たり判定は player.w / player.h のままなので
-  // ここをいじっても難易度は変わらない。
   function drawPlayer() {
-    if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0) return;
+    if (player.invuln > 0 && player.shield <= 0 && Math.floor(player.invuln * 12) % 2 === 0) return;
 
     const t = performance.now() / 1000;
+    const air = GROUND - player.y;              // 地面からの高さ
+    const airborne = air > 1;
     const moving = Math.abs(player.vx) > 20;
     const lean = Math.max(-1, Math.min(1, player.vx / player.speed));
 
-    // 待機時のふわふわ、移動時の弾み
-    const bob = moving ? Math.abs(Math.sin(t * 9)) * 3 : Math.sin(t * 2.2) * 1.6;
-    // 弾んだぶんだけ潰れる（スカッシュ＆ストレッチ）
-    const squash = 1 + bob * 0.012;
+    const bob = airborne ? 0 : (moving ? Math.abs(Math.sin(t * 9)) * 3 : Math.sin(t * 2.2) * 1.6);
+    // 上昇中は伸び、落下中は少し潰れる
+    const stretch = airborne ? Math.max(-0.14, Math.min(0.16, -player.vy / 4200)) : 0;
+    const squash = 1 + bob * 0.012 + stretch;
 
-    // まばたき: 3.4 秒ごとに一瞬だけ閉じる
     const bt = t % 3.4;
     const eyeOpen = bt > 3.2 ? Math.abs(bt - 3.3) / 0.1 : 1;
 
     ctx.save();
-    ctx.translate(player.x, player.y);
 
-    // 影（跳ねると小さくなる）
-    ctx.fillStyle = "rgba(0,0,0,0.32)";
+    // 影は地面に残り、高く跳ぶほど小さく薄く
+    const shadowK = Math.max(0.25, 1 - air / 220);
+    ctx.globalAlpha = 0.32 * shadowK;
+    ctx.fillStyle = "#000000";
     ctx.beginPath();
-    ctx.ellipse(0, 1, 17 - bob * 0.5, 4.5 - bob * 0.15, 0, 0, Math.PI * 2);
+    ctx.ellipse(player.x, GROUND + 1, 17 * shadowK, 4.5 * shadowK, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
-    ctx.translate(lean * 2, -bob);
+    ctx.translate(player.x + lean * 2, player.y - bob);
     ctx.rotate(lean * 0.16);
     ctx.scale(1 / squash, squash);
 
     const cx = 0;
-    const cy = -19; // 体の中心
+    const cy = -19;
     const rx = 17;
     const ry = 18;
 
-    // しっぽ（ふりふり）
+    // しっぽ
     ctx.strokeStyle = "#3fbfe8";
     ctx.lineCap = "round";
     ctx.lineWidth = 5;
@@ -466,8 +662,7 @@
     );
     ctx.stroke();
 
-    // 耳。内側のピンクは耳の先端に向かって縮めた相似形にして、
-    // 体に隠れない上側だけに収める。
+    // 耳
     const ear = (ex, dir, shrink) => {
       const tipX = cx + ex + 1 * dir;
       const tipY = cy - ry - 11;
@@ -490,7 +685,7 @@
     ear(-8, -1, 0.42);
     ear(8, 1, 0.42);
 
-    // 体（下がふっくらした丸）
+    // 体
     const grad = ctx.createLinearGradient(0, cy - ry, 0, cy + ry);
     grad.addColorStop(0, "#8ae9ff");
     grad.addColorStop(1, "#35b6e6");
@@ -499,13 +694,12 @@
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // ほっぺのつや
     ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.beginPath();
     ctx.ellipse(cx - 6, cy - 8, 5.5, 3.6, -0.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // 目（進行方向を見る）
+    // 目
     const look = lean * 1.6;
     const eyeY = cy - 2;
     for (const sx of [-6.5, 6.5]) {
@@ -513,35 +707,38 @@
       ctx.beginPath();
       ctx.ellipse(cx + sx, eyeY, 4.4, 5.2 * eyeOpen, 0, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.fillStyle = "#16203a";
       ctx.beginPath();
       ctx.ellipse(cx + sx + look, eyeY + 0.5, 2.6, 3.2 * eyeOpen, 0, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(cx + sx + look - 1, eyeY - 1.4, 1.2 * eyeOpen, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // ほっぺ
     ctx.fillStyle = "rgba(255,122,158,0.8)";
     ctx.beginPath();
     ctx.ellipse(cx - 12, cy + 5, 3.8, 2.6, 0, 0, Math.PI * 2);
     ctx.ellipse(cx + 12, cy + 5, 3.8, 2.6, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 口（ω）
+    // 口（跳んでいる間は開ける）
     ctx.strokeStyle = "#16203a";
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(cx - 2.2, cy + 6, 2.2, 0, Math.PI);
-    ctx.arc(cx + 2.2, cy + 6, 2.2, 0, Math.PI);
-    ctx.stroke();
+    if (airborne) {
+      ctx.ellipse(cx, cy + 7, 2.8, 3.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#16203a";
+      ctx.fill();
+    } else {
+      ctx.arc(cx - 2.2, cy + 6, 2.2, 0, Math.PI);
+      ctx.arc(cx + 2.2, cy + 6, 2.2, 0, Math.PI);
+      ctx.stroke();
+    }
 
     // あんよ
-    const swing = moving ? Math.sin(t * 14) * 2.5 : 0;
+    const swing = airborne ? -2 : (moving ? Math.sin(t * 14) * 2.5 : 0);
     ctx.fillStyle = "#2aa8d8";
     ctx.beginPath();
     ctx.ellipse(cx - 7, cy + ry - 1 + swing, 5, 3.2, 0, 0, Math.PI * 2);
@@ -549,6 +746,22 @@
     ctx.fill();
 
     ctx.restore();
+
+    // シールドの輪（点滅で残り時間を知らせる）
+    if (player.shield > 0) {
+      const blink = player.shield < 1.5 && Math.floor(player.shield * 8) % 2 === 0;
+      if (!blink) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(124,196,255,0.9)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y - 19, 27 + Math.sin(t * 5) * 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(124,196,255,0.12)";
+        ctx.fill();
+        ctx.restore();
+      }
+    }
   }
 
   function drawBomb(b) {
@@ -556,17 +769,33 @@
     ctx.translate(b.x, b.y);
     ctx.rotate(Math.sin(b.spin) * 0.2);
 
-    ctx.fillStyle = "#1d2438";
+    if (b.red) {
+      // 危険な赤い爆弾は脈打たせて目立たせる
+      const pulse = 0.6 + Math.abs(Math.sin(b.spin * 4)) * 0.4;
+      ctx.fillStyle = `rgba(255,60,60,${0.18 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, b.r * 2.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = b.red ? "#8e1f26" : "#1d2438";
     ctx.beginPath();
     ctx.arc(0, 0, b.r, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#39425f";
+    ctx.fillStyle = b.red ? "#d43a3a" : "#39425f";
     ctx.beginPath();
     ctx.arc(-b.r * 0.3, -b.r * 0.35, b.r * 0.32, 0, Math.PI * 2);
     ctx.fill();
 
-    // 導火線
+    if (b.red) {
+      ctx.strokeStyle = "#ff8a8a";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, b.r * 0.62, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     ctx.strokeStyle = "#8a6a3c";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
@@ -574,7 +803,6 @@
     ctx.quadraticCurveTo(b.r * 0.5, -b.r * 1.5, b.r * 0.2, -b.r * 1.9);
     ctx.stroke();
 
-    // 火花
     const f = 0.6 + Math.abs(Math.sin(b.spin * 3)) * 0.6;
     ctx.fillStyle = "#ffd166";
     ctx.beginPath();
@@ -587,22 +815,116 @@
     ctx.restore();
   }
 
-  function drawItem(it) {
+  function drawBlast(bl) {
+    const p = Math.min(1, bl.t / (bl.grow + bl.life));
+    const alpha = Math.max(0, 1 - p);
     ctx.save();
-    ctx.translate(it.x, it.y);
-    ctx.rotate(it.t * 2);
-    ctx.fillStyle = "#7ef0c0";
-    ctx.shadowColor = "#7ef0c0";
-    ctx.shadowBlur = 12;
+    const g = ctx.createRadialGradient(bl.x, bl.y, bl.r * 0.15, bl.x, bl.y, Math.max(1, bl.r));
+    g.addColorStop(0, `rgba(255,240,180,${0.85 * alpha})`);
+    g.addColorStop(0.5, `rgba(255,150,50,${0.6 * alpha})`);
+    g.addColorStop(1, `rgba(255,60,40,0)`);
+    ctx.fillStyle = g;
     ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 === 0 ? it.r : it.r * 0.45;
-      const a = (Math.PI / 5) * i - Math.PI / 2;
-      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.arc(bl.x, bl.y, Math.max(1, bl.r), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255,200,120,${0.7 * alpha})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(bl.x, bl.y, Math.max(1, bl.r), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function starPath(r, inner, points) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const rr = i % 2 === 0 ? r : r * inner;
+      const a = (Math.PI / points) * i - Math.PI / 2;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
     }
     ctx.closePath();
-    ctx.fill();
+  }
+
+  function drawItem(it) {
+    const c = it.type.color;
+    ctx.save();
+    ctx.translate(it.x, it.y + Math.sin(it.t * 4) * 2);
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = c;
+
+    switch (it.type.key) {
+      case "star":
+        ctx.rotate(it.t * 2);
+        starPath(it.r, 0.45, 5);
+        ctx.fill();
+        break;
+      case "gem":
+        ctx.rotate(Math.sin(it.t * 2) * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(0, -it.r);
+        ctx.lineTo(it.r * 0.85, 0);
+        ctx.lineTo(0, it.r);
+        ctx.lineTo(-it.r * 0.85, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.beginPath();
+        ctx.moveTo(0, -it.r);
+        ctx.lineTo(it.r * 0.85, 0);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case "heart": {
+        const s = it.r * 0.95;
+        ctx.beginPath();
+        ctx.moveTo(0, s * 0.75);
+        ctx.bezierCurveTo(-s * 1.5, -s * 0.4, -s * 0.45, -s * 1.35, 0, -s * 0.35);
+        ctx.bezierCurveTo(s * 0.45, -s * 1.35, s * 1.5, -s * 0.4, 0, s * 0.75);
+        ctx.fill();
+        break;
+      }
+      case "shield":
+        ctx.beginPath();
+        ctx.moveTo(0, -it.r);
+        ctx.lineTo(it.r * 0.82, -it.r * 0.45);
+        ctx.lineTo(it.r * 0.82, it.r * 0.25);
+        ctx.quadraticCurveTo(it.r * 0.6, it.r, 0, it.r * 1.05);
+        ctx.quadraticCurveTo(-it.r * 0.6, it.r, -it.r * 0.82, it.r * 0.25);
+        ctx.lineTo(-it.r * 0.82, -it.r * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.beginPath();
+        ctx.arc(0, 0, it.r * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      case "clock":
+        ctx.beginPath();
+        ctx.arc(0, 0, it.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "#2a1f43";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -it.r * 0.6);
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(it.t * 3) * it.r * 0.45, Math.sin(it.t * 3) * it.r * 0.45);
+        ctx.stroke();
+        break;
+    }
     ctx.restore();
+  }
+
+  function heart(cx, cy, s) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s * 0.7);
+    ctx.bezierCurveTo(cx - s * 1.4, cy - s * 0.4, cx - s * 0.4, cy - s * 1.3, cx, cy - s * 0.35);
+    ctx.bezierCurveTo(cx + s * 0.4, cy - s * 1.3, cx + s * 1.4, cy - s * 0.4, cx, cy + s * 0.7);
+    ctx.fill();
   }
 
   function drawHUD() {
@@ -615,34 +937,28 @@
     ctx.fillStyle = "#8f9ec9";
     ctx.fillText(`HI ${hiScore}`, 14, 50);
 
-    // 残機
     ctx.textAlign = "right";
     for (let i = 0; i < player.lives; i++) {
       ctx.fillStyle = "#ff6b8a";
       heart(W - 18 - i * 22, 24, 8);
     }
-
     ctx.fillStyle = "#8f9ec9";
     ctx.font = "12px system-ui, sans-serif";
-    ctx.fillText(`${elapsed.toFixed(1)}s`, W - 14, 50);
-  }
+    ctx.fillText(`${elapsed.toFixed(1)}s  ×${DIFFICULTY_SCALE}`, W - 14, 50);
 
-  function heart(cx, cy, s) {
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + s * 0.7);
-    ctx.bezierCurveTo(cx - s * 1.4, cy - s * 0.4, cx - s * 0.4, cy - s * 1.3, cx, cy - s * 0.35);
-    ctx.bezierCurveTo(cx + s * 0.4, cy - s * 1.3, cx + s * 1.4, cy - s * 0.4, cx, cy + s * 0.7);
-    ctx.fill();
-  }
-
-  function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
+    // 効果中バッジ
+    ctx.textAlign = "left";
+    ctx.font = "bold 12px system-ui, sans-serif";
+    let by = 72;
+    if (player.shield > 0) {
+      ctx.fillStyle = "#7cc4ff";
+      ctx.fillText(`🛡 ${player.shield.toFixed(1)}s`, 14, by);
+      by += 18;
+    }
+    if (slowMo > 0) {
+      ctx.fillStyle = "#c89bff";
+      ctx.fillText(`◷ ${slowMo.toFixed(1)}s`, 14, by);
+    }
   }
 
   function draw() {
@@ -655,11 +971,21 @@
     for (const it of items) drawItem(it);
     for (const b of bombs) drawBomb(b);
     drawPlayer();
+    for (const bl of blasts) drawBlast(bl);
 
     for (const p of particles) {
       ctx.globalAlpha = Math.max(0, p.life / p.max);
       ctx.fillStyle = p.color;
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.textAlign = "center";
+    ctx.font = "bold 15px system-ui, sans-serif";
+    for (const q of popups) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, q.life / 0.5));
+      ctx.fillStyle = q.color;
+      ctx.fillText(q.text, q.x, q.y);
     }
     ctx.globalAlpha = 1;
     ctx.restore();
@@ -675,6 +1001,8 @@
     draw();
     requestAnimationFrame(loop);
   }
+
+  showOverlay("ボムよけゲーム", READY_DESC, "スタート");
   requestAnimationFrame(loop);
 })();
 </script>
