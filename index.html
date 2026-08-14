@@ -418,37 +418,136 @@
     ctx.stroke();
   }
 
+  // 見た目だけのパラメータ。当たり判定は player.w / player.h のままなので
+  // ここをいじっても難易度は変わらない。
   function drawPlayer() {
     if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0) return;
-    const x = player.x;
-    const y = player.y;
+
+    const t = performance.now() / 1000;
+    const moving = Math.abs(player.vx) > 20;
+    const lean = Math.max(-1, Math.min(1, player.vx / player.speed));
+
+    // 待機時のふわふわ、移動時の弾み
+    const bob = moving ? Math.abs(Math.sin(t * 9)) * 3 : Math.sin(t * 2.2) * 1.6;
+    // 弾んだぶんだけ潰れる（スカッシュ＆ストレッチ）
+    const squash = 1 + bob * 0.012;
+
+    // まばたき: 3.4 秒ごとに一瞬だけ閉じる
+    const bt = t % 3.4;
+    const eyeOpen = bt > 3.2 ? Math.abs(bt - 3.3) / 0.1 : 1;
+
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(player.x, player.y);
 
-    // 影
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    // 影（跳ねると小さくなる）
+    ctx.fillStyle = "rgba(0,0,0,0.32)";
     ctx.beginPath();
-    ctx.ellipse(0, 2, player.w / 2, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 1, 17 - bob * 0.5, 4.5 - bob * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 体
+    ctx.translate(lean * 2, -bob);
+    ctx.rotate(lean * 0.16);
+    ctx.scale(1 / squash, squash);
+
+    const cx = 0;
+    const cy = -19; // 体の中心
+    const rx = 17;
+    const ry = 18;
+
+    // しっぽ（ふりふり）
+    ctx.strokeStyle = "#3fbfe8";
+    ctx.lineCap = "round";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(rx - 3, cy + 6);
+    ctx.quadraticCurveTo(
+      rx + 10, cy + 6 + Math.sin(t * 6) * 4,
+      rx + 8, cy - 4 + Math.sin(t * 6) * 6
+    );
+    ctx.stroke();
+
+    // 耳。内側のピンクは耳の先端に向かって縮めた相似形にして、
+    // 体に隠れない上側だけに収める。
+    const ear = (ex, dir, shrink) => {
+      const tipX = cx + ex + 1 * dir;
+      const tipY = cy - ry - 11;
+      const mix = (px2, py2) => [
+        px2 + (tipX - px2) * shrink,
+        py2 + (tipY - py2) * shrink,
+      ];
+      const [ax, ay] = mix(cx + ex - 6 * dir, cy - ry + 5);
+      const [bx2, by2] = mix(cx + ex + 7 * dir, cy - ry + 1);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.quadraticCurveTo(tipX, tipY, bx2, by2);
+      ctx.closePath();
+      ctx.fill();
+    };
     ctx.fillStyle = "#4dd0ff";
-    roundRect(-player.w / 2, -player.h, player.w, player.h - 8, 8);
-    ctx.fill();
+    ear(-8, -1, 0);
+    ear(8, 1, 0);
+    ctx.fillStyle = "#ff9ec0";
+    ear(-8, -1, 0.42);
+    ear(8, 1, 0.42);
 
-    // 顔
-    ctx.fillStyle = "#0b1020";
-    const eyeY = -player.h + 14;
+    // 体（下がふっくらした丸）
+    const grad = ctx.createLinearGradient(0, cy - ry, 0, cy + ry);
+    grad.addColorStop(0, "#8ae9ff");
+    grad.addColorStop(1, "#35b6e6");
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(-7, eyeY, 3.2, 0, Math.PI * 2);
-    ctx.arc(7, eyeY, 3.2, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 足
+    // ほっぺのつや
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(cx - 6, cy - 8, 5.5, 3.6, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 目（進行方向を見る）
+    const look = lean * 1.6;
+    const eyeY = cy - 2;
+    for (const sx of [-6.5, 6.5]) {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(cx + sx, eyeY, 4.4, 5.2 * eyeOpen, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#16203a";
+      ctx.beginPath();
+      ctx.ellipse(cx + sx + look, eyeY + 0.5, 2.6, 3.2 * eyeOpen, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(cx + sx + look - 1, eyeY - 1.4, 1.2 * eyeOpen, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ほっぺ
+    ctx.fillStyle = "rgba(255,122,158,0.8)";
+    ctx.beginPath();
+    ctx.ellipse(cx - 12, cy + 5, 3.8, 2.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 12, cy + 5, 3.8, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 口（ω）
+    ctx.strokeStyle = "#16203a";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(cx - 2.2, cy + 6, 2.2, 0, Math.PI);
+    ctx.arc(cx + 2.2, cy + 6, 2.2, 0, Math.PI);
+    ctx.stroke();
+
+    // あんよ
+    const swing = moving ? Math.sin(t * 14) * 2.5 : 0;
     ctx.fillStyle = "#2aa8d8";
-    const swing = Math.sin(performance.now() / 60) * (Math.abs(player.vx) > 20 ? 4 : 0);
-    ctx.fillRect(-11, -8, 8, 8 + swing);
-    ctx.fillRect(3, -8, 8, 8 - swing);
+    ctx.beginPath();
+    ctx.ellipse(cx - 7, cy + ry - 1 + swing, 5, 3.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 7, cy + ry - 1 - swing, 5, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 
