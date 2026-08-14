@@ -134,7 +134,7 @@
     y: GROUND,
     w: 34,
     h: 40,
-    speed: 340,
+    speed: 560,
     vx: 0,
     lives: 3,
     invuln: 0,
@@ -292,7 +292,10 @@
 
     if (pointerX !== null) {
       const diff = pointerX - player.x;
-      player.vx = Math.max(-player.speed, Math.min(player.speed, diff * 8));
+      // dt で割ることで「1 フレームで届く距離」を上限速度まで出す。
+      // 行き過ぎて振動しないよう、残り距離ぶんに丸める。
+      const want = diff / dt;
+      player.vx = Math.max(-player.speed, Math.min(player.speed, want));
     } else {
       player.vx = dir * player.speed;
     }
