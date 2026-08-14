@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>game1 — ブラウザゲーム置き場</title>
+<meta name="description" content="ブラウザですぐ遊べる HTML5 ゲーム。ボムよけゲームと CHAIN BLAST。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="game1 — ブラウザゲーム置き場">
+<meta property="og:description" content="ブラウザですぐ遊べる HTML5 ゲーム。ボムよけゲームと CHAIN BLAST。">
+<meta property="og:image" content="https://otl.github.io/game1/assets/bomb-dodge.webp">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b1020'/><circle cx='16' cy='19' r='8' fill='%231d2438' stroke='%23ff5d5d' stroke-width='2'/><path d='M16 11 q3-3 5-5' stroke='%238a6a3c' stroke-width='2' fill='none'/><circle cx='21' cy='6' r='2.6' fill='%23ffd166'/></svg>">
+<style>
+  :root {
+    --bg: #0b1020;
+    --card: #141c33;
+    --line: #2b3866;
+    --text: #e9eefb;
+    --muted: #8f9ec9;
+    --accent: #ffcc4d;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(1100px 620px at 18% -12%, #1c2a55 0%, transparent 60%),
+      radial-gradient(900px 520px at 88% 4%, #2a1c46 0%, transparent 58%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, system-ui, -apple-system, sans-serif;
+    line-height: 1.7;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 56px 20px 72px;
+  }
+  header { margin-bottom: 40px; }
+  h1 {
+    margin: 0 0 10px;
+    font-size: clamp(30px, 6vw, 46px);
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+  }
+  h1 .dot { color: var(--accent); }
+  .lead {
+    margin: 0;
+    color: var(--muted);
+    font-size: clamp(14px, 2.4vw, 16px);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  @media (min-width: 720px) {
+    .grid { grid-template-columns: 1fr 1fr; gap: 26px; }
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #18213c 0%, var(--card) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-4px);
+    border-color: var(--glow, #4a5ea3);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--glow, #4a5ea3) inset;
+    outline: none;
+  }
+  .shot {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #080d1d;
+    border-bottom: 1px solid var(--line);
+  }
+  .shot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 12%;
+    display: block;
+  }
+  .shot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 55%, rgba(11, 16, 32, 0.85) 100%);
+  }
+  .body { padding: 18px 20px 22px; }
+  .card h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    color: var(--glow, var(--text));
+  }
+  .card p {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 16px;
+  }
+  .tags span {
+    font-size: 11.5px;
+    color: #cbd6f5;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #12182b;
+    background: var(--glow, var(--accent));
+    border-radius: 999px;
+    padding: 9px 18px;
+    align-self: flex-start;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 22px;
+    border-top: 1px solid #1e2947;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  footer a { color: #9fc7ff; }
+  @media (prefers-reduced-motion: reduce) {
+    .card { transition: none; }
+    .card:hover, .card:focus-visible { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>game1 <span class="dot">▸</span> ブラウザゲーム置き場</h1>
+    <p class="lead">インストール不要。クリックすればその場で遊べます（PC / スマホ対応）。</p>
+  </header>
+
+  <main class="grid">
+    <a class="card" style="--glow:#4dd0ff" href="bomb-dodge/">
+      <div class="shot">
+        <img src="assets/bomb-dodge.webp" width="720" height="554"
+             alt="ボムよけゲームの画面。星空を背景に爆弾が降り、下部で水色のキャラクターが跳んでいる" loading="lazy">
+      </div>
+      <div class="body">
+        <h2>ボムよけゲーム</h2>
+        <p>上から降ってくる爆弾を、左右移動とジャンプでよけ続ける。赤い爆弾は着地すると爆発するので、跳んでかわそう。</p>
+        <div class="tags">
+          <span>アクション</span><span>2段ジャンプ</span><span>アイテム5種</span><span>ハイスコア</span>
+        </div>
+        <span class="play">遊ぶ →</span>
+      </div>
+    </a>
+
+    <a class="card" style="--glow:#ff6ad5" href="chain-blast/">
+      <div class="shot">
+        <img src="assets/chain-blast.webp" width="560" height="998"
+             alt="CHAIN BLAST の画面。8×8 の盤面に紫・オレンジ・ピンクのブロックが並んでいる" loading="lazy">
+      </div>
+      <div class="body">
+        <h2>CHAIN BLAST</h2>
+        <p>ブロックブラスト風の 8×8 パズル。連鎖する特殊ブロック、コンボ倍率、パワーアップで駆け引きが増えている。</p>
+        <div class="tags">
+          <span>パズル</span><span>連鎖</span><span>コンボ倍率</span><span>パワーアップ</span>
+        </div>
+        <span class="play">遊ぶ →</span>
+      </div>
+    </a>
+  </main>
+
+  <footer>
+    ソースコードは <a href="https://github.com/OTL/game1">github.com/OTL/game1</a>。
+    各ゲームは依存ライブラリなしで動きます。
+  </footer>
+</div>
+</body>
+</html>

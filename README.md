@@ -1,6 +1,8 @@
 # game1
 
-ブラウザで遊べる HTML5 ゲーム置き場。各ゲームはそれぞれのディレクトリに入っています。
+ブラウザで遊べる HTML5 ゲーム置き場。GitHub Pages で公開しています。
+
+**▶ https://otl.github.io/game1/**
 
 | ゲーム | 内容 |
 | --- | --- |
@@ -10,9 +12,21 @@
 どちらも依存ライブラリなしで、各ディレクトリの `index.html` をブラウザで開くだけで遊べます。
 詳しい遊び方は各ディレクトリの README を参照してください。
 
+## 構成
+
 ```
-# ローカルサーバで開く場合（リポジトリのルートで）
+.
+├── index.html         … トップページ（ゲーム一覧）
+├── assets/            … トップページ用のスクリーンショット
+├── bomb-dodge/        … ボムよけゲーム
+└── chain-blast/       … CHAIN BLAST
+```
+
+`.nojekyll` を置いて Jekyll の処理を無効化し、静的ファイルをそのまま配信しています。
+
+## ローカルで開く
+
+```
 npx http-server -p 8080 .
-# → http://localhost:8080/bomb-dodge/
-# → http://localhost:8080/chain-blast/
+# → http://localhost:8080/
 ```
