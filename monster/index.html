@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>みんなでたまごっち — 世界でひとつのモンスターを育てる</title>
+<meta name="description" content="アクセスした人みんなで 1 匹のモンスターを育てる育成ゲーム。数値パラメータを伸ばして、進化させて、バトルに挑もう。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="みんなでたまごっち">
+<meta property="og:description" content="アクセスした人みんなで 1 匹のモンスターを育てる育成ゲーム。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b1020'/><ellipse cx='16' cy='19' rx='9' ry='10' fill='%23ffd166'/><circle cx='12' cy='17' r='2' fill='%232a2340'/><circle cx='20' cy='17' r='2' fill='%232a2340'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="titles">
+      <h1>みんなで<span>たまごっち</span></h1>
+      <p class="sub">アクセスした人みんなで、世界にひとつのモンスターを育てる</p>
+    </div>
+    <div class="topright">
+      <button class="chip" id="btn-who" type="button">👤 <span id="who-name">ななしさん</span></button>
+      <span class="chip status" id="sync-status" title="共有のしかたは README を見てね">ローカル</span>
+      <button class="chip" id="btn-help" type="button">？ あそびかた</button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ── 左：モンスター ────────────────────────────── -->
+    <section class="panel stage-panel">
+      <div class="season">
+        <span class="season-no">第 <b id="season-no">-</b> 世代</span>
+        <span class="season-left">つぎの世代まで <b id="season-left">-</b></span>
+      </div>
+
+      <div class="stage-wrap">
+        <canvas id="stage" width="640" height="480" aria-label="育てているモンスター"></canvas>
+        <div class="fx" id="fx-text"></div>
+      </div>
+
+      <div class="idcard">
+        <h2 id="mon-name">タマゴ</h2>
+        <div class="badges" id="mon-types"></div>
+        <div class="idmeta">
+          <span id="mon-cat">なぞの タマゴ</span>
+          <span>Lv.<b id="mon-level">1</b></span>
+          <span>うまれてから <b id="mon-age">-</b></span>
+        </div>
+        <div class="expbar"><i id="exp-fill"></i><span id="exp-text">0 / 0</span></div>
+      </div>
+
+      <div class="actions" id="actions">
+        <button class="act" data-act="feed">🍚<span>ごはん</span></button>
+        <button class="act" data-act="snack">🍰<span>おやつ</span></button>
+        <button class="act" data-act="play">🎾<span>あそぶ</span></button>
+        <button class="act" data-act="bath">🛁<span>おふろ</span></button>
+        <button class="act" data-act="sleep">💤<span>ねかす</span></button>
+        <button class="act" data-act="pet">✋<span>なでる</span></button>
+      </div>
+
+      <div class="train">
+        <div class="train-head">とっくん <small>げんきを 18 つかって パラメータを のばす</small></div>
+        <div class="train-btns">
+          <button class="tr" data-train="hp">たいりょく<b>+4</b></button>
+          <button class="tr" data-train="atk">こうげき<b>+4</b></button>
+          <button class="tr" data-train="def">ぼうぎょ<b>+4</b></button>
+          <button class="tr" data-train="spd">すばやさ<b>+4</b></button>
+        </div>
+      </div>
+
+      <div class="battle-btns">
+        <button class="big" id="btn-wild">⚔️ たびに でる</button>
+        <button class="big boss" id="btn-boss">👑 きょうの ぬしに いどむ</button>
+      </div>
+    </section>
+
+    <!-- ── 右：数字 ─────────────────────────────────── -->
+    <aside class="side">
+      <section class="panel">
+        <h3>ごきげん メーター</h3>
+        <div class="bars" id="bars"></div>
+        <p class="cond">コンディション <b id="cond-val">100%</b>
+          <small>おせわが行きとどくほど 数値が のびる</small></p>
+      </section>
+
+      <section class="panel">
+        <h3>ステータス</h3>
+        <table class="stats">
+          <tbody>
+            <tr><th>さいだい HP</th><td id="st-hp">-</td><td class="tr-val" id="tr-hp"></td></tr>
+            <tr><th>こうげき</th><td id="st-atk">-</td><td class="tr-val" id="tr-atk"></td></tr>
+            <tr><th>ぼうぎょ</th><td id="st-def">-</td><td class="tr-val" id="tr-def"></td></tr>
+            <tr><th>すばやさ</th><td id="st-spd">-</td><td class="tr-val" id="tr-spd"></td></tr>
+          </tbody>
+        </table>
+        <p class="hint" id="branch-hint"></p>
+        <div class="moves" id="moves"></div>
+      </section>
+
+      <section class="panel">
+        <h3>みんなの きろく</h3>
+        <div class="counters" id="counters"></div>
+        <h4>おせわ ランキング</h4>
+        <ol class="rank" id="rank"></ol>
+        <h4>さいきんの できごと</h4>
+        <ul class="log" id="log"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    <a href="../">← ほかのゲーム</a>
+    <span>ソース: <a href="https://github.com/OTL/game1">github.com/OTL/game1</a></span>
+  </footer>
+</div>
+
+<!-- ── バトル画面 ───────────────────────────────────── -->
+<div class="overlay" id="battle-overlay" hidden>
+  <div class="battle">
+    <canvas id="battle-canvas" width="720" height="400"></canvas>
+    <div class="bmsg" id="battle-msg">やせいの モンスターが あらわれた！</div>
+    <div class="bcmd" id="battle-cmd"></div>
+  </div>
+</div>
+
+<!-- ── あそびかた ──────────────────────────────────── -->
+<div class="overlay" id="help-overlay" hidden>
+  <div class="sheet">
+    <h2>あそびかた</h2>
+    <p><b>1 匹のモンスターを、アクセスした人みんなで育てます。</b>
+       種族・色・名前・進化さきは「世代番号」だけから決まるので、
+       同じ 7 日間にアクセスした人は、世界じゅうどこでも まったく同じコに会えます。</p>
+    <ul>
+      <li><b>時間でも育つ</b> — 経験値は 2 分に 1 ずつ自然に増えます。誰も来なくても、そのコは育っています。</li>
+      <li><b>おせわ</b> — ごはん・あそぶ・おふろ などで 4 つのメーターを保つ。低いままだと ステータスに補正がかかって弱くなります。</li>
+      <li><b>とっくん</b> — げんきを消費して たいりょく／こうげき／ぼうぎょ／すばやさ を +4。<b>いちばん伸ばした値で最終進化の姿が変わります。</b></li>
+      <li><b>しんか</b> — Lv.10 と Lv.26 で姿が変わります。タマゴは経験値 30 でかえります。</li>
+      <li><b>バトル</b> — タイプ相性ありのターン制。「きょうの ぬし」は日付から決まる強敵で、その日は世界共通の相手です。</li>
+      <li><b>7 日で世代交代</b> — シーズンが終わると、次のタマゴがやってきます。</li>
+    </ul>
+    <h3>ほかの人と ほんとうに共有するには</h3>
+    <p>この画面は静的サイトなので、既定では記録は <b>あなたのブラウザ（と、その別タブ）</b>に保存されます。
+       JSON を <code>GET</code> / <code>PUT</code> できる置き場の URL を下に入れると、そこを共有ノートにして
+       みんなの記録がひとつにまとまります。</p>
+    <div class="syncrow">
+      <input id="sync-url" type="url" placeholder="https://… (JSON を GET/PUT できる URL)" spellcheck="false">
+      <button id="sync-save" type="button">つなぐ</button>
+    </div>
+    <button class="close" id="help-close" type="button">とじる</button>
+  </div>
+</div>
+
+<script src="js/rng.js"></script>
+<script src="js/species.js"></script>
+<script src="js/sprite.js"></script>
+<script src="js/state.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
