@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1020">
+<title>おえかきスタジオ — 自由に絵が描けるお絵かきゲーム</title>
+<meta name="description" content="レイヤー・手ブレ補正・筆圧対応のブラウザお絵かきツール。お題チャレンジで遊べます。">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b1020'/><path d='M7 24c2-9 8-14 15-16' stroke='%234dd0ff' stroke-width='3.4' fill='none' stroke-linecap='round'/><path d='M9 25l-3 1 1-3z' fill='%23ffd166'/><circle cx='24' cy='8' r='3' fill='%23ff6ad5'/></svg>">
+</head>
+<body>
+
+<div id="app">
+
+  <header id="topbar">
+    <a class="tb-btn home" href="../" title="ゲーム一覧へ" aria-label="ゲーム一覧へ">←</a>
+    <span class="brand">おえかきスタジオ</span>
+    <span class="flex"></span>
+    <button class="tb-btn" id="btn-undo" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled>↶</button>
+    <button class="tb-btn" id="btn-redo" title="やり直す (Ctrl+Shift+Z)" aria-label="やり直す" disabled>↷</button>
+    <button class="tb-btn" id="btn-fit" title="全体表示" aria-label="全体表示">⤢</button>
+    <button class="tb-btn accent" id="btn-challenge" title="お題チャレンジ">🎯 <span class="lbl">お題</span></button>
+    <button class="tb-btn" id="btn-export" title="PNG で保存" aria-label="PNG で保存">💾</button>
+    <button class="tb-btn" id="btn-menu" title="メニュー" aria-label="メニュー">☰</button>
+  </header>
+
+  <div id="body">
+
+    <nav id="tools" aria-label="ツール">
+      <div class="tool-list" id="tool-list"></div>
+      <div class="zoom">
+        <button class="tool" id="btn-zoom-in" title="拡大" aria-label="拡大">＋</button>
+        <span id="zoom-label">100%</span>
+        <button class="tool" id="btn-zoom-out" title="縮小" aria-label="縮小">−</button>
+      </div>
+    </nav>
+
+    <main id="stage">
+      <canvas id="view"></canvas>
+      <div id="ring" hidden></div>
+      <div id="challenge-bar" hidden>
+        <span class="ch-theme" id="ch-theme">—</span>
+        <span class="ch-time" id="ch-time">0:00</span>
+        <button class="ch-give" id="ch-finish">できた！</button>
+      </div>
+      <div id="toast"></div>
+    </main>
+
+    <aside id="panel">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="brush" role="tab">ブラシ</button>
+        <button class="tab" data-tab="color" role="tab">色</button>
+        <button class="tab" data-tab="layer" role="tab">レイヤー</button>
+        <button class="tab-toggle" id="panel-toggle" aria-label="パネルの開閉">▾</button>
+      </div>
+
+      <div class="tab-body">
+
+        <section class="tab-pane active" data-pane="brush">
+          <div class="brush-preview"><canvas id="brush-preview" width="260" height="56"></canvas></div>
+
+          <label class="field">
+            <span class="field-head">太さ <b id="val-size">8</b> px</span>
+            <input type="range" id="in-size" min="1" max="200" value="8">
+          </label>
+
+          <label class="field">
+            <span class="field-head">不透明度 <b id="val-opacity">100</b>%</span>
+            <input type="range" id="in-opacity" min="1" max="100" value="100">
+          </label>
+
+          <label class="field">
+            <span class="field-head">手ブレ補正 <b id="val-stab">3</b></span>
+            <input type="range" id="in-stab" min="0" max="10" value="3">
+          </label>
+
+          <label class="field" id="field-tolerance" hidden>
+            <span class="field-head">塗りつぶしの許容値 <b id="val-tol">32</b></span>
+            <input type="range" id="in-tol" min="0" max="128" value="32">
+          </label>
+
+          <div class="field">
+            <span class="field-head">対称定規</span>
+            <div class="seg" id="seg-symmetry">
+              <button data-v="none" class="active">なし</button>
+              <button data-v="x">左右</button>
+              <button data-v="y">上下</button>
+              <button data-v="xy">4分割</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-pane" data-pane="color">
+          <div class="picker">
+            <canvas id="sv" width="240" height="180"></canvas>
+            <canvas id="hue" width="24" height="180"></canvas>
+          </div>
+          <div class="color-row">
+            <span class="swatch-current" id="current-color"></span>
+            <input type="text" id="hex" spellcheck="false" maxlength="7" aria-label="カラーコード">
+            <button class="mini" id="btn-bg">背景色に</button>
+          </div>
+          <div class="field">
+            <span class="field-head">パレット</span>
+            <div class="swatches" id="palette"></div>
+          </div>
+          <div class="field">
+            <span class="field-head">最近使った色</span>
+            <div class="swatches" id="recent"></div>
+          </div>
+        </section>
+
+        <section class="tab-pane" data-pane="layer">
+          <div class="layer-actions">
+            <button class="mini" id="ly-add">＋追加</button>
+            <button class="mini" id="ly-dup">複製</button>
+            <button class="mini" id="ly-up">▲</button>
+            <button class="mini" id="ly-down">▼</button>
+            <button class="mini" id="ly-merge">下と結合</button>
+            <button class="mini" id="ly-clear">中身を消す</button>
+            <button class="mini danger" id="ly-del">削除</button>
+          </div>
+          <label class="field">
+            <span class="field-head">レイヤーの不透明度 <b id="val-lyop">100</b>%</span>
+            <input type="range" id="in-lyop" min="0" max="100" value="100">
+          </label>
+          <div id="layer-list" class="layer-list"></div>
+        </section>
+
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- メニュー -->
+<div class="modal" id="modal-menu" hidden>
+  <div class="sheet">
+    <h2>メニュー</h2>
+    <button class="row-btn" id="mn-gallery">🖼️ ギャラリーを見る</button>
+    <button class="row-btn" id="mn-export">💾 PNG で保存する</button>
+    <button class="row-btn" id="mn-challenge">🎯 お題チャレンジ</button>
+    <button class="row-btn" id="mn-help">❓ 使い方 / ショートカット</button>
+    <button class="row-btn danger" id="mn-new">🗑️ 新しく描きなおす</button>
+    <button class="row-btn ghost" data-close>閉じる</button>
+  </div>
+</div>
+
+<!-- 使い方 -->
+<div class="modal" id="modal-help" hidden>
+  <div class="sheet">
+    <h2>使い方</h2>
+    <ul class="help">
+      <li>キャンバスをなぞるだけで描けます。ペンタブや Apple Pencil の<b>筆圧</b>に対応（マウス／指の場合は描く速さで太さが変わります）。</li>
+      <li><b>2 本指</b>でピンチすると拡大・縮小、そのまま動かすと移動。マウスはホイールで拡大、右ドラッグか中ドラッグで移動。</li>
+      <li><b>手ブレ補正</b>を上げると線がなめらかになります（ゆっくり描くとよく効きます）。</li>
+      <li><b>対称定規</b>を使うと左右・上下対称の絵が一気に描けます。</li>
+      <li><b>レイヤー</b>は 12 枚まで。線画と色を分けると塗りやすいです。</li>
+      <li>描いた絵は自動保存され、次に開いたときに続きから描けます。</li>
+    </ul>
+    <h3>ショートカット</h3>
+    <ul class="help">
+      <li><b>B</b> ペン / <b>N</b> 筆 / <b>P</b> 鉛筆 / <b>M</b> マーカー / <b>A</b> エアブラシ / <b>E</b> 消しゴム / <b>G</b> 塗りつぶし / <b>I</b> スポイト</li>
+      <li><b>[</b> <b>]</b> 太さ変更 / <b>Ctrl+Z</b> 元に戻す / <b>Ctrl+Shift+Z</b> やり直す / <b>Ctrl+S</b> 保存 / <b>Space+ドラッグ</b> 移動</li>
+    </ul>
+    <button class="row-btn ghost" data-close>閉じる</button>
+  </div>
+</div>
+
+<!-- お題チャレンジ開始 -->
+<div class="modal" id="modal-challenge" hidden>
+  <div class="sheet">
+    <h2>🎯 お題チャレンジ</h2>
+    <p class="note">ランダムなお題を、制限時間内に描ききるモードです。時間内に「できた！」を押すとボーナス。</p>
+    <div class="theme-box">
+      <span id="theme-text">—</span>
+      <button class="mini" id="theme-reroll">🎲 引き直す</button>
+    </div>
+    <div class="field">
+      <span class="field-head">制限時間</span>
+      <div class="seg" id="seg-time">
+        <button data-v="60">1分</button>
+        <button data-v="180" class="active">3分</button>
+        <button data-v="600">10分</button>
+        <button data-v="0">無制限</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="ch-fresh" checked> まっさらなキャンバスで始める</label>
+    <button class="row-btn accent" id="ch-start">スタート！</button>
+    <button class="row-btn ghost" data-close>やめる</button>
+  </div>
+</div>
+
+<!-- 結果 -->
+<div class="modal" id="modal-result" hidden>
+  <div class="sheet">
+    <h2 id="rs-title">できあがり！</h2>
+    <div class="result-shot"><img id="rs-img" alt="描いた絵"></div>
+    <div class="rank-row"><span class="rank" id="rs-rank">A</span><span id="rs-theme"></span></div>
+    <ul class="score-list" id="rs-scores"></ul>
+    <p class="comment" id="rs-comment"></p>
+    <button class="row-btn accent" id="rs-save">🖼️ ギャラリーに残す</button>
+    <button class="row-btn" id="rs-export">💾 PNG で保存</button>
+    <button class="row-btn ghost" data-close>閉じる（絵は消えません）</button>
+  </div>
+</div>
+
+<!-- ギャラリー -->
+<div class="modal" id="modal-gallery" hidden>
+  <div class="sheet wide">
+    <h2>🖼️ ギャラリー</h2>
+    <div class="gallery" id="gallery"></div>
+    <button class="row-btn ghost" data-close>閉じる</button>
+  </div>
+</div>
+
+<script src="js/color.js"></script>
+<script src="js/brushes.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/challenge.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
