@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>シルエットクイズ — 難しい</title>
+<meta name="description" content="回転・反転・拡大クロップされた真っ黒なシルエットが何かを当てる、かなり難しいクイズゲーム。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23f3ead7'/><path d='M9 24c0-6 3-11 7-11s7 5 7 11z' fill='%23111'/><circle cx='16' cy='9' r='4' fill='%23111'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- タイトル -->
+  <section id="startView" class="view start">
+    <h1>シルエットクイズ<span>難しい</span></h1>
+    <p class="lead">
+      まっ黒な影が何なのかを当てるゲーム。<br>
+      影は<strong>回転・反転・タテヨコの変形</strong>がかかったうえ、
+      最初は<strong>拡大されすぎて一部しか見えません</strong>。
+      時間が減るほどズームが引いて全体が見えてきますが、
+      早く答えるほど点は高い。
+    </p>
+    <p id="loading" class="loading">シルエットを準備中…</p>
+    <div id="levelBtns" class="levels" hidden>
+      <button type="button" data-level="normal">
+        <b>ふつう</b><small>12秒／回転すこし／ズーム1.7倍</small><span class="best"></span>
+      </button>
+      <button type="button" data-level="hard" class="primary">
+        <b>むずかしい</b><small>9秒／全方向回転・反転／ズーム2.8倍</small><span class="best"></span>
+      </button>
+      <button type="button" data-level="oni">
+        <b>鬼</b><small>7秒／変形つき／ズーム4.2倍／選択肢6・ライフ2</small><span class="best"></span>
+      </button>
+    </div>
+    <ul class="tips">
+      <li>選択肢は<strong>わざと似たものが並びます</strong>（ネコの問題にはイヌ・キツネ・オオカミ）。</li>
+      <li><b>ヒント</b>を押すと即座に全体が見えますが、得点は半分。</li>
+      <li>キーボードの <kbd>1</kbd>〜<kbd>6</kbd> で回答、<kbd>H</kbd> でヒント。</li>
+    </ul>
+    <p class="home"><a href="../">← ゲーム一覧へ</a></p>
+  </section>
+
+  <!-- ゲーム -->
+  <section id="gameView" class="view game" hidden>
+    <div class="hud">
+      <div class="stat"><span class="k">スコア</span><span class="v" id="score">0</span></div>
+      <div class="stat"><span class="k">コンボ</span><span class="v" id="combo">—</span></div>
+      <div class="stat"><span class="k">ライフ</span><span class="v hearts" id="lives"></span></div>
+      <div class="stat"><span class="k">問題</span><span class="v" id="progress">1 / 10</span></div>
+      <button type="button" id="quitBtn" class="ghost">やめる</button>
+    </div>
+
+    <div class="timeTrack"><div class="timeBar" id="timeBar"></div></div>
+
+    <div class="stageWrap">
+      <canvas id="stage" width="460" height="460" aria-label="シルエット"></canvas>
+      <div class="feedback" id="feedback" hidden></div>
+    </div>
+
+    <div class="choices" id="choices"></div>
+    <button type="button" id="hintBtn" class="hint">ヒント：全体を見る（得点半分）</button>
+  </section>
+
+  <!-- リザルト -->
+  <section id="resultView" class="view result" hidden>
+    <h2>リザルト</h2>
+    <p id="newBest" class="newBest" hidden>★ ハイスコア更新！</p>
+    <p class="bigScore"><span id="resultScore">0</span><small>点</small></p>
+    <p class="best2">ベスト <span id="resultBest">0</span></p>
+    <p class="detail" id="resultDetail"></p>
+    <h3>まちがえた問題</h3>
+    <ul class="missList" id="missList"></ul>
+    <div class="resultBtns">
+      <button type="button" id="retryBtn" class="primary">もう一度</button>
+      <button type="button" id="backBtn" class="ghost">難易度を選び直す</button>
+    </div>
+    <p class="home"><a href="../">← ゲーム一覧へ</a></p>
+  </section>
+
+</div>
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
