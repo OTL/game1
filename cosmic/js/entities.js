@@ -10,9 +10,30 @@ function randomBodyName(rng) {
   return NAME_PARTS_A[(rng() * NAME_PARTS_A.length) | 0] + NAME_PARTS_B[(rng() * NAME_PARTS_B.length) | 0];
 }
 
-/* 質量→半径 (立方根スケール。見やすさのため係数調整) */
+/* 質量→半径 (立方根スケール。見やすさのため係数調整)。
+ * 破片など、常に小さい質量の対象にのみ使う近似式。 */
 function massToRadius(mass) {
   return 6 * Math.pow(Math.max(mass, 0.4), 1 / 3);
+}
+
+/* 実機フィードバック対応（第2回・サイズ分布の再設計）: 敵の表示半径は、
+ * massToRadius（質量の単純な立方根）ではなく、STAGES（進化段階）のradiusBaseを
+ * 使ってプレイヤーの playerRadius() と全く同じ方法で決める。
+ *
+ * 根本原因: これまで敵の半径は massToRadius(mass) = 6*mass^(1/3) で計算していたが、
+ * この式は序盤の小さい質量（〜数百）でしか意図した見た目にならず、終盤の質量（数百万〜
+ * 一千万超）ではプレイヤー自身の半径（STAGES.radiusBaseで意図的に小さく抑えられている）
+ * を大きく超える異常な値（1000px超のワールド半径）になっていた。同じ質量でも
+ * プレイヤーと敵とで見た目のスケールが一致しておらず、「敵は常に自分よりデカく見える」
+ * 体感の直接の原因だった。この関数はプレイヤーと全く同じSTAGESベースの補間を使うことで、
+ * 同じ質量なら同じ見た目の大きさになることを保証する。 */
+function enemyVisualRadius(mass) {
+  const idx = stageIndexForMass(mass);
+  const stage = STAGES[idx];
+  const nextStage = STAGES[Math.min(idx + 1, STAGES.length - 1)];
+  const span = Math.max(nextStage.mass - stage.mass, 1);
+  const t = idx >= STAGES.length - 1 ? 1 : Math.min(1, Math.max(0, (mass - stage.mass) / span));
+  return stage.radiusBase * (0.85 + t * 0.3);
 }
 
 const ENEMY_PALETTES = {
@@ -61,7 +82,7 @@ function makeEnemyBody(kind, mass, x, y, rng) {
     mass,
     hp: mass,
     maxHp: mass,
-    radius: massToRadius(mass),
+    radius: enemyVisualRadius(mass),
     angle: rng() * Math.PI * 2,
     spin: (rng() - 0.5) * (hostile ? 0.7 : 0.32),
     // タンブリング用の不規則な角速度ゆらぎ（非等速回転）
@@ -78,6 +99,7 @@ function makeEnemyBody(kind, mass, x, y, rng) {
     tailPhase: rng() * 10,
     hitFlash: 0,
     despawnTimer: 0,
+    mergeCooldown: 0,
   };
 }
 
@@ -230,8 +252,8 @@ const GRAV_MAX_ACCEL = 900;      // 極端なスイングバイで暴れない�
 const ENEMY_GRAV_CONST = 5.2;    // 敵同士の簡易相互重力
 const ENEMY_GRAV_RANGE = 260;    // 敵同士の重力を計算する近傍半径
 
-function applyPlayerGravity(enemies, player, dt) {
-  const gm = GRAV_CONST * player.mass;
+function applyPlayerGravity(enemies, player, dt, gravityMult) {
+  const gm = GRAV_CONST * player.mass * (gravityMult || 1);
   for (let i = 0; i < enemies.length; i++) {
     const e = enemies[i];
     if (!e.alive) continue;
@@ -253,15 +275,23 @@ function applyPlayerGravity(enemies, player, dt) {
  *
  * 実機フィードバック対応: 敵同士の合体を無制限に繰り返すと、1体がどんどん肥大化して
  * 「画面全体を覆う巨大なボケた敵」になってしまう（分裂ではなく合体の連鎖が原因だった）。
- * これを防ぐため、敵1体の質量は常に `player.mass * BALANCE.enemyMassCapMult` を超えない
- * ようにクランプする。上限に達した後の衝突は、超過分を質量として取り込まずその場で
- * 破片化する（吸収する側にとってもメリットが残る）。 */
-function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng, dt, onDestroyed, player) {
+ * これを防ぐため、敵1体の質量（＝戦闘力）は常に `player.mass * BALANCE.enemyMassCapMult`
+ * を超えないようにクランプする。上限に達した後の衝突は、超過分を質量として取り込まず
+ * その場で破片化する（吸収する側にとってもメリットが残る）。
+ * 表示半径は enemyVisualRadius（STAGESベース、プレイヤーと同じ補間）で質量から求めた上で、
+ * さらに screenRadiusCap（画面短辺の40%相当のワールド半径）でもクランプする。質量と半径を
+ * 分離しているため、「戦闘力の上限」と「見た目の上限」を別々に安全に制御できる。
+ * 実機フィードバック対応（第2回）: 合体そのものの「頻度」も抑える。合体した直後の
+ * 個体には一定時間 `mergeCooldown` を設け、クールダウン中は合体させず反発だけさせる
+ * ことで、同じ個体が連鎖的に肥大化し続けることを防ぐ。 */
+function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng, dt, onDestroyed, player, screenRadiusCap) {
   const n = enemies.length;
   const massCap = player ? Math.max(1, player.mass * BALANCE.enemyMassCapMult) : Infinity;
+  const MERGE_COOLDOWN_SEC = 4.5;
   for (let i = 0; i < n; i++) {
     const a = enemies[i];
     if (!a.alive) continue;
+    if (a.mergeCooldown > 0) a.mergeCooldown -= dt;
     for (let j = i + 1; j < n; j++) {
       const b = enemies[j];
       if (!b.alive) continue;
@@ -271,9 +301,20 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
       const r = Math.sqrt(r2) || 1;
       const sumR = a.radius + b.radius;
       if (r < sumR * 0.92) {
-        // 衝突: 大きい方が生き残り、小さい方は破壊されて破片化（運動量保存）
         const big = a.mass >= b.mass ? a : b;
         const small = a.mass >= b.mass ? b : a;
+        // 合体クールダウン中、またはすでに上限質量に達している場合は合体させず、
+        // 反発（めり込み解消）だけ行って離す（合体の頻度・連鎖を抑制する）。
+        if (big.mergeCooldown > 0 || big.mass >= massCap - 0.01) {
+          const nx = dx / r, ny = dy / r;
+          const push = (sumR * 0.92 - r) * 0.5;
+          a.x -= nx * push * (small === a ? 1.4 : 0.6);
+          a.y -= ny * push * (small === a ? 1.4 : 0.6);
+          b.x += nx * push * (small === b ? 1.4 : 0.6);
+          b.y += ny * push * (small === b ? 1.4 : 0.6);
+          continue;
+        }
+        // 衝突: 大きい方が生き残り、小さい方は破壊されて破片化（運動量保存）
         const totalVx = (a.vx * a.mass + b.vx * b.mass) / (a.mass + b.mass);
         const totalVy = (a.vy * a.mass + b.vy * b.mass) / (a.mass + b.mass);
         let gainedMass = small.mass * 0.4;
@@ -284,9 +325,10 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
           big.mass += gainedMass;
           big.maxHp += gainedMass;
           big.hp = Math.min(big.maxHp, big.hp + gainedMass);
-          big.radius = massToRadius(big.mass);
+          big.radius = Math.min(enemyVisualRadius(big.mass), screenRadiusCap || Infinity);
         }
         big.vx = totalVx; big.vy = totalVy;
+        big.mergeCooldown = MERGE_COOLDOWN_SEC;
         small.alive = false;
         // 質量上限を超えた分（+ 直接吸収されなかった残り）は破片として放出する。
         // 破片は敵化しない（分裂の連鎖を作らない）ため、これ以上の個体数増加は起きない。
