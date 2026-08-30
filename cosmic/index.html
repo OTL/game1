@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05040f">
+<title>コズミック・イーター — 宇宙成長ゲーム</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2305040f'/><circle cx='16' cy='16' r='9' fill='%23120a24'/><circle cx='16' cy='16' r='9' fill='none' stroke='%239b6bff' stroke-width='1.5'/><circle cx='16' cy='16' r='4' fill='%23000'/></svg>">
+</head>
+<body>
+
+<canvas id="game-canvas"></canvas>
+
+<!-- ===== HUD ===== -->
+<div id="hud">
+  <div id="hud-top">
+    <div id="stage-badge">
+      <span id="stage-name">岩石片</span>
+      <span id="stage-level">Lv <b id="hud-level">1</b></span>
+    </div>
+    <div id="bars">
+      <div class="bar hp-bar"><i id="hp-fill"></i><span id="hp-text">30/30</span></div>
+      <div class="bar mass-bar"><i id="mass-fill"></i><span id="mass-text">質量 1</span></div>
+    </div>
+    <div id="hud-time">⏱ <span id="play-time">00:00</span></div>
+  </div>
+
+  <div id="lockon" class="hidden">
+    <div class="lockon-name" id="lockon-name">-</div>
+    <div class="lockon-bar"><i id="lockon-fill"></i></div>
+    <div class="lockon-sub" id="lockon-sub"></div>
+  </div>
+
+  <div id="upgrade-list" aria-label="取得アップグレード"></div>
+
+  <button id="btn-menu" title="メニュー" aria-label="メニュー">☰</button>
+</div>
+
+<!-- ===== レベルアップ カード選択 ===== -->
+<div id="levelup-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2>進化の選択</h2>
+    <p class="modal-sub">レベルアップ！ 強化を1つ選んでください</p>
+    <div id="cards" class="cards"></div>
+  </div>
+</div>
+
+<!-- ===== タイトル画面 ===== -->
+<div id="title-screen" class="modal">
+  <div class="modal-inner title-inner">
+    <h1>コズミック・イーター</h1>
+    <p class="title-desc">岩のかけらから始まり、あらゆる天体を喰らい、<br>やがてブラックホールとなれ。</p>
+    <div class="title-buttons">
+      <button id="btn-continue" class="btn btn-primary hidden">つづきから</button>
+      <button id="btn-newgame" class="btn btn-ghost">はじめから</button>
+    </div>
+    <p class="title-hint">マウスドラッグ / タッチで移動。小さな天体に体当たりして吸収しよう。</p>
+  </div>
+</div>
+
+<!-- ===== メニュー(一時停止) ===== -->
+<div id="pause-modal" class="modal hidden">
+  <div class="modal-inner">
+    <h2>メニュー</h2>
+    <div class="pause-buttons">
+      <button id="btn-resume" class="btn btn-primary">つづける</button>
+      <button id="btn-restart-confirm" class="btn btn-ghost">はじめからやり直す</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 死亡トースト ===== -->
+<div id="death-toast" class="toast hidden"></div>
+
+<!-- ===== クリア（リザルト） ===== -->
+<div id="result-screen" class="modal hidden">
+  <div class="modal-inner result-inner">
+    <h2>宇宙の終着点 — ブラックホール誕生</h2>
+    <p class="modal-sub">すべてを飲み込む存在になった。</p>
+    <div class="result-stats">
+      <div><span>総プレイ時間</span><b id="res-time">00:00</b></div>
+      <div><span>吸収した天体</span><b id="res-count">0</b></div>
+      <div><span>最終質量</span><b id="res-mass">0</b></div>
+      <div><span>到達レベル</span><b id="res-level">1</b></div>
+    </div>
+    <button id="btn-result-restart" class="btn btn-primary">もう一度あそぶ</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/render.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/save.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
