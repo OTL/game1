@@ -29,6 +29,15 @@
     lockonTarget: null,
     dmgAgg: new Map(),   // 同一対象への連続ヒットを合算して表示するための集計（enemy uid / 'player' / 'gain'）
     missCooldown: 0,
+    // 実機フィードバック対応（第2回・サイズ分布の再設計）: 敵のスポーン基準質量は
+    // プレイヤーの実際の質量に瞬時に追従させず、緩やかに遅れて追いつく別変数として保持する。
+    // これにより「進化直後に敵が一斉に強くなる」体感を防ぐ。質量は指数的に増え続けるため、
+    // 生の質量ではなく対数（log(mass)）をEMAで平滑化する（質量そのものを平滑化すると、
+    // 終盤の急成長期に敵が置き去りになり、ratioが際限なく0へ近づいてしまうことを
+    // 実機テストで確認したため）。log空間での平滑化は、質量の成長率が一定なら
+    // 「プレイヤー質量に対する敵基準質量の比」が一定値に収束する扱いやすい性質を持つ。
+    enemyScaleMass: BALANCE.startMass,
+    enemyScaleLogMass: Math.log(BALANCE.startMass),
   };
 
   const CONTACT_DPS = 20;      // 基準戦闘ダメージ/秒（同質量同士）
@@ -96,17 +105,34 @@
     return 'asteroid';
   }
 
-  /* 敵1体の質量倍率。実機フィードバック対応: 「脅威」枠の上限を
-   * BALANCE.enemyMassCapMult に固定し、プレイヤーの何倍も巨大な敵（画面を覆う
-   * ボケた球）が生成されないようにする。この上限は敵同士の合体後の質量にも
-   * updateEnemyMutualGravityAndCollisions 側で同様に適用している。 */
-  function rollEnemyMass(player) {
+  /* 敵1体の質量倍率。実機フィードバック対応（第2回・サイズ分布の再設計）:
+   * 「大半（7〜8割）は自分より小さい餌、2割前後は同格〜やや大きい、明確に大きい
+   * 脅威は近傍に同時1〜2体まで」という目標分布に沿って抽選する。基準質量には
+   * 実際のプレイヤー質量ではなく、緩やかに遅れて追従する `scaleMass`
+   * （state.enemyScaleMass）を使うことで、進化直後に敵が一斉に強くなる体感を防ぐ。
+   * 画面占有率の上限（screenRadiusCapFor）は表示半径（enemyVisualRadius）側で
+   * 別途クランプする（trySpawnEnemies・updateEnemyMutualGravityAndCollisions参照）。 */
+  function rollEnemyMass(scaleMass, forceNonThreat) {
     const r = rng();
     let mult;
-    if (r < 0.55) mult = 0.12 + rng() * 0.6;      // 小さめ・餌
-    else if (r < 0.85) mult = 0.75 + rng() * 0.6;  // 拮抗
-    else mult = 1.4 + rng() * (BALANCE.enemyMassCapMult - 1.4); // 脅威（上限つき）
-    return Math.max(0.3, player.mass * mult);
+    if (forceNonThreat || r < BALANCE.preyChance) {
+      mult = BALANCE.preyMassMultRange[0] + rng() * (BALANCE.preyMassMultRange[1] - BALANCE.preyMassMultRange[0]);
+    } else if (r < BALANCE.preyChance + BALANCE.evenChance) {
+      mult = BALANCE.evenMassMultRange[0] + rng() * (BALANCE.evenMassMultRange[1] - BALANCE.evenMassMultRange[0]);
+    } else {
+      mult = BALANCE.threatMassMultRange[0] + rng() * (BALANCE.threatMassMultRange[1] - BALANCE.threatMassMultRange[0]);
+    }
+    const mass = Math.max(0.3, scaleMass * mult);
+    return Math.min(mass, scaleMass * BALANCE.enemyMassCapMult);
+  }
+
+  /* 近傍の敵1体が画面短辺に対して占めてよい直径の割合（BALANCE.maxEnemyScreenFrac）
+   * から求めたワールド半径の上限。カメラのズームが変わっても、常に「画面を覆う
+   * 巨大な敵」の表示半径そのものをこの値でクランプする（enemyVisualRadiusと組み合わせて
+   * 使う。質量そのものは戦闘バランス用に別途 enemyMassCapMult でクランプする）。 */
+  function screenRadiusCapFor() {
+    const shortSide = Math.min(renderer.w, renderer.h);
+    return (shortSide * BALANCE.maxEnemyScreenFrac * 0.5) / Math.max(0.05, state.camera.zoom);
   }
 
   function spawnRadiusFor(player) {
@@ -121,6 +147,15 @@
     return n;
   }
 
+  /* プレイヤー近傍に居る「脅威」（質量がプレイヤーのBALANCE.threatRatioThreshold倍以上）の数。
+   * 目標分布「脅威は同時に1〜2体まで」を維持するための判定に使う。 */
+  function nearThreatCount(player, radius) {
+    let n = 0;
+    const th = player.mass * BALANCE.threatRatioThreshold;
+    for (const e of state.enemies) if (e.alive && e.mass >= th && dist(e, player) < radius) n++;
+    return n;
+  }
+
   function trySpawnEnemies(player) {
     const maxEnemies = BALANCE.maxEnemies;
     if (state.enemies.length >= maxEnemies) return;
@@ -128,19 +163,26 @@
     // 画面内密度の上限: 近傍に既に十分な数がいる場合はスポーンを控える
     // （分裂・合体の連鎖と合わせて「画面が敵で埋まる」ことを防ぐ）。
     if (nearEnemyCount(player, spawnR * 0.65) >= BALANCE.nearViewSoftCap) return;
+    const radiusCap = screenRadiusCapFor();
     const tries = 2;
     for (let i = 0; i < tries && state.enemies.length < maxEnemies; i++) {
       const kind = pickEnemyKind(player);
-      const mass = rollEnemyMass(player);
+      // 近傍にすでに「脅威」枠が上限数いる場合は、今回のスポーンは強制的に
+      // 非脅威（餌寄り）にロールし直す（目標分布: 脅威は同時1〜2体まで）。
+      const threatsNear = nearThreatCount(player, spawnR * 0.85);
+      const forceNonThreat = threatsNear >= BALANCE.maxThreatsNear;
+      const mass = rollEnemyMass(state.enemyScaleMass, forceNonThreat);
       // 質量比が大きい「脅威」個体ほど、外周寄りの遠い位置にのみスポーンさせる。
       // ＝ プレイヤーより大幅に大きい敵は近接遭遇せず「遠くの存在」として現れる。
       const threatRatio = mass / player.mass;
-      const farBias = threatRatio > 1.4 ? 0.78 : 0.55;
+      const farBias = threatRatio > 1.4 ? 0.68 : 0.5;
       const ang = rng() * Math.PI * 2;
       const r = spawnR * (farBias + rng() * (0.98 - farBias));
       const x = player.x + Math.cos(ang) * r;
       const y = player.y + Math.sin(ang) * r;
       const body = makeEnemyBody(kind, mass, x, y, rng);
+      // 画面短辺の40%を超える表示半径にはしない（近接に巨大な敵を出さない安全弁）。
+      if (body.radius > radiusCap) body.radius = radiusCap;
       if (kind === 'planet' && rng() < 0.35) body.hasRing = true;
       if (kind === 'comet') {
         // 彗星は速めに視界を横切らせる: プレイヤー付近を通過する直線的な高速軌道
@@ -164,14 +206,22 @@
   }
 
   /* ---------- 戦闘処理 ---------- */
+  const CRIT_MULTIPLIER = 2.2; // 「核融合暴走」発動時のダメージ倍率（説明文と一致させる）
+
   function offenseMultiplier(player, speedRatio) {
     let mult = 1;
     mult += upVal('rings', upLevel(player, 'rings')) / 100;
-    const critLv = upLevel(player, 'critical');
-    if (critLv > 0) mult *= 1 + (upVal('critical', critLv) / 100) * 1.2;
     const ramLv = upLevel(player, 'ramspeed');
     if (ramLv > 0) mult += (upVal('ramspeed', ramLv) / 100) * speedRatio;
-    return mult;
+    // 核融合暴走: 説明文どおり「%の確率でダメージが2.2倍」になる確率発動のクリティカル
+    // （以前は確率ではなく常時わずかに加算される別物の効果になっていたため修正）。
+    const critLv = upLevel(player, 'critical');
+    let isCrit = false;
+    if (critLv > 0 && rng() * 100 < upVal('critical', critLv)) {
+      mult *= CRIT_MULTIPLIER;
+      isCrit = true;
+    }
+    return { mult, isCrit };
   }
 
   function creditMass(player, amount, x, y) {
@@ -227,6 +277,18 @@
   }
 
   function damageEnemy(enemy, amount, player) {
+    // 溶岩惑星: 与えたダメージ（実際に削れたHP分。オーバーキル分は含めない）の
+    // 一定割合を自分の質量に変換する。以前は即吸収時のみの特殊処理だったが、
+    // 説明文「与えたダメージの%を自分の質量に変換する」に合わせ、あらゆる
+    // ダメージ源（接触・波動・衛星など）に一律で効くようにした。
+    const lavaLv = upLevel(player, 'lava');
+    if (lavaLv > 0) {
+      const realDealt = Math.min(amount, Math.max(0, enemy.hp));
+      if (realDealt > 0) {
+        const bonus = creditMass(player, realDealt * (upVal('lava', lavaLv) / 100), enemy.x, enemy.y);
+        if (bonus > 0.15) queueFloat('player-gain', enemy.x, enemy.y + 12, bonus, '#ff9a5c');
+      }
+    }
     enemy.hp -= amount;
     enemy.hitFlash = 0.25;
     queueFloat('enemy-' + enemy.uid, enemy.x, enemy.y - enemy.radius - 14, amount, '#ffd9a0');
@@ -262,12 +324,7 @@
     const ratio = effMass / enemy.mass;
 
     if (ratio >= INSTAKILL_RATIO) {
-      const dealt = enemy.hp;
-      let bonus = 0;
-      const lavaLv = upLevel(player, 'lava');
-      if (lavaLv > 0) bonus = creditMass(player, dealt * (upVal('lava', lavaLv) / 100), enemy.x, enemy.y);
-      damageEnemy(enemy, dealt * 99, player);
-      if (bonus > 0) showFloat(enemy.x, enemy.y + 12, '熔解 +' + fmtMass(bonus), '#ff9a5c');
+      damageEnemy(enemy, enemy.hp * 99, player);
     } else if (ratio <= 1 / INSTAKILL_RATIO) {
       // 押し返し
       const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
@@ -277,10 +334,11 @@
       applyPlayerDamage(player, dmg);
     } else {
       // 拮抗した戦闘
-      const mult = offenseMultiplier(player, speedRatio);
-      const dmgToEnemy = CONTACT_DPS * ratio * mult * dt;
+      const off = offenseMultiplier(player, speedRatio);
+      const dmgToEnemy = CONTACT_DPS * ratio * off.mult * dt;
       const dmgToPlayer = CONTACT_DPS / ratio * dt;
       damageEnemy(enemy, dmgToEnemy, player);
+      if (off.isCrit) showFloat(enemy.x, enemy.y - enemy.radius - 26, '会心!', '#ffe066');
       applyPlayerDamage(player, dmgToPlayer);
       const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
       enemy.x -= nx * 30 * dt; enemy.y -= ny * 30 * dt;
@@ -306,6 +364,10 @@
     player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
     state.enemies = [];
     state.fragments.length = 0;
+    // 死亡直後は敵のスポーン基準質量も即座に新しい（低い）質量へ合わせる。
+    // これをしないと、追従が遅れたままの高い基準値で敵がスポーンし続けてしまう。
+    state.enemyScaleMass = player.mass;
+    state.enemyScaleLogMass = Math.log(Math.max(1e-6, player.mass));
     showToast('力尽きた… 「' + currentStage(player).name + '」の始まりからやり直す。');
     saveGame(player);
   }
@@ -524,7 +586,7 @@
       if (e.isHostile) {
         e.aiTimer -= dt;
         const d = dist(e, player);
-        const aggroR = 620 + upVal('sense', upLevel(player, 'sense')) * 0; // 索敵範囲は敵固定（sense はプレイヤー側情報のみ）
+        const aggroR = 620; // 敵の索敵範囲は固定（プレイヤー側の「重力感知」はロックオン・警戒表示にのみ作用する）
         if (d < aggroR && e.mass < player.mass * INSTAKILL_RATIO * 1.3) {
           // 弱いなら逃げる、強ければ追う
           const flee = e.mass < player.mass ? -1 : 1;
@@ -574,13 +636,19 @@
         pulseDamage(player, playerRadius(player) * 6, upVal('stormfield', stormLv), '#ffd18f', true);
       }
     }
-    // 太陽フレア
+    // 太陽フレア: 説明文どおり「進行方向へ扇状」に放つ（全方位のpulseDamageではなく、
+    // cmeより広い扇形のconeDamageを使う）。
     const flareLv = upLevel(player, 'flare');
     if (flareLv > 0) {
       fx.flareTimer -= dt;
       if (fx.flareTimer <= 0) {
         fx.flareTimer = 5;
-        pulseDamage(player, playerRadius(player) * 7, upVal('flare', flareLv), '#ffb15c');
+        coneDamage(player, playerRadius(player) * 8, upVal('flare', flareLv), 1.05);
+        const dir = Math.hypot(player.vx, player.vy) > 5 ? Math.atan2(player.vy, player.vx) : player.angle;
+        for (let i = -3; i <= 3; i++) {
+          const a = dir + i * 0.15;
+          state.particles.spawn({ x: player.x, y: player.y, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, size: 4, color: '#ffb15c', life: 0.4 });
+        }
       }
     }
     // コロナ質量放出
@@ -646,9 +714,17 @@
       s.x = player.x + Math.cos(s.angle) * pr * s.dist;
       s.y = player.y + Math.sin(s.angle) * pr * s.dist;
       const dmg = s.kind === 'binary' ? upVal('binary', upLevel(player, 'binary')) : upVal('moon', upLevel(player, 'moon')) * 4;
+      const pullRange = s.kind === 'binary' ? pr * 4.5 : 0;
       for (const e of state.enemies) {
         if (!e.alive) continue;
-        if (dist(s, e) < e.radius + 8) damageEnemy(e, dmg * dt * 3, player);
+        const d = dist(s, e);
+        if (d < e.radius + 8) damageEnemy(e, dmg * dt * 3, player);
+        // 伴星: 説明文どおり周囲の敵を弱く引き寄せる引力を持つ（弱い敵のみ、強い敵には効かない）
+        if (pullRange > 0 && d < pullRange && d > 1 && e.mass < player.mass * 0.8) {
+          const nx = (s.x - e.x) / d, ny = (s.y - e.y) / d;
+          const pull = 70 * (1 - d / pullRange);
+          e.vx += nx * pull * dt; e.vy += ny * pull * dt;
+        }
       }
     }
     // 捕獲した天体
@@ -718,7 +794,8 @@
     if (player.tailTrail.length > 60) player.tailTrail.splice(0, player.tailTrail.length - 60);
   }
 
-  function coneDamage(player, range, dmg) {
+  function coneDamage(player, range, dmg, halfAngle) {
+    halfAngle = halfAngle || 0.6;
     const dir = Math.hypot(player.vx, player.vy) > 5 ? Math.atan2(player.vy, player.vx) : player.angle;
     for (const e of state.enemies) {
       if (!e.alive) continue;
@@ -727,7 +804,7 @@
       const ang = Math.atan2(e.y - player.y, e.x - player.x);
       let diff = Math.abs(ang - dir);
       if (diff > Math.PI) diff = Math.PI * 2 - diff;
-      if (diff < 0.6) damageEnemy(e, dmg, player);
+      if (diff < halfAngle) damageEnemy(e, dmg, player);
     }
   }
 
@@ -743,17 +820,38 @@
     return dist(player, target) <= captureRangeFor(player);
   }
 
+  /* 重力感知アップグレードの範囲（ロックオンパネルの有効距離、および画面外の
+   * 強大な敵を警戒表示する距離）。sense のレベルに応じて拡大する。 */
+  function senseRangeFor(player) {
+    const bonus = upVal('sense', upLevel(player, 'sense')) / 100;
+    return 900 * (1 + bonus);
+  }
+
   function updateLockonUI(player) {
     let nearest = null, nd = Infinity;
+    const senseR = senseRangeFor(player);
+    let nearestThreat = null, ntd = Infinity;
+    const threatMassTh = player.mass * BALANCE.threatRatioThreshold;
     for (const e of state.enemies) {
       if (!e.alive) continue;
       const d = dist(player, e);
       if (d < nd) { nd = d; nearest = e; }
+      // 重力感知: 画面外にいる強大な敵（脅威）を警戒表示するための最近接個体を探す
+      if (e.mass >= threatMassTh && d < ntd && d <= senseR) { ntd = d; nearestThreat = e; }
     }
     state.lockonTarget = nearest;
+    // 画面内にすでに見えている脅威は警戒表示の対象外（見えているので警戒の意味がない）
+    if (nearestThreat) {
+      const sp = renderer.worldToScreen(state.camera, nearestThreat.x, nearestThreat.y);
+      const margin = 80;
+      const onScreen = sp.x > -margin && sp.x < renderer.w + margin && sp.y > -margin && sp.y < renderer.h + margin;
+      state.distantThreat = onScreen ? null : nearestThreat;
+    } else {
+      state.distantThreat = null;
+    }
     const panel = $('lockon');
     const captureEl = $('btn-capture');
-    if (!nearest || nd > 900) {
+    if (!nearest || nd > senseR) {
       panel.classList.add('hidden');
       captureEl.classList.add('hidden');
       return;
@@ -835,24 +933,23 @@
   }
 
   /* ---------- メインループ ---------- */
-  function step(ts) {
-    if (!state.running) return;
-    requestAnimationFrame(step);
-    let dt = state.lastTs ? (ts - state.lastTs) / 1000 : 0;
-    state.lastTs = ts;
-    dt = Math.min(dt, 0.05);
-
-    const player = state.player;
-
+  /* 1フレーム分のゲームロジック更新（rAFベースのstep()から呼び出す）。 */
+  function updateFrame(player, dt) {
     if (!state.paused && !state.cleared) {
       player.playTime += dt;
+      // 敵のスポーン基準質量を、実際のプレイヤー質量へ緩やかに（遅れて）追従させる（log空間で平滑化）。
+      state.enemyScaleLogMass += (Math.log(Math.max(1e-6, player.mass)) - state.enemyScaleLogMass) * Math.min(1, dt / BALANCE.enemyScaleLagSeconds);
+      state.enemyScaleMass = Math.exp(state.enemyScaleLogMass);
       const speedRatio = updatePlayerMovement(player, dt);
+      state.speedRatio = speedRatio;
       trySpawnEnemies(player);
       despawnFarEnemies(player);
-      applyPlayerGravity(state.enemies, player, dt);
+      // 重力波アップグレード: 敵にも破片と同様に強く働く重力（説明文の「敵と破片を引き寄せる」を実装）
+      const gwaveMult = 1 + upVal('gwave', upLevel(player, 'gwave')) / 100;
+      applyPlayerGravity(state.enemies, player, dt, gwaveMult);
       updateEnemyMutualGravityAndCollisions(state.enemies, state.fragments, null, rng, dt, (small, big) => {
         renderer.addShake(clamp(small.mass / Math.max(1, player.mass) * 2, 0.5, 4));
-      }, player);
+      }, player, screenRadiusCapFor());
       pruneBodyCounts(state.enemies, state.fragments, player);
       updateEnemyAI(player, dt);
       for (const e of state.enemies) resolveCollision(player, e, dt, speedRatio);
@@ -878,7 +975,16 @@
       updateHud(player);
       updateLockonUI(player);
     }
+  }
 
+  function step(ts) {
+    if (!state.running) return;
+    requestAnimationFrame(step);
+    let dt = state.lastTs ? (ts - state.lastTs) / 1000 : 0;
+    state.lastTs = ts;
+    dt = Math.min(dt, 0.05);
+    const player = state.player;
+    updateFrame(player, dt);
     render(player, dt);
   }
 
@@ -939,6 +1045,21 @@
       const stage = currentStage(player);
       const s = renderer.worldToScreen(cam, player.x, player.y);
       const sr = playerRadius(player) * cam.zoom;
+      // 加速衝突アップグレード: 最大速度に近いほど自機後方に加速光を灯す（「高速移動」の体感化）。
+      const ramLv = upLevel(player, 'ramspeed');
+      const spdR = state.speedRatio || 0;
+      if (ramLv > 0 && spdR > 0.6) {
+        const boostT = clamp((spdR - 0.6) / 0.4, 0, 1);
+        const dir = Math.atan2(player.vy, player.vx);
+        const bx = s.x - Math.cos(dir) * sr * 1.4, by = s.y - Math.sin(dir) * sr * 1.4;
+        const grad = renderer.ctx.createRadialGradient(bx, by, 0, bx, by, sr * (1.4 + boostT));
+        grad.addColorStop(0, `rgba(255,220,140,${(0.55 * boostT).toFixed(2)})`);
+        grad.addColorStop(1, 'rgba(255,220,140,0)');
+        renderer.ctx.fillStyle = grad;
+        renderer.ctx.beginPath();
+        renderer.ctx.arc(bx, by, sr * (1.4 + boostT), 0, Math.PI * 2);
+        renderer.ctx.fill();
+      }
       const pseudo = {
         kind: stage.kind, palette: derivePalette(stage.color), seedBucket: stage.key.length * 13 + player.stageIdx,
         angle: player.angle, spinPhase: player.spinPhase || 0, hitFlash: player.hitFlash, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
@@ -955,7 +1076,41 @@
 
     renderer.drawParticles(state.particles, cam);
     renderer.drawFloatTexts(state.floats, cam);
+
+    // 重力感知アップグレード: 画面外にいる強大な敵（脅威）を画面端の矢印で警戒表示する
+    if (state.distantThreat && state.distantThreat.alive) {
+      drawThreatWarning(player, state.distantThreat, cam);
+    }
+
     renderer.endFrame();
+  }
+
+  /* 画面端に警戒の矢印とおおよその距離を表示する（重力感知アップグレードの効果）。 */
+  function drawThreatWarning(player, threat, cam) {
+    const ctx = renderer.ctx;
+    const cx = renderer.w / 2, cy = renderer.h / 2;
+    const ang = Math.atan2(threat.y - player.y, threat.x - player.x);
+    const margin = 46;
+    const halfW = renderer.w / 2 - margin, halfH = renderer.h / 2 - margin;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const t = Math.min(halfW / Math.max(1e-4, Math.abs(dx)), halfH / Math.max(1e-4, Math.abs(dy)));
+    const ax = cx + dx * t, ay = cy + dy * t;
+    const pulse = 0.55 + 0.35 * Math.sin(renderer.time * 6);
+    ctx.save();
+    ctx.translate(ax, ay);
+    ctx.rotate(ang);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#ff5c66';
+    ctx.beginPath();
+    ctx.moveTo(14, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    const d = dist(player, threat);
+    ctx.textAlign = 'center';
+    ctx.font = '700 11px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,110,120,0.9)';
+    ctx.fillText(fmtMass(d) + 'm 警戒', ax - dx * 20, ay - dy * 20 + 4);
   }
 
   /* ---------- 起動 / メニュー ---------- */
@@ -972,6 +1127,8 @@
     state.player = player;
     state.enemies = [];
     state.fragments.length = 0;
+    state.enemyScaleMass = player.mass;
+    state.enemyScaleLogMass = Math.log(Math.max(1e-6, player.mass));
     state.camera.x = player.x; state.camera.y = player.y;
     state.camera.zoom = currentStage(player).camZoom;
     state.cleared = false; state.dead = false; state.paused = false;

@@ -33,13 +33,16 @@ const DIRECT_RATIO = 0.55;
 const EFFICIENCY_AVG_BONUS = 0.18; // 質量転換効率アップグレード等の平均上乗せを大まかに織り込む
 const ATTEMPT_RATE = 0.281;        // 1秒あたりの接触試行回数（実機フィードバックの実測値: 03:53で恒星Lv13到達 から逆算）
 const CONTESTED_WIN_RATE = 0.4;    // 拮抗した相手を退けて吸収できる確率
-const ENEMY_MASS_CAP_MULT = 4;     // data.js の BALANCE.enemyMassCapMult と合わせる
+const ENEMY_MASS_CAP_MULT = 2.0;   // data.js の BALANCE.enemyMassCapMult と合わせる（実機フィードバック第2回で4→2に引き下げ）
+// data.js の BALANCE.prey/even/threatMassMultRange, prey/evenChance と合わせる（サイズ分布の再設計）
+const PREY_RANGE = [0.15, 0.65], EVEN_RANGE = [0.7, 1.3], THREAT_RANGE = [1.4, 2.0];
+const PREY_CHANCE = 0.76, EVEN_CHANCE = 0.19;
 
 function rollEnemyMassMult(rng) {
   const r = rng();
-  if (r < 0.55) return 0.12 + rng() * 0.6;
-  if (r < 0.85) return 0.75 + rng() * 0.6;
-  return Math.min(ENEMY_MASS_CAP_MULT, 1.4 + rng() * 2.2);
+  if (r < PREY_CHANCE) return PREY_RANGE[0] + rng() * (PREY_RANGE[1] - PREY_RANGE[0]);
+  if (r < PREY_CHANCE + EVEN_CHANCE) return EVEN_RANGE[0] + rng() * (EVEN_RANGE[1] - EVEN_RANGE[0]);
+  return Math.min(ENEMY_MASS_CAP_MULT, THREAT_RANGE[0] + rng() * (THREAT_RANGE[1] - THREAT_RANGE[0]));
 }
 
 function simulate(multiplierFn, seed, maxSeconds) {
@@ -92,7 +95,7 @@ function summarize(label, multiplierFn, seeds, maxSeconds) {
   }
 }
 
-const NORMAL_STAGE_PACING_MULT = [0.437, 0.1215, 0.0972, 0.0729, 0.0623, 0.0526, 0.0405, 0.0381, 0.0405];
+const NORMAL_STAGE_PACING_MULT = [0.3955, 0.11, 0.088, 0.066, 0.0564, 0.0476, 0.0367, 0.0345, 0.0367];
 
 const seeds = Array.from({ length: 40 }, (_, i) => i * 7919 + 13);
 summarize('加速モード（お試し）(massGainMultiplier=1.0 固定)', () => 1.0, seeds, 3600);
