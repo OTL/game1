@@ -4,7 +4,9 @@
    ============================================================ */
 'use strict';
 
-const SAVE_KEY = 'cosmic-eater-save-v2'; // v2: レベルアップ必要質量カーブ変更のため旧セーブ(v1)は破棄
+// v3: 実機フィードバック対応（通常/加速モードの追加、捕獲した衛星の永続化、
+// 敵質量上限などバランス変更）のため旧セーブ(v1/v2)は破棄する。
+const SAVE_KEY = 'cosmic-eater-save-v3';
 
 function serializePlayer(player) {
   return {
@@ -18,10 +20,17 @@ function serializePlayer(player) {
     nextLevelMass: player.nextLevelMass,
     level: player.level,
     reviveUsed: player.reviveUsed,
+    mode: player.mode,
     checkpointMass: player.checkpointMass,
     checkpointStageIdx: player.checkpointStageIdx,
     checkpointUpgrades: player.checkpointUpgrades,
     checkpointHp: player.checkpointHp,
+    capturedSatellites: (player.capturedSatellites || []).map(s => ({
+      uid: s.uid, kind: s.kind, palette: s.palette, name: s.name,
+      mass: s.mass, hp: s.hp, maxHp: s.maxHp, radius: s.radius,
+      dist: s.dist, speed: s.speed, hasRing: s.hasRing,
+      seedBucket: s.seedBucket, irregularShape: s.irregularShape,
+    })),
   };
 }
 

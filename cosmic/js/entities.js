@@ -103,8 +103,10 @@ function makePlayer(stage) {
     nextLevelMass: BALANCE.startMass * levelUpGrowthFor(1),
     level: 1,
     reviveUsed: false,
+    mode: 'normal',    // 'normal' | 'fast'（加速モード・お試し）
     fx: { veinsTimer: 0, auroraTimer: 0, stormTimer: 0, flareTimer: 0, cmeTimer: 0 },
-    satellites: [], // {angle, dist}
+    satellites: [],           // 「衛星」アップグレードの汎用衛星 {angle, dist, speed, kind}
+    capturedSatellites: [],   // 捕獲した天体（惑星以上で解放）
   };
 }
 
@@ -247,9 +249,16 @@ function applyPlayerGravity(enemies, player, dt) {
 
 /* 敵同士の近傍限定の簡易引力＋衝突判定。互いに引き合い、めり込むほど近づいたら
  * 大きい方が小さい方を飲み込む（破片を生成、運動量保存）。O(n^2) だが敵数上限が
- * 小さい（30〜40体程度）ため 60fps を維持できる。 */
-function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng, dt, onDestroyed) {
+ * 小さい（20〜30体程度）ため 60fps を維持できる。
+ *
+ * 実機フィードバック対応: 敵同士の合体を無制限に繰り返すと、1体がどんどん肥大化して
+ * 「画面全体を覆う巨大なボケた敵」になってしまう（分裂ではなく合体の連鎖が原因だった）。
+ * これを防ぐため、敵1体の質量は常に `player.mass * BALANCE.enemyMassCapMult` を超えない
+ * ようにクランプする。上限に達した後の衝突は、超過分を質量として取り込まずその場で
+ * 破片化する（吸収する側にとってもメリットが残る）。 */
+function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng, dt, onDestroyed, player) {
   const n = enemies.length;
+  const massCap = player ? Math.max(1, player.mass * BALANCE.enemyMassCapMult) : Infinity;
   for (let i = 0; i < n; i++) {
     const a = enemies[i];
     if (!a.alive) continue;
@@ -267,14 +276,21 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
         const small = a.mass >= b.mass ? b : a;
         const totalVx = (a.vx * a.mass + b.vx * b.mass) / (a.mass + b.mass);
         const totalVy = (a.vy * a.mass + b.vy * b.mass) / (a.mass + b.mass);
-        const gainedMass = small.mass * 0.4;
-        big.mass += gainedMass;
-        big.maxHp += gainedMass;
-        big.hp = Math.min(big.maxHp, big.hp + gainedMass);
-        big.radius = massToRadius(big.mass);
+        let gainedMass = small.mass * 0.4;
+        const room = Math.max(0, massCap - big.mass);
+        const overflow = Math.max(0, gainedMass - room);
+        gainedMass = Math.min(gainedMass, room);
+        if (gainedMass > 0) {
+          big.mass += gainedMass;
+          big.maxHp += gainedMass;
+          big.hp = Math.min(big.maxHp, big.hp + gainedMass);
+          big.radius = massToRadius(big.mass);
+        }
         big.vx = totalVx; big.vy = totalVy;
         small.alive = false;
-        spawnFragments(fragments, small.x, small.y, small.mass * 0.6, small.palette.base, rng, undefined, small.vx, small.vy);
+        // 質量上限を超えた分（+ 直接吸収されなかった残り）は破片として放出する。
+        // 破片は敵化しない（分裂の連鎖を作らない）ため、これ以上の個体数増加は起きない。
+        spawnFragments(fragments, small.x, small.y, small.mass * 0.6 + overflow, small.palette.base, rng, undefined, small.vx, small.vy);
         if (onDestroyed) onDestroyed(small, big);
         continue;
       }
@@ -291,3 +307,30 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
     }
   }
 }
+
+/* 実機フィードバック対応: 敵・破片の合計個体数がワールド全体で上限を超えないよう、
+ * プレイヤーから最も遠いものから間引く（分裂連鎖・スポーン過多で画面が埋まるのを防ぐ）。
+ * 破片は視覚的な重要度が低いため先に間引き、それでも超過する場合のみ敵を間引く。 */
+function pruneBodyCounts(enemies, fragments, player) {
+  if (fragments.length > BALANCE.maxFragments) {
+    fragments.sort((a, b) => distSq(b, player) - distSq(a, player));
+    fragments.length = BALANCE.maxFragments;
+  }
+  const aliveEnemies = enemies.filter(e => e.alive);
+  if (aliveEnemies.length > BALANCE.maxEnemies) {
+    aliveEnemies.sort((a, b) => distSq(b, player) - distSq(a, player));
+    const excess = aliveEnemies.length - BALANCE.maxEnemies;
+    for (let i = 0; i < excess; i++) aliveEnemies[i].alive = false;
+  }
+  let total = enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0) + fragments.length;
+  if (total > BALANCE.maxTotalBodies) {
+    const alive = enemies.filter(e => e.alive).sort((a, b) => distSq(b, player) - distSq(a, player));
+    let over = total - BALANCE.maxTotalBodies;
+    for (let i = 0; i < alive.length && over > 0; i++) { alive[i].alive = false; over--; }
+    if (over > 0 && fragments.length > 0) {
+      fragments.sort((a, b) => distSq(b, player) - distSq(a, player));
+      fragments.length = Math.max(0, fragments.length - over);
+    }
+  }
+}
+function distSq(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }

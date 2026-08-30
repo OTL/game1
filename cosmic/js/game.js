@@ -26,6 +26,9 @@
     dead: false,
     pointerActive: false,
     pointerX: 0, pointerY: 0,
+    lockonTarget: null,
+    dmgAgg: new Map(),   // 同一対象への連続ヒットを合算して表示するための集計（enemy uid / 'player' / 'gain'）
+    missCooldown: 0,
   };
 
   const CONTACT_DPS = 20;      // 基準戦闘ダメージ/秒（同質量同士）
@@ -74,10 +77,14 @@
     p.nextLevelMass = data.nextLevelMass || data.mass * levelUpGrowthFor(data.level || 1);
     p.level = data.level || 1;
     p.reviveUsed = !!data.reviveUsed;
+    p.mode = gameModeOrDefault(data.mode);
     p.checkpointMass = data.checkpointMass || data.mass;
     p.checkpointStageIdx = data.checkpointStageIdx || p.stageIdx;
     p.checkpointUpgrades = data.checkpointUpgrades || Object.assign({}, p.upgrades);
     p.checkpointHp = data.checkpointHp || playerMaxHp(p);
+    p.capturedSatellites = (data.capturedSatellites || []).map(s => Object.assign({
+      angle: rng() * Math.PI * 2, x: p.x, y: p.y,
+    }, s));
   }
 
   /* ---------- 敵生成 ---------- */
@@ -89,12 +96,16 @@
     return 'asteroid';
   }
 
+  /* 敵1体の質量倍率。実機フィードバック対応: 「脅威」枠の上限を
+   * BALANCE.enemyMassCapMult に固定し、プレイヤーの何倍も巨大な敵（画面を覆う
+   * ボケた球）が生成されないようにする。この上限は敵同士の合体後の質量にも
+   * updateEnemyMutualGravityAndCollisions 側で同様に適用している。 */
   function rollEnemyMass(player) {
     const r = rng();
     let mult;
     if (r < 0.55) mult = 0.12 + rng() * 0.6;      // 小さめ・餌
     else if (r < 0.85) mult = 0.75 + rng() * 0.6;  // 拮抗
-    else mult = 1.4 + rng() * 2.2;                 // 脅威
+    else mult = 1.4 + rng() * (BALANCE.enemyMassCapMult - 1.4); // 脅威（上限つき）
     return Math.max(0.3, player.mass * mult);
   }
 
@@ -103,18 +114,32 @@
     return base * 0.75;
   }
 
+  /* プレイヤー近傍（画面内に見えやすい範囲）に居る敵の数。密度上限の判定に使う。 */
+  function nearEnemyCount(player, radius) {
+    let n = 0;
+    for (const e of state.enemies) if (e.alive && dist(e, player) < radius) n++;
+    return n;
+  }
+
   function trySpawnEnemies(player) {
-    const maxEnemies = 26;
+    const maxEnemies = BALANCE.maxEnemies;
     if (state.enemies.length >= maxEnemies) return;
     const spawnR = spawnRadiusFor(player);
-    const tries = 3;
+    // 画面内密度の上限: 近傍に既に十分な数がいる場合はスポーンを控える
+    // （分裂・合体の連鎖と合わせて「画面が敵で埋まる」ことを防ぐ）。
+    if (nearEnemyCount(player, spawnR * 0.65) >= BALANCE.nearViewSoftCap) return;
+    const tries = 2;
     for (let i = 0; i < tries && state.enemies.length < maxEnemies; i++) {
-      const ang = rng() * Math.PI * 2;
-      const r = spawnR * (0.55 + rng() * 0.45);
-      const x = player.x + Math.cos(ang) * r;
-      const y = player.y + Math.sin(ang) * r;
       const kind = pickEnemyKind(player);
       const mass = rollEnemyMass(player);
+      // 質量比が大きい「脅威」個体ほど、外周寄りの遠い位置にのみスポーンさせる。
+      // ＝ プレイヤーより大幅に大きい敵は近接遭遇せず「遠くの存在」として現れる。
+      const threatRatio = mass / player.mass;
+      const farBias = threatRatio > 1.4 ? 0.78 : 0.55;
+      const ang = rng() * Math.PI * 2;
+      const r = spawnR * (farBias + rng() * (0.98 - farBias));
+      const x = player.x + Math.cos(ang) * r;
+      const y = player.y + Math.sin(ang) * r;
       const body = makeEnemyBody(kind, mass, x, y, rng);
       if (kind === 'planet' && rng() < 0.35) body.hasRing = true;
       if (kind === 'comet') {
@@ -151,6 +176,7 @@
 
   function creditMass(player, amount, x, y) {
     amount = Math.max(0, amount) * (1 + upVal('efficiency', upLevel(player, 'efficiency')) / 100);
+    amount *= massGainMultiplierFor(player.mode, player.stageIdx);
     player.mass += amount;
     player.totalMassGained += amount;
     return amount;
@@ -158,12 +184,35 @@
 
   function showFloat(x, y, text, color) { state.floats.spawn(x, y, text, color); }
 
+  /* ---------- ダメージ数値 / MISS 表示の集計（スパム対策） ----------
+   * 実機フィードバック対応: 同じ相手への連続ヒットや、シールドの連続MISS判定が
+   * 毎フレーム表示されると数値が画面を埋め尽くしてしまう。実際のダメージ計算は
+   * 毎フレーム行いつつ、表示だけは対象ごとに集計してBALANCE.floatFlushInterval
+   * 秒に1回、合算した数値をまとめて1つ出す。 */
+  function queueFloat(key, x, y, amount, color) {
+    let e = state.dmgAgg.get(key);
+    if (!e) { e = { amount: 0, x, y, color, t: 0 }; state.dmgAgg.set(key, e); }
+    e.amount += amount; e.x = x; e.y = y; e.color = color;
+  }
+  function flushFloatAggregates(dt) {
+    for (const [key, e] of state.dmgAgg) {
+      e.t += dt;
+      if (e.t >= BALANCE.floatFlushInterval) {
+        if (e.amount > 0.15) {
+          const prefix = key === 'player-dmg' ? '-' : '+';
+          showFloat(e.x, e.y, prefix + fmtMass(Math.abs(e.amount)), e.color);
+        }
+        state.dmgAgg.delete(key);
+      }
+    }
+  }
+
   function killEnemy(enemy, player, viaContact) {
     enemy.alive = false;
     const directRatio = 0.55;
     const direct = enemy.mass * directRatio;
     const gained = creditMass(player, direct, enemy.x, enemy.y);
-    showFloat(enemy.x, enemy.y - enemy.radius - 4, '+' + fmtMass(gained), '#8fe3ff');
+    queueFloat('player-gain', enemy.x, enemy.y - enemy.radius - 4, gained, '#8fe3ff');
     spawnFragments(state.fragments, enemy.x, enemy.y, enemy.mass * (1 - directRatio), enemy.palette.base, rng, undefined, enemy.vx, enemy.vy);
     player.absorbedCount++;
     renderer.addShake(clamp(enemy.mass / player.mass * 6, 1, 8));
@@ -180,6 +229,7 @@
   function damageEnemy(enemy, amount, player) {
     enemy.hp -= amount;
     enemy.hitFlash = 0.25;
+    queueFloat('enemy-' + enemy.uid, enemy.x, enemy.y - enemy.radius - 14, amount, '#ffd9a0');
     if (enemy.hp <= 0 && enemy.alive) killEnemy(enemy, player);
   }
 
@@ -187,7 +237,10 @@
     if (player.invuln > 0) return;
     const shieldLv = upLevel(player, 'shield');
     if (shieldLv > 0 && rng() * 100 < upVal('shield', shieldLv)) {
-      showFloat(player.x, player.y - playerRadius(player) - 6, 'MISS', '#8fe3ff');
+      if (state.missCooldown <= 0) {
+        showFloat(player.x, player.y - playerRadius(player) - 6, 'MISS', '#8fe3ff');
+        state.missCooldown = BALANCE.missFlushInterval;
+      }
       return;
     }
     const crustLv = upLevel(player, 'crust');
@@ -195,7 +248,7 @@
     const dmg = amount * (1 - reduce);
     player.hp -= dmg;
     player.hitFlash = 0.3;
-    if (dmg > 0.4) showFloat(player.x, player.y - playerRadius(player) - 6, '-' + Math.ceil(dmg), '#ff6b7a');
+    if (dmg > 0.4) queueFloat('player-dmg', player.x, player.y - playerRadius(player) - 6, dmg, '#ff6b7a');
     if (player.hp <= 0) handlePlayerDeath(player);
   }
 
@@ -387,6 +440,15 @@
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
     window.addEventListener('blur', up);
+
+    // 捕獲: PCはQキー、スマホは画面上の捕獲ボタン
+    window.addEventListener('keydown', e => {
+      if (e.key === 'q' || e.key === 'Q') { if (state.player) tryCapture(state.player); }
+    });
+    $('btn-capture').addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      if (state.player) tryCapture(state.player);
+    });
   }
 
   /* ---------- 更新処理 ---------- */
@@ -441,7 +503,7 @@
       if (d < pr * 0.9 || f.life <= 0) {
         if (d < pr * 1.4) {
           const gained = creditMass(player, f.mass, f.x, f.y);
-          if (gained > 0.15) showFloat(f.x, f.y, '+' + fmtMass(gained), '#bfe3ff');
+          if (gained > 0.15) queueFloat('player-gain', player.x, player.y - pr - 4, gained, '#bfe3ff');
         }
         state.fragments.splice(i, 1);
       }
@@ -535,20 +597,6 @@
     if (tailLv > 0 && Math.hypot(player.vx, player.vy) > 40) {
       pulseDamage(player, playerRadius(player) * 1.5, upVal('tail', tailLv) * dt, '#c9e8ff', false, true);
     }
-    // 衛星 / 伴星
-    if (player.satellites.length) {
-      for (const s of player.satellites) {
-        s.angle += s.speed * dt;
-        const sr = playerRadius(player);
-        s.x = player.x + Math.cos(s.angle) * sr * s.dist;
-        s.y = player.y + Math.sin(s.angle) * sr * s.dist;
-        const dmg = s.kind === 'binary' ? upVal('binary', upLevel(player, 'binary')) : upVal('moon', upLevel(player, 'moon')) * 4;
-        for (const e of state.enemies) {
-          if (!e.alive) continue;
-          if (dist(s, e) < e.radius + 8) damageEnemy(e, dmg * dt * 3, player);
-        }
-      }
-    }
     player.invuln = Math.max(0, player.invuln - dt);
     if (player.hitFlash > 0) player.hitFlash -= dt * 2.2;
     // 自転（球体テクスチャの流れ用の位相）。序盤2段階は不規則形状のため、
@@ -583,6 +631,93 @@
     }
   }
 
+  /* ---------- 衛星（アップグレード「衛星」「伴星」＋捕獲した天体） ----------
+   * 実機フィードバック対応: 惑星以上で解放される「捕獲」で得た衛星は、自分の
+   * 周りを公転しながら (1) 敵に接触ダメージを与え、(2) 近くの破片（小天体）を
+   * 自動で引き寄せて質量を手伝って回収する。強い敵に接触され続けると破壊されうる。
+   * 既存の「衛星」アップグレードは汎用の小型衛星として player.satellites に残し、
+   * 捕獲した天体は player.capturedSatellites で別管理しつつ同じ公転・接触damageの
+   * 仕組みを共有する（HUDでは合算して表示）。 */
+  function updateSatellites(player, dt) {
+    const pr = playerRadius(player);
+    // 汎用衛星（アップグレード由来）
+    for (const s of player.satellites) {
+      s.angle += s.speed * dt;
+      s.x = player.x + Math.cos(s.angle) * pr * s.dist;
+      s.y = player.y + Math.sin(s.angle) * pr * s.dist;
+      const dmg = s.kind === 'binary' ? upVal('binary', upLevel(player, 'binary')) : upVal('moon', upLevel(player, 'moon')) * 4;
+      for (const e of state.enemies) {
+        if (!e.alive) continue;
+        if (dist(s, e) < e.radius + 8) damageEnemy(e, dmg * dt * 3, player);
+      }
+    }
+    // 捕獲した天体
+    for (let i = player.capturedSatellites.length - 1; i >= 0; i--) {
+      const s = player.capturedSatellites[i];
+      s.angle += s.speed * dt;
+      s.x = player.x + Math.cos(s.angle) * pr * s.dist;
+      s.y = player.y + Math.sin(s.angle) * pr * s.dist;
+      s.spinPhase = (s.spinPhase || 0) + 0.5 * dt;
+      if (s.hitFlash > 0) s.hitFlash -= dt * 2.2;
+
+      const contactDmg = s.mass * 0.09;
+      for (const e of state.enemies) {
+        if (!e.alive) continue;
+        const d = dist(s, e);
+        if (d < e.radius + s.radius) {
+          damageEnemy(e, contactDmg * dt, player);
+          // 十分に強い敵が触れ続けると衛星も破壊されうる
+          if (e.mass > s.mass * 1.3) {
+            s.hp -= CONTACT_DPS * (e.mass / s.mass) * 0.35 * dt;
+            s.hitFlash = 0.25;
+          }
+        }
+      }
+      // 近くの破片（小天体）を自動吸収する手伝い
+      const helpRange = s.radius + 70;
+      for (let fi = state.fragments.length - 1; fi >= 0; fi--) {
+        const f = state.fragments[fi];
+        const fd = dist(f, s);
+        if (fd > helpRange) continue;
+        const nx = (s.x - f.x) / (fd || 1), ny = (s.y - f.y) / (fd || 1);
+        f.vx += nx * 140 * dt; f.vy += ny * 140 * dt;
+        if (fd < s.radius * 1.1) {
+          const gained = creditMass(player, f.mass, s.x, s.y);
+          if (gained > 0.15) queueFloat('player-gain', s.x, s.y, gained, '#8fe3c9');
+          state.fragments.splice(fi, 1);
+        }
+      }
+
+      if (s.hp <= 0) {
+        spawnFragments(state.fragments, s.x, s.y, s.mass * 0.5, s.palette.base, rng, undefined, 0, 0);
+        player.capturedSatellites.splice(i, 1);
+        renderer.addShake(5);
+        showToast(s.name + ' の衛星が破壊された…');
+      }
+    }
+  }
+
+  /* ---------- 彗星の尾アップグレードの視覚的な軌跡 ----------
+   * 実機フィードバック対応: 「彗星の尾」アップグレード（tail）は移動軌跡に接触ダメージ
+   * 判定（pulseDamage、半径 playerRadius*1.5）を持つが、これまで対応する見た目が
+   * 存在しなかった。実際に見える発光プラズマの帯を自機の後ろに描画し、判定範囲と
+   * 見た目のサイズを一致させる。 */
+  function updateTailTrail(player, dt) {
+    const tailLv = upLevel(player, 'tail');
+    if (tailLv <= 0) { player.tailTrail.length = 0; return; }
+    const moving = Math.hypot(player.vx, player.vy) > 40;
+    if (moving) {
+      player.tailTrail.push({ x: player.x, y: player.y, age: 0 });
+    }
+    const maxAge = 0.7;
+    for (let i = player.tailTrail.length - 1; i >= 0; i--) {
+      const t = player.tailTrail[i];
+      t.age += dt;
+      if (t.age > maxAge) player.tailTrail.splice(i, 1);
+    }
+    if (player.tailTrail.length > 60) player.tailTrail.splice(0, player.tailTrail.length - 60);
+  }
+
   function coneDamage(player, range, dmg) {
     const dir = Math.hypot(player.vx, player.vy) > 5 ? Math.atan2(player.vy, player.vx) : player.angle;
     for (const e of state.enemies) {
@@ -597,6 +732,17 @@
   }
 
   /* ---------- ロックオンHUD ---------- */
+  function captureRangeFor(player) {
+    return Math.max(BALANCE.captureRangeMin, playerRadius(player) * BALANCE.captureRangeMult);
+  }
+  function canCapture(player, target) {
+    if (!target || !target.alive || target.isHostile) return false;
+    if (!captureUnlockedFor(player.stageIdx)) return false;
+    if (player.capturedSatellites.length >= captureCapacityFor(player.stageIdx)) return false;
+    if (target.mass > player.mass * BALANCE.captureMassRatio) return false;
+    return dist(player, target) <= captureRangeFor(player);
+  }
+
   function updateLockonUI(player) {
     let nearest = null, nd = Infinity;
     for (const e of state.enemies) {
@@ -604,13 +750,54 @@
       const d = dist(player, e);
       if (d < nd) { nd = d; nearest = e; }
     }
+    state.lockonTarget = nearest;
     const panel = $('lockon');
-    if (!nearest || nd > 900) { panel.classList.add('hidden'); return; }
+    const captureEl = $('btn-capture');
+    if (!nearest || nd > 900) {
+      panel.classList.add('hidden');
+      captureEl.classList.add('hidden');
+      return;
+    }
     panel.classList.remove('hidden');
     $('lockon-name').textContent = nearest.name;
     $('lockon-fill').style.width = clamp(nearest.hp / nearest.maxHp * 100, 0, 100) + '%';
-    const rel = nearest.mass > player.mass * INSTAKILL_RATIO ? '⚠ 危険' : (nearest.mass < player.mass / INSTAKILL_RATIO ? '捕食可能' : '拮抗');
+    const capturable = canCapture(player, nearest);
+    let rel = nearest.mass > player.mass * INSTAKILL_RATIO ? '⚠ 危険' : (nearest.mass < player.mass / INSTAKILL_RATIO ? '捕食可能' : '拮抗');
+    if (capturable) rel = '🛰 捕獲可能';
     $('lockon-sub').textContent = fmtMass(nearest.mass) + ' 質量 ・ ' + rel;
+    panel.classList.toggle('capturable', capturable);
+    if (captureUnlockedFor(player.stageIdx)) {
+      captureEl.classList.remove('hidden');
+      captureEl.classList.toggle('ready', capturable);
+      captureEl.disabled = !capturable;
+    } else {
+      captureEl.classList.add('hidden');
+    }
+  }
+
+  /* ---------- 捕獲（衛星化） ---------- */
+  function tryCapture(player) {
+    if (state.paused || state.cleared) return;
+    const target = state.lockonTarget;
+    if (!canCapture(player, target)) return;
+    target.alive = false;
+    const idx = state.enemies.indexOf(target);
+    if (idx >= 0) state.enemies.splice(idx, 1);
+    player.capturedSatellites.push({
+      uid: target.uid, kind: target.kind, palette: target.palette, name: target.name,
+      mass: target.mass, hp: target.mass, maxHp: target.mass,
+      radius: target.radius, angle: rng() * Math.PI * 2,
+      dist: 2.4 + player.capturedSatellites.length * 0.9, speed: 0.9 + rng() * 0.3,
+      hasRing: !!target.hasRing, seedBucket: target.seedBucket, irregularShape: target.irregularShape,
+      spinPhase: 0, hitFlash: 0,
+    });
+    renderer.addShake(6);
+    for (let i = 0; i < 14; i++) {
+      const a = rng() * Math.PI * 2, spd = 30 + rng() * 90;
+      state.particles.spawn({ x: target.x, y: target.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, size: 2 + rng() * 3, color: '#8fe3c9', life: 0.5 + rng() * 0.3 });
+    }
+    showToast(target.name + ' を衛星として捕獲した！');
+    saveGame(player);
   }
 
   /* ---------- HUD更新 ---------- */
@@ -627,6 +814,16 @@
     $('mass-fill').style.width = (t * 100) + '%';
     $('mass-text').textContent = '質量 ' + fmtMass(player.mass);
     $('play-time').textContent = fmtTime(player.playTime);
+    $('mode-badge').textContent = GAME_MODES[player.mode].label;
+
+    const satEl = $('satellite-hud');
+    const cap = captureCapacityFor(player.stageIdx);
+    if (cap <= 0) {
+      satEl.classList.add('hidden');
+    } else {
+      satEl.classList.remove('hidden');
+      satEl.innerHTML = '🛰 ' + player.capturedSatellites.length + ' / ' + cap;
+    }
   }
 
   function showToast(text) {
@@ -655,14 +852,19 @@
       applyPlayerGravity(state.enemies, player, dt);
       updateEnemyMutualGravityAndCollisions(state.enemies, state.fragments, null, rng, dt, (small, big) => {
         renderer.addShake(clamp(small.mass / Math.max(1, player.mass) * 2, 0.5, 4));
-      });
+      }, player);
+      pruneBodyCounts(state.enemies, state.fragments, player);
       updateEnemyAI(player, dt);
       for (const e of state.enemies) resolveCollision(player, e, dt, speedRatio);
       updateFragments(player, dt);
       updatePassives(player, dt);
+      updateSatellites(player, dt);
+      updateTailTrail(player, dt);
       checkLevelUp(player);
       state.particles.update(dt);
       state.floats.update(dt);
+      flushFloatAggregates(dt);
+      state.missCooldown = Math.max(0, state.missCooldown - dt);
 
       state.saveTimer -= dt;
       if (state.saveTimer <= 0) { state.saveTimer = BALANCE.autosaveInterval; saveGame(player); }
@@ -694,7 +896,6 @@
 
     // 敵（画面外カリング）
     const margin = 140;
-    let nearestEnemy = null, nearestD = Infinity;
     for (const e of state.enemies) {
       if (!e.alive) continue;
       const s = renderer.worldToScreen(cam, e.x, e.y);
@@ -702,23 +903,35 @@
       if (s.x < -margin - sr || s.x > renderer.w + margin + sr || s.y < -margin - sr || s.y > renderer.h + margin + sr) continue;
       renderer.drawBody(e, s.x, s.y, sr, cam);
       if (sr > 6) renderer.drawHpBar(s.x, s.y, sr, e.hp / e.maxHp, e.isHostile ? '#ff6b7a' : '#5ce0a0');
-      const d = dist(e, player);
-      if (d < nearestD) { nearestD = d; nearestEnemy = e; }
     }
-    // ロックオン対象: 固定のガイド線ではなく、薄くパルスする動的マーカー
-    if (nearestEnemy && nearestD < 900) {
-      const s = renderer.worldToScreen(cam, nearestEnemy.x, nearestEnemy.y);
-      const sr = nearestEnemy.radius * cam.zoom;
-      renderer.drawLockonMarker(s.x, s.y, sr, dt || 0, nearestEnemy.mass > player.mass * INSTAKILL_RATIO);
-    }
+    // ※ 固定の点線軌道円によるロックオン表示は実機フィードバックで完全廃止。
+    // ロックオン情報は左上のHUDパネル（#lockon）のみで表示する。
 
-    // 衛星
+    // 衛星（アップグレード由来の汎用衛星）
     for (const sat of player.satellites) {
       const s = renderer.worldToScreen(cam, sat.x || player.x, sat.y || player.y);
       renderer.ctx.fillStyle = sat.kind === 'binary' ? '#ffd18f' : '#cfd6ff';
       renderer.ctx.beginPath();
       renderer.ctx.arc(s.x, s.y, (sat.kind === 'binary' ? 10 : 6) * cam.zoom, 0, Math.PI * 2);
       renderer.ctx.fill();
+    }
+    // 捕獲した衛星（自分の天体として描画。画面を埋めないよう半径をプレイヤーの
+    // 1.1倍までにクランプする）
+    {
+      const capMaxR = playerRadius(player) * 1.1;
+      for (const sat of player.capturedSatellites) {
+        const s = renderer.worldToScreen(cam, sat.x, sat.y);
+        const sr = Math.min(sat.radius, capMaxR) * cam.zoom;
+        renderer.drawBody(sat, s.x, s.y, sr, cam);
+        renderer.ctx.strokeStyle = 'rgba(140,230,190,0.8)';
+        renderer.ctx.lineWidth = 1.6;
+        renderer.ctx.beginPath(); renderer.ctx.arc(s.x, s.y, sr + 2.5, 0, Math.PI * 2); renderer.ctx.stroke();
+      }
+    }
+
+    // 彗星の尾アップグレードの視覚的な軌跡（発光プラズマの帯、ダメージ判定範囲と一致）
+    if (upLevel(player, 'tail') > 0 && player.tailTrail.length > 1) {
+      renderer.drawTail(cam, player.tailTrail, playerRadius(player) * 1.5);
     }
 
     // プレイヤー
@@ -746,13 +959,14 @@
   }
 
   /* ---------- 起動 / メニュー ---------- */
-  function startGame(fresh) {
+  function startGame(fresh, mode) {
     const player = newPlayer();
     if (!fresh) {
       const data = loadGame();
       if (data) applySaveData(player, data);
     } else {
       clearSave();
+      player.mode = gameModeOrDefault(mode);
     }
     rebuildSatellites(player);
     state.player = player;
@@ -772,7 +986,8 @@
 
   function bindUI() {
     $('btn-continue').addEventListener('click', () => startGame(false));
-    $('btn-newgame').addEventListener('click', () => startGame(true));
+    $('btn-newgame').addEventListener('click', () => startGame(true, 'normal'));
+    $('btn-newgame-fast').addEventListener('click', () => startGame(true, 'fast'));
     $('btn-menu').addEventListener('click', () => {
       if (state.cleared) return;
       state.paused = true;
@@ -784,9 +999,9 @@
     });
     $('btn-restart-confirm').addEventListener('click', () => {
       $('pause-modal').classList.add('hidden');
-      startGame(true);
+      startGame(true, state.player ? state.player.mode : 'normal');
     });
-    $('btn-result-restart').addEventListener('click', () => startGame(true));
+    $('btn-result-restart').addEventListener('click', () => startGame(true, state.player ? state.player.mode : 'normal'));
 
     if (hasSave()) $('btn-continue').classList.remove('hidden');
   }
