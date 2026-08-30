@@ -41,21 +41,34 @@ function paletteFor(kind, rng) {
 
 let _bodyUid = 1;
 
+/* 準惑星以上（自己重力で丸くなった天体）かどうか。それ未満（岩石片〜小惑星クラス）は
+ * 不規則なジャガイモ型でタンブリングさせる。 */
+function isSphericalKind(kind) {
+  return kind === 'planet' || kind === 'gasgiant' || kind === 'browndwarf' ||
+    kind === 'star' || kind === 'giant' || kind === 'neutron' || kind === 'blackhole' || kind === 'dwarf';
+}
+
 function makeEnemyBody(kind, mass, x, y, rng) {
   const pal = paletteFor(kind, rng);
   const hostile = kind === 'hostile';
+  const irregular = !isSphericalKind(kind); // asteroid / comet(核) / hostile は不規則形状
   return {
     uid: _bodyUid++,
     kind,
     x, y,
-    vx: (rng() - 0.5) * (hostile ? 10 : 26),
-    vy: (rng() - 0.5) * (hostile ? 10 : 26),
+    vx: (rng() - 0.5) * (hostile ? 14 : 30),
+    vy: (rng() - 0.5) * (hostile ? 14 : 30),
     mass,
     hp: mass,
     maxHp: mass,
     radius: massToRadius(mass),
     angle: rng() * Math.PI * 2,
-    spin: (rng() - 0.5) * (hostile ? 0.6 : 0.25),
+    spin: (rng() - 0.5) * (hostile ? 0.7 : 0.32),
+    // タンブリング用の不規則な角速度ゆらぎ（非等速回転）
+    spinWobbleAmp: irregular ? 0.3 + rng() * 0.5 : 0,
+    spinWobbleFreq: 0.4 + rng() * 1.1,
+    spinWobblePhase: rng() * Math.PI * 2,
+    irregularShape: irregular,
     seedBucket: (rng() * 10000) | 0,
     palette: pal,
     name: randomBodyName(rng),
@@ -78,6 +91,7 @@ function makePlayer(stage) {
     angle: -Math.PI / 2,
     spin: 0.2,
     spinPhase: 0,
+    spinWobblePhase: 0,
     seedBucket: 1,
     hitFlash: 0,
     invuln: 0,
@@ -171,25 +185,109 @@ class FloatTextPool {
   forEachActive(fn) { for (const p of this.pool) if (p.active) fn(p); }
 }
 
-/* 破片（吸収可能な質量の粒） */
-function makeFragment(x, y, mass, color, rng) {
+/* 破片（吸収可能な質量の粒）。運動量保存: 親天体の速度を引き継いだ上に、
+ * 爆発による放射状の速度を加える（衝突の運動量保存則）。以後は減速せず、
+ * 個々に回転しながら真空を漂う。 */
+function makeFragment(x, y, mass, color, rng, baseVx, baseVy) {
   const ang = rng() * Math.PI * 2;
   const spd = 20 + rng() * 60;
   return {
     x, y,
-    vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+    vx: (baseVx || 0) + Math.cos(ang) * spd,
+    vy: (baseVy || 0) + Math.sin(ang) * spd,
     mass, color, alive: true,
     radius: Math.max(2.2, massToRadius(mass) * 0.6),
-    life: 20,
+    life: 22,
+    angle: rng() * Math.PI * 2,
+    spin: (rng() - 0.5) * 3.2,
   };
 }
 
-function spawnFragments(list, x, y, totalMass, color, rng, count) {
+function spawnFragments(list, x, y, totalMass, color, rng, count, baseVx, baseVy) {
   count = count || Math.min(14, Math.max(3, Math.round(Math.sqrt(totalMass))));
   const per = totalMass / count;
   for (let i = 0; i < count; i++) {
     list.push(makeFragment(
-      x + (rng() - 0.5) * 10, y + (rng() - 0.5) * 10, per, color, rng
+      x + (rng() - 0.5) * 10, y + (rng() - 0.5) * 10, per, color, rng, baseVx, baseVy
     ));
+  }
+}
+
+/* ============================================================
+ * ケプラー運動・簡易重力
+ * ------------------------------------------------------------
+ * 真空中なので摩擦による減衰は入れない。かわりに、
+ *  1) プレイヤーの質量による近傍天体への重力（質量が大きいほどスイングバイ的に軌道が曲がる）
+ *  2) 敵天体どうしの近傍限定の簡易引力（緩やかに引き合い、近づきすぎると衝突・破壊）
+ * を毎フレーム計算する。天体数は上限が決まっているため O(n^2) でも 60fps を維持できる。
+ * ============================================================ */
+const GRAV_CONST = 46;           // プレイヤー重力の強さ（見た目重視の調整値。実際のGではない）
+const GRAV_PLAYER_RANGE = 1400;  // この距離を超えたら重力計算を打ち切る（遠方カリング）
+const GRAV_MIN_R = 40;           // 加速度が発散しないための最小距離
+const GRAV_MAX_ACCEL = 900;      // 極端なスイングバイで暴れないための加速度上限
+const ENEMY_GRAV_CONST = 5.2;    // 敵同士の簡易相互重力
+const ENEMY_GRAV_RANGE = 260;    // 敵同士の重力を計算する近傍半径
+
+function applyPlayerGravity(enemies, player, dt) {
+  const gm = GRAV_CONST * player.mass;
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (!e.alive) continue;
+    const dx = player.x - e.x, dy = player.y - e.y;
+    const r2 = dx * dx + dy * dy;
+    if (r2 > GRAV_PLAYER_RANGE * GRAV_PLAYER_RANGE) continue;
+    const r = Math.sqrt(r2) || 1;
+    const rc = Math.max(GRAV_MIN_R, r);
+    let a = gm / (rc * rc);
+    if (a > GRAV_MAX_ACCEL) a = GRAV_MAX_ACCEL;
+    e.vx += (dx / r) * a * dt;
+    e.vy += (dy / r) * a * dt;
+  }
+}
+
+/* 敵同士の近傍限定の簡易引力＋衝突判定。互いに引き合い、めり込むほど近づいたら
+ * 大きい方が小さい方を飲み込む（破片を生成、運動量保存）。O(n^2) だが敵数上限が
+ * 小さい（30〜40体程度）ため 60fps を維持できる。 */
+function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng, dt, onDestroyed) {
+  const n = enemies.length;
+  for (let i = 0; i < n; i++) {
+    const a = enemies[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < n; j++) {
+      const b = enemies[j];
+      if (!b.alive) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const r2 = dx * dx + dy * dy;
+      if (r2 > ENEMY_GRAV_RANGE * ENEMY_GRAV_RANGE) continue;
+      const r = Math.sqrt(r2) || 1;
+      const sumR = a.radius + b.radius;
+      if (r < sumR * 0.92) {
+        // 衝突: 大きい方が生き残り、小さい方は破壊されて破片化（運動量保存）
+        const big = a.mass >= b.mass ? a : b;
+        const small = a.mass >= b.mass ? b : a;
+        const totalVx = (a.vx * a.mass + b.vx * b.mass) / (a.mass + b.mass);
+        const totalVy = (a.vy * a.mass + b.vy * b.mass) / (a.mass + b.mass);
+        const gainedMass = small.mass * 0.4;
+        big.mass += gainedMass;
+        big.maxHp += gainedMass;
+        big.hp = Math.min(big.maxHp, big.hp + gainedMass);
+        big.radius = massToRadius(big.mass);
+        big.vx = totalVx; big.vy = totalVy;
+        small.alive = false;
+        spawnFragments(fragments, small.x, small.y, small.mass * 0.6, small.palette.base, rng, undefined, small.vx, small.vy);
+        if (onDestroyed) onDestroyed(small, big);
+        continue;
+      }
+      // 引力（見た目重視。あまりに軽い相手同士は無視して計算量・視覚ノイズを抑える）
+      const gm = ENEMY_GRAV_CONST * (a.mass + b.mass);
+      const rc = Math.max(24, r);
+      let acc = gm / (rc * rc);
+      if (acc > 260) acc = 260;
+      const nx = dx / r, ny = dy / r;
+      a.vx += nx * acc * (b.mass / (a.mass + b.mass)) * dt;
+      a.vy += ny * acc * (b.mass / (a.mass + b.mass)) * dt;
+      b.vx -= nx * acc * (a.mass / (a.mass + b.mass)) * dt;
+      b.vy -= ny * acc * (a.mass / (a.mass + b.mass)) * dt;
+    }
   }
 }

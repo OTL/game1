@@ -26,6 +26,15 @@ class Renderer {
     this.shootingStars = [];
     this.shootingTimer = 3 + Math.random() * 5;
     this.tint = { r: 5, g: 7, b: 16 };
+    this.milkyWay = generateMilkyWayBand(1600, 900, 909);
+    this.dust = [
+      { field: generateDustField(46, 8001), factor: 0.22, tile: 1400, size: 1.0 },
+      { field: generateDustField(58, 8002), factor: 0.42, tile: 1100, size: 1.4 },
+      { field: generateDustField(40, 8003), factor: 0.68, tile: 800, size: 1.9 },
+    ];
+    this.lockonPulse = 0;
+    this.prevCamX = 0; this.prevCamY = 0;
+    this.camVelX = 0; this.camVelY = 0;
   }
 
   resize() {
@@ -143,7 +152,29 @@ class Renderer {
   drawBackground(cam, dt, stageIdx) {
     dt = dt || 0;
     this.bgTime += dt;
+    updateWorldLight(this.bgTime);
+    // カメラ（≒プレイヤー）の速度を推定 — 進行方向と逆に星の流れを作るスピード感演出に使う
+    if (dt > 0) {
+      this.camVelX = (cam.x - this.prevCamX) / dt;
+      this.camVelY = (cam.y - this.prevCamY) / dt;
+    }
+    this.prevCamX = cam.x; this.prevCamY = cam.y;
     const ctx = this.ctx;
+
+    // 天の川：背景の最も遠いレイヤーとして、ごく薄い視差でドリフト表示。
+    // 巨大な1枚絵を画面より十分大きく引き伸ばして描画し、タイルの継ぎ目を作らないぶん
+    // 描画コール数も1回に抑える（毎フレームのラスタコスト対策）。
+    {
+      const mw = this.milkyWay;
+      const factor = 0.01;
+      const drawW = Math.max(this.w, this.h) * 2.6;
+      const drawH = drawW * (mw.height / mw.width);
+      const ox = -(cam.x * factor) % (drawW * 0.5);
+      const oy = -(cam.y * factor) % (drawH * 0.5);
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(mw, this.w / 2 - drawW / 2 + ox, this.h / 2 - drawH / 2 + oy, drawW, drawH);
+      ctx.globalAlpha = 1;
+    }
 
     // 星空（3層パララックス、星の瞬き付き）
     for (const layer of this.bgLayers) {
@@ -183,18 +214,64 @@ class Renderer {
     }
     ctx.globalAlpha = 1;
 
+    // 漂う微細な塵（多層パララックス、光源方向で明るさが変化。プレイヤー移動時は
+    // 進行方向と逆に微かに流れてスピード感を出す）
+    this.drawDust(cam, dt);
+
     // 流れ星
     this.updateShootingStars(dt);
     this.drawShootingStars();
 
-    // 進化段階に応じた色調変化（序盤は暗青 → 恒星帯は暖色 → 終盤は深い紫）
+    // 進化段階に応じた色調変化（序盤は暗青 → 恒星帯は暖色 → 終盤は深い紫）。
+    // 彩度を抑えたトーンに寄せ、暗部を締める。
     const target = this.targetTintFor(stageIdx || 0);
     const k = 1 - Math.exp(-dt * 0.5);
     this.tint.r = lerp(this.tint.r, target.r, k);
     this.tint.g = lerp(this.tint.g, target.g, k);
     this.tint.b = lerp(this.tint.b, target.b, k);
-    ctx.fillStyle = `rgba(${this.tint.r | 0},${this.tint.g | 0},${this.tint.b | 0},0.22)`;
+    ctx.fillStyle = `rgba(${this.tint.r | 0},${this.tint.g | 0},${this.tint.b | 0},0.24)`;
     ctx.fillRect(0, 0, this.w, this.h);
+    // 薄いビネット（画面端をわずかに締める）は毎フレームのcanvas再描画コストを避けるため
+    // CSSのオーバーレイ要素（#vignette）で常時表示している（game.jsの起動処理でDOMに追加）。
+  }
+
+  /* 漂う塵：カメラ相対のタイル空間にラップして配置し、各層ごとに独立した視差係数で
+   * スクロールさせる。各粒は自身の法線をゆっくり回転させ、WORLD_LIGHT との内積で
+   * 明るさが変化する（=単一光源で「光を受けて煌めく」ように見える）。
+   * プレイヤーの実速度（カメラ速度で近似）が大きいほど、進行方向と逆向きに
+   * わずかに尾を引かせてスピード感を出す。 */
+  drawDust(cam, dt) {
+    const ctx = this.ctx;
+    const spd = Math.hypot(this.camVelX, this.camVelY);
+    const streak = Math.min(1, spd / 260);
+    const sdx = spd > 1 ? -this.camVelX / spd : 0, sdy = spd > 1 ? -this.camVelY / spd : 0;
+    for (const layer of this.dust) {
+      const tile = layer.tile;
+      const px = ((cam.x * layer.factor) % tile + tile) % tile;
+      const py = ((cam.y * layer.factor) % tile + tile) % tile;
+      for (const d of layer.field) {
+        d.normal += d.spin * dt;
+        let wx = d.x * tile - px, wy = d.y * tile - py;
+        wx = ((wx % tile) + tile * 1.5) % tile - tile * 0.5;
+        wy = ((wy % tile) + tile * 1.5) % tile - tile * 0.5;
+        const sx = wx + this.w / 2, sy = wy + this.h / 2;
+        if (sx < -20 || sx > this.w + 20 || sy < -20 || sy > this.h + 20) continue;
+        const nx = Math.cos(d.normal), ny = Math.sin(d.normal);
+        const lit = Math.max(0, nx * WORLD_LIGHT.x + ny * WORLD_LIGHT.y);
+        const bright = 0.10 + 0.55 * lit;
+        const sz = d.size * layer.size;
+        if (streak > 0.08) {
+          // 速度線: グラデーションを毎粒子ごとに生成すると重いので単色半透明の線で近似
+          const len = sz * (1 + streak * 9);
+          ctx.strokeStyle = `rgba(220,226,255,${(bright * 0.6).toFixed(2)})`;
+          ctx.lineWidth = Math.max(0.6, sz * 0.6);
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + sdx * len, sy + sdy * len); ctx.stroke();
+        } else {
+          ctx.fillStyle = `rgba(220,226,255,${bright.toFixed(2)})`;
+          ctx.beginPath(); ctx.arc(sx, sy, sz, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
   }
 
   beginFrame(dt, cam) {
@@ -248,17 +325,42 @@ class Renderer {
       ctx.restore();
     }
 
-    // 彗星の尾
-    if (kind === 'comet' && body.vx !== undefined) {
-      const spd = Math.hypot(body.vx, body.vy) || 1;
-      const dx = -body.vx / spd, dy = -body.vy / spd;
-      const len = sr * 6;
-      const grad = ctx.createLinearGradient(sx, sy, sx + dx * len, sy + dy * len);
-      grad.addColorStop(0, 'rgba(200,230,255,0.55)');
-      grad.addColorStop(1, 'rgba(200,230,255,0)');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = sr * 0.9;
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + dx * len, sy + dy * len); ctx.stroke();
+    // 彗星の尾：進行方向の逆ではなく、恒星（WORLD_LIGHT）の反対方向へ伸びる。
+    // イオンの尾はまっすぐ青く、ダストの尾はやや進行方向寄りに曲がって白い。
+    if (kind === 'comet') {
+      const adx = -WORLD_LIGHT.x, ady = -WORLD_LIGHT.y;
+      const len = sr * 7;
+      // イオンの尾（まっすぐ、青）
+      {
+        const ex = sx + adx * len, ey = sy + ady * len;
+        const grad = ctx.createLinearGradient(sx, sy, ex, ey);
+        grad.addColorStop(0, 'rgba(150,190,255,0.5)');
+        grad.addColorStop(1, 'rgba(150,190,255,0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = Math.max(1, sr * 0.35);
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+      // ダストの尾（速度方向に少し引きずられて曲がる、白っぽく太い）
+      {
+        const spd = Math.hypot(body.vx || 0, body.vy || 0);
+        const vdx = spd > 1 ? (body.vx / spd) : adx, vdy = spd > 1 ? (body.vy / spd) : ady;
+        const bendX = adx * 0.72 - vdx * 0.28, bendY = ady * 0.72 - vdy * 0.28;
+        const bendLen = Math.hypot(bendX, bendY) || 1;
+        const dlen = len * 0.85;
+        const midX = sx + (adx * 0.5 + bendX / bendLen * 0.5) * dlen * 0.55;
+        const midY = sy + (ady * 0.5 + bendY / bendLen * 0.5) * dlen * 0.55;
+        const endX = sx + bendX / bendLen * dlen, endY = sy + bendY / bendLen * dlen;
+        const grad = ctx.createLinearGradient(sx, sy, endX, endY);
+        grad.addColorStop(0, 'rgba(235,235,240,0.42)');
+        grad.addColorStop(1, 'rgba(235,235,240,0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = Math.max(1.5, sr * 0.75);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.quadraticCurveTo(midX, midY, endX, endY);
+        ctx.stroke();
+      }
     }
 
     // ヒットフラッシュ
@@ -288,15 +390,23 @@ class Renderer {
     const kind = body.kind;
     const spinPhase = (body.spinPhase !== undefined ? body.spinPhase : body.angle) || 0;
     const FULL_QUALITY_MIN_SR = 15;
+    // 不規則形状（ジャガイモ型）にするかどうか。準惑星以上の kind（dwarf/planet/gasgiant/
+    // browndwarf/star/giant/neutron/blackhole）は自己重力で丸くなっている前提で常に球体。
+    const irregular = !!body.irregularShape;
 
-    if (sr < FULL_QUALITY_MIN_SR || kind === 'comet') {
-      // 近似描画: 静的テクスチャを緩やかに回転させるだけ（コスト最小）
-      const tex = getBodyTexture(kind, body.palette, body.seedBucket % 6);
-      ctx.save();
-      ctx.translate(sx, sy);
-      ctx.rotate(spinPhase * 0.4);
-      ctx.drawImage(tex, -sr, -sr, sr * 2, sr * 2);
-      ctx.restore();
+    if (sr < FULL_QUALITY_MIN_SR || kind === 'comet' || irregular) {
+      // 近似描画: 形状（アルベド）はタンブリングで自由に回転させ、その上に
+      // 常に同じ光源方向を向いた固定シェーディングマスクを重ねる。
+      // これにより自転・タンブリングしていても明暗境界（ターミネーター）は
+      // ワールド全体で常に同じ向きになる＝単一光源の一貫性を保てる。
+      // 描画コストを抑えるため、回転位相を離散化した合成済みフレームを
+      // キャッシュして drawImage 1回で済ませる（renderGlobeFrame と同じ手法）。
+      const sizePx = Math.max(8, Math.min(64, Math.round((sr * 2) / 4) * 4));
+      const twoPi = Math.PI * 2;
+      const norm = ((spinPhase % twoPi) + twoPi) % twoPi;
+      const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
+      const frame = getNearBodyFrame(kind, body.palette, body.seedBucket % 6, irregular, sizePx, frameIdx);
+      ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
       return;
     }
 
@@ -352,8 +462,26 @@ class Renderer {
     const ctx = this.ctx;
     ctx.fillStyle = f.color;
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    // ハイライトは常に光源方向側に置く（全天体・全パーティクル共通の光源で一貫させる）
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath(); ctx.arc(sx - sr * 0.3, sy - sr * 0.3, sr * 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx + WORLD_LIGHT.x * sr * 0.3, sy + WORLD_LIGHT.y * sr * 0.3, sr * 0.35, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /* ロックオン対象を示す動的マーカー。固定のリング／ガイド線ではなく、
+   * 薄くパルスする点線の輪を対象の周りに描く。 */
+  drawLockonMarker(sx, sy, sr, dt, danger) {
+    this.lockonPulse = (this.lockonPulse + dt * 2.2) % (Math.PI * 2);
+    const ctx = this.ctx;
+    const pulse = 0.5 + 0.5 * Math.sin(this.lockonPulse);
+    const r = sr + 10 + pulse * 5;
+    const color = danger ? '255,110,120' : '140,230,255';
+    ctx.save();
+    ctx.strokeStyle = `rgba(${color},${(0.22 + pulse * 0.32).toFixed(2)})`;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([6, 7]);
+    ctx.lineDashOffset = -this.time * 26;
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
   }
 
   drawHpBar(sx, sy, sr, ratio, color) {
