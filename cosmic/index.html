@@ -34,6 +34,7 @@
   </div>
 
   <div id="satellite-hud" class="hidden" aria-label="保有衛星"></div>
+  <div id="endless-hud" class="hidden" aria-label="エンドレス統計"></div>
   <div id="mode-badge" aria-label="ゲームモード"></div>
 
   <div id="upgrade-list" aria-label="取得アップグレード"></div>
@@ -71,6 +72,7 @@
     <h2>メニュー</h2>
     <div class="pause-buttons">
       <button id="btn-resume" class="btn btn-primary">つづける</button>
+      <button id="btn-pause-result" class="btn btn-ghost hidden">リザルトを見る</button>
       <button id="btn-restart-confirm" class="btn btn-ghost">はじめからやり直す</button>
     </div>
   </div>
@@ -83,14 +85,17 @@
 <div id="result-screen" class="modal hidden">
   <div class="modal-inner result-inner">
     <h2>宇宙の終着点 — ブラックホール誕生</h2>
-    <p class="modal-sub">すべてを飲み込む存在になった。</p>
+    <p class="modal-sub" id="result-sub">すべてを飲み込む存在になった。</p>
     <div class="result-stats">
-      <div><span>総プレイ時間</span><b id="res-time">00:00</b></div>
-      <div><span>吸収した天体</span><b id="res-count">0</b></div>
-      <div><span>最終質量</span><b id="res-mass">0</b></div>
+      <div><span id="res-time-label">総プレイ時間</span><b id="res-time">00:00</b></div>
+      <div><span id="res-count-label">吸収した天体</span><b id="res-count">0</b></div>
+      <div><span id="res-mass-label">最終質量</span><b id="res-mass">0</b></div>
       <div><span>到達レベル</span><b id="res-level">1</b></div>
     </div>
-    <button id="btn-result-restart" class="btn btn-primary">もう一度あそぶ</button>
+    <div class="title-buttons">
+      <button id="btn-result-endless" class="btn btn-primary">そのまま遊ぶ（エンドレス）</button>
+      <button id="btn-result-restart" class="btn btn-ghost">もう一度あそぶ</button>
+    </div>
   </div>
 </div>
 

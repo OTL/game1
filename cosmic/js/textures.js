@@ -84,6 +84,64 @@ function updateWorldLight(t) {
 const TEX_SIZE = 128;
 
 /* ============================================================
+ * クレーター生成（岩石質の天体: 岩石片/小惑星/準惑星/彗星核）— 実機フィードバック対応（第3回）
+ * ------------------------------------------------------------
+ * 以前は低オクターブの値ノイズ（fbm、グリッドサイズ6が主成分）をそのまま
+ * mixColor(dark, base, noise^1.6) に通していたため、数個の大きく滑らかな明暗の
+ * 塊が「白い斑点が数個貼り付いたサッカーボール」に見えてしまっていた。
+ * 代わりに、大小さまざまな半径のクレーターを明示的にいくつも配置し、それぞれ
+ * 「縁が明るいリム」「底に向かって暗くなるお椀」を持たせることで、月や小惑星の
+ * 写真に近い凹凸のある見た目にする。u（経度相当）は周期的（トーラス状）に
+ * 距離を測り、球面/正距円筒図法のどちらでも継ぎ目が出ないようにする。 */
+const _craterFieldCache = new Map();
+function getCraterField(seed) {
+  let c = _craterFieldCache.get(seed);
+  if (c) return c;
+  const rng = mulberry32((seed * 65599 + 101) >>> 0);
+  const count = 10 + ((rng() * 8) | 0);
+  const craters = [];
+  for (let i = 0; i < count; i++) {
+    craters.push({
+      u: rng(), v: rng(),
+      r: 0.045 + Math.pow(rng(), 2.1) * 0.30, // 半径は小さいものに偏り、稀に大きいものも混じる
+      depth: 0.22 + rng() * 0.32,
+    });
+  }
+  _craterFieldCache.set(seed, craters);
+  return craters;
+}
+function craterToroidalDist(u, v, cu, cv, wrapU) {
+  let du = u - cu;
+  if (wrapU) du = ((du + 0.5) % 1 + 1) % 1 - 0.5;
+  const dv = v - cv;
+  return Math.hypot(du, dv);
+}
+/* 戻り値は明るさへの加算的な補正量（-1..1程度）。0=補正なし、正=リムで明るい、負=お椀の底で暗い。 */
+function craterShadeAt(u, v, craters, wrapU) {
+  let s = 0;
+  for (let i = 0; i < craters.length; i++) {
+    const c = craters[i];
+    const d = craterToroidalDist(u, v, c.u, c.v, wrapU);
+    const nd = d / c.r;
+    if (nd >= 1) continue;
+    const rim = Math.exp(-Math.pow((nd - 0.8) / 0.14, 2)) * 0.5;
+    const bowl = -(1 - nd) * c.depth;
+    s += rim + bowl;
+  }
+  return Math.max(-0.72, Math.min(0.55, s));
+}
+/* このkindにクレーター表現を使うかどうか（岩石質の不整形/小型天体のみ。
+ * 惑星以降は既存の穏やかなノイズ地形のままにする）。
+ * 注意: comet は base/light がもともと非常に明るい氷色（ほぼ白）のパレットのため、
+ * このクレーター表現をそのまま使うと明るいリム部分が白飛びしてしまい、直そうとした
+ * 「白い斑点」の問題を別の形で再現してしまう（実機フィードバック対応の副作用を実機
+ * 検証時に発見・修正）。そのため comet は対象から外し、従来の穏やかなノイズ地形のまま
+ * にする。 */
+function isCrateredKind(kind) {
+  return kind === 'rock' || kind === 'asteroid' || kind === 'dwarf';
+}
+
+/* ============================================================
  * LOD（テクスチャ解像度の段階） — 実機フィードバック対応
  * ------------------------------------------------------------
  * 「巨大な敵がモザイク状にボケる」問題は、固定の低解像度テクスチャキャッシュを
@@ -145,6 +203,11 @@ function generateAlbedoShapeTexture(kind, palette, seed, irregular, texSize) {
   const base = hexToRgb(palette.base);
   const dark = hexToRgb(palette.dark || palette.base);
   const light = hexToRgb(palette.light || '#ffffff');
+  // クレーターのリム（縁）を明るくする際の目標色。パレット自体の light（例: 彗星の
+  // ほぼ純白のハイライト色）をそのまま使うと、明るいパレットで白飛びしてしまう
+  // （実機検証で発見）。base からほどよく明るくした色に固定することで、どのパレットでも
+  // 白飛びせず一貫した「リムが少し明るい」見た目になるようにする。
+  const crRim = mixColor(base, { r: 255, g: 255, b: 255 }, 0.32);
   const shapeParams = irregular ? getIrregularShapeParams(seed) : null;
 
   for (let py = 0; py < texSize; py++) {
@@ -169,6 +232,17 @@ function generateAlbedoShapeTexture(kind, palette, seed, irregular, texSize) {
         col = mixColor(dark, base, band * 0.7 + n * 0.3);
       } else if (kind === 'star' || kind === 'neutron') {
         col = mixColor(base, light, Math.pow(n, 1.4));
+      } else if (isCrateredKind(kind)) {
+        // 実機フィードバック対応（第3回）: 多オクターブノイズで岩肌の下地を作った上に、
+        // 明示的なクレーター（縁が明るく底が暗い）を重ねる。乗算ではなく mixColor で
+        // dark/light の範囲内に収まるようブレンドすることで、パレットの色域を超えて
+        // 白飛びすることがないようにしている（乗算方式では明るい下地色で白飛びし、
+        // 直そうとした「白い斑点」を再現してしまうことを実機検証で発見・修正した）。
+        const craters = getCraterField(seed);
+        const cs = craterShadeAt(u, v, craters, true);
+        col = mixColor(dark, base, 0.3 + n * 0.55);
+        if (cs > 0) col = mixColor(col, crRim, Math.min(1, cs) * 0.7);
+        else if (cs < 0) col = mixColor(col, dark, Math.min(1, -cs));
       } else {
         const crater = Math.pow(n, 1.6);
         col = mixColor(dark, base, crater);
@@ -218,11 +292,25 @@ function getNearBodyFrame(kind, palette, seedBucket, irregular, sizePx, frameIdx
   ctx.translate(r, r);
   ctx.rotate(rotation);
   ctx.drawImage(tex, -r, -r, sizePx, sizePx);
-  ctx.restore();
   const ambientFloor = (kind === 'star' || kind === 'neutron') ? 0.6 : 0.16;
   ctx.globalCompositeOperation = 'multiply';
-  ctx.drawImage(getShadingMask(sizePx, ambientFloor), 0, 0);
+  // getShadingMask は常にワールド座標の光源方向を向く必要があるため、ここでは
+  // 現在の回転をキャンセルしてから描く（回転で一緒に回ってしまうと光源方向が
+  // ずれてしまう）。
+  ctx.rotate(-rotation);
+  ctx.drawImage(getShadingMask(sizePx, ambientFloor), -r, -r, sizePx, sizePx);
+  // 実機フィードバック対応（第3回・白い斑点の真因）: 不規則形状（ジャガイモ型）の
+  // アルベドテクスチャは、輪郭の外側や凹んだくびれ部分が透明（alpha=0）になっている。
+  // ここまでの 'multiply' 合成は、透明な下地に対しても不透明なシェーディングマスクを
+  // そのまま乗せてしまい、くびれ部分だけ真っ白／真っ黒のマスク色がそのまま透けて
+  // 見える（大きな白い斑点に見える）不具合の直接の原因だった。'destination-in' で
+  // 元のアルベド形状のアルファをもう一度重ねることで、輪郭の外側・くびれの内側を
+  // 確実に透明へ戻す。
+  ctx.rotate(rotation);
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(tex, -r, -r, sizePx, sizePx);
   ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
   _nearFrameCache.set(key, cv);
   if (_nearFrameCache.size > 600) _nearFrameCache.delete(_nearFrameCache.keys().next().value);
   return cv;
@@ -256,6 +344,7 @@ function generateEquirectTexture(kind, palette, seed, w, h) {
   const base = hexToRgb(palette.base);
   const dark = hexToRgb(palette.dark || palette.base);
   const light = hexToRgb(palette.light || '#ffffff');
+  const crRim = mixColor(base, { r: 255, g: 255, b: 255 }, 0.32); // 上のgenerateAlbedoShapeTextureと同じ理由
   const img = ctx.createImageData(w, h);
   for (let py = 0; py < h; py++) {
     const v = py / h; // 0..1 緯度
@@ -270,11 +359,17 @@ function generateEquirectTexture(kind, palette, seed, w, h) {
         col = mixColor(dark, base, band * 0.7 + n * 0.3);
       } else if (kind === 'star' || kind === 'neutron') {
         col = mixColor(base, light, Math.pow(n, 1.3));
+      } else if (isCrateredKind(kind)) {
+        const craters = getCraterField(seed);
+        const cs = craterShadeAt(u, v, craters, true);
+        col = mixColor(dark, base, 0.3 + n * 0.55);
+        if (cs > 0) col = mixColor(col, crRim, Math.min(1, cs) * 0.7);
+        else if (cs < 0) col = mixColor(col, dark, Math.min(1, -cs));
       } else {
         const crater = Math.pow(n, 1.6);
         col = mixColor(dark, base, crater);
       }
-      img.data[idx] = col.r; img.data[idx + 1] = col.g; img.data[idx + 2] = col.b; img.data[idx + 3] = 255;
+      img.data[idx] = Math.max(0, Math.min(255, col.r)); img.data[idx + 1] = Math.max(0, Math.min(255, col.g)); img.data[idx + 2] = Math.max(0, Math.min(255, col.b)); img.data[idx + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -444,23 +539,40 @@ function generateStarfieldLayer(w, h, density, seed) {
   return cv;
 }
 
-/* ゆっくりドリフト／明滅する星雲レイヤー（星空とは別に、独立した速度で流す） */
+/* ゆっくりドリフト／明滅する星雲レイヤー（星空とは別に、独立した速度で流す）。
+ *
+ * 実機フィードバック対応（第3回・背景の市松模様）: 原因は、このタイル画像がトーラス状に
+ * シームレスではなかったこと。各星雲の光暈（radial gradient）はタイル中央付近ほど明るく
+ * タイル端に近づくほど暗く途切れており、drawBackground() 側でこの同じタイルを敷き詰めて
+ * 描画すると、タイル境界を挟んで明暗が周期的に変化する＝大きな正方形のムラ（市松模様）
+ * として見えていた。修正: 各光暈をキャンバスの上下左右斜めの計9箇所（自分自身＋8方向の
+ * 隣接コピー）に描画することで、タイル端をまたぐ光暈も反対側の端に continuous に
+ * 繋がるようにする（トーラス状ラップ）。これによりどの倍率・位置でタイルを敷き詰めても
+ * 境界に不連続な明暗の段差が生じない。 */
 function generateNebulaLayer(w, h, seed) {
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d');
   const rng = mulberry32(seed);
   const nebColors = ['#3a2a6d', '#1a3a6d', '#5a2a5d', '#204a5a', '#3a1a4a'];
+  const wrapOffsets = [-w, 0, w];
+  const wrapOffsetsY = [-h, 0, h];
   for (let i = 0; i < 6; i++) {
     const cx = rng() * w, cy = rng() * h;
     const r = (0.22 + rng() * 0.32) * Math.max(w, h);
     const col = hexToRgb(nebColors[i % nebColors.length]);
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, rgbStr(col, 0.38));
-    grad.addColorStop(0.5, rgbStr(col, 0.18));
-    grad.addColorStop(1, rgbStr(col, 0));
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    for (const ox of wrapOffsets) {
+      for (const oy of wrapOffsetsY) {
+        const bx = cx + ox, by = cy + oy;
+        if (bx + r < 0 || bx - r > w || by + r < 0 || by - r > h) continue;
+        const grad = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+        grad.addColorStop(0, rgbStr(col, 0.38));
+        grad.addColorStop(0.5, rgbStr(col, 0.18));
+        grad.addColorStop(1, rgbStr(col, 0));
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
   }
   return cv;
 }

@@ -87,6 +87,7 @@
     p.level = data.level || 1;
     p.reviveUsed = !!data.reviveUsed;
     p.mode = gameModeOrDefault(data.mode);
+    p.endless = !!data.endless;
     p.checkpointMass = data.checkpointMass || data.mass;
     p.checkpointStageIdx = data.checkpointStageIdx || p.stageIdx;
     p.checkpointUpgrades = data.checkpointUpgrades || Object.assign({}, p.upgrades);
@@ -170,7 +171,11 @@
       // 近傍にすでに「脅威」枠が上限数いる場合は、今回のスポーンは強制的に
       // 非脅威（餌寄り）にロールし直す（目標分布: 脅威は同時1〜2体まで）。
       const threatsNear = nearThreatCount(player, spawnR * 0.85);
-      const forceNonThreat = threatsNear >= BALANCE.maxThreatsNear;
+      // エンドレスモード（ブラックホール到達後）はBALANCE.endlessThreatChanceで指定した
+      // 確率でのみ「脅威」個体を許可する（既定0=常に非脅威）。「脅威なし or わずか」で
+      // 何でも吸い込めるブラックホールとして遊べるようにする。
+      const forceNonThreat = threatsNear >= BALANCE.maxThreatsNear ||
+        (player.endless && rng() >= BALANCE.endlessThreatChance);
       const mass = rollEnemyMass(state.enemyScaleMass, forceNonThreat);
       // 質量比が大きい「脅威」個体ほど、外周寄りの遠い位置にのみスポーンさせる。
       // ＝ プレイヤーより大幅に大きい敵は近接遭遇せず「遠くの存在」として現れる。
@@ -262,8 +267,15 @@
     const directRatio = 0.55;
     const direct = enemy.mass * directRatio;
     const gained = creditMass(player, direct, enemy.x, enemy.y);
-    queueFloat('player-gain', enemy.x, enemy.y - enemy.radius - 4, gained, '#8fe3ff');
-    spawnFragments(state.fragments, enemy.x, enemy.y, enemy.mass * (1 - directRatio), enemy.palette.base, rng, undefined, enemy.vx, enemy.vy);
+    // 実機フィードバック対応（第3回・数値表示バグ）: 以前はキル・破片吸収・溶岩・衛星
+    // 吸収などあらゆる質量獲得を同じ 'player-gain' キーに集計していたため、画面のどこかで
+    // 起きた無関係な複数の獲得（例: 遠くの敵を1体倒した直後に近くの破片を何十個も
+    // 吸収する等）が0.35秒の間に一つの数値へ合算され、「+32.59M」のような自機の質量を
+    // 大きく超える実態と乖離した数値が表示される原因になっていた。以後は獲得の種類ごとに
+    // 別のキーで集計する（同種の連続ヒットはこれまでどおりまとめて表示しつつ、種類の違う
+    // 獲得同士は混ざらない）。
+    queueFloat('gain-kill', enemy.x, enemy.y - enemy.radius - 4, gained, '#8fe3ff');
+    spawnFragments(state.fragments, enemy.x, enemy.y, enemy.mass * (1 - directRatio), enemy.palette, rng, undefined, enemy.vx, enemy.vy);
     player.absorbedCount++;
     renderer.addShake(clamp(enemy.mass / player.mass * 6, 1, 8));
     for (let i = 0; i < 10; i++) {
@@ -286,7 +298,7 @@
       const realDealt = Math.min(amount, Math.max(0, enemy.hp));
       if (realDealt > 0) {
         const bonus = creditMass(player, realDealt * (upVal('lava', lavaLv) / 100), enemy.x, enemy.y);
-        if (bonus > 0.15) queueFloat('player-gain', enemy.x, enemy.y + 12, bonus, '#ff9a5c');
+        if (bonus > 0.15) queueFloat('gain-lava', enemy.x, enemy.y + 12, bonus, '#ff9a5c');
       }
     }
     enemy.hp -= amount;
@@ -479,16 +491,51 @@
     }
   }
 
-  /* ---------- クリア ---------- */
-  function triggerClear(player) {
-    state.cleared = true;
-    state.paused = true;
+  /* ---------- クリア / エンドレスモード ----------
+   * 実機フィードバック対応（第3回）: 「ブラックホールになった後も遊びたい」への対応。
+   * クリア（ブラックホール到達）後のリザルト画面に「そのまま遊ぶ」ボタンを追加し、
+   * 選ぶとブラックホールのままプレイを継続できるエンドレスモードへ移行する。
+   * 以前はクリアと同時に clearSave() でセーブを破棄していたが、エンドレス継続と
+   * リロード後の復元を両立するため、クリア後もセーブは維持したままにする
+   * （「もう一度あそぶ」で新しい周回を始める場合は startGame(true, ...) 側で
+   * 明示的に clearSave() される）。 */
+  function populateResultStats(player) {
     $('res-time').textContent = fmtTime(player.playTime);
     $('res-count').textContent = player.absorbedCount;
     $('res-mass').textContent = fmtMass(player.mass);
     $('res-level').textContent = player.level;
+    if (player.endless) {
+      $('result-sub').textContent = 'すべてを飲み込む存在として、宇宙を漂い続けている。';
+      $('res-time-label').textContent = '総プレイ時間';
+      $('res-count-label').textContent = '総吸収数';
+      $('res-mass-label').textContent = '現在の質量';
+      $('btn-result-endless').textContent = 'プレイに戻る';
+    } else {
+      $('result-sub').textContent = 'すべてを飲み込む存在になった。';
+      $('res-time-label').textContent = '総プレイ時間';
+      $('res-count-label').textContent = '吸収した天体';
+      $('res-mass-label').textContent = '最終質量';
+      $('btn-result-endless').textContent = 'そのまま遊ぶ（エンドレス）';
+    }
+  }
+
+  function triggerClear(player) {
+    state.cleared = true;
+    state.paused = true;
+    populateResultStats(player);
     $('result-screen').classList.remove('hidden');
-    clearSave();
+    saveGame(player);
+  }
+
+  /* 「そのまま遊ぶ」: ブラックホールとしてエンドレスモードへ移行し、プレイを再開する。
+   * 既にエンドレス中に（一時停止メニューから）リザルトを開き直しただけの場合も、
+   * このボタンは単にプレイへ戻るボタンとして機能する（冪等）。 */
+  function continueEndless(player) {
+    player.endless = true;
+    state.cleared = false;
+    state.paused = false;
+    $('result-screen').classList.add('hidden');
+    saveGame(player);
   }
 
   /* ---------- 入力 ---------- */
@@ -554,6 +601,7 @@
     for (let i = state.fragments.length - 1; i >= 0; i--) {
       const f = state.fragments[i];
       f.life -= dt;
+      f.age = (f.age || 0) + dt;
       const d = dist(f, player);
       if (d < range) {
         const nx = (player.x - f.x) / (d || 1), ny = (player.y - f.y) / (d || 1);
@@ -565,7 +613,7 @@
       if (d < pr * 0.9 || f.life <= 0) {
         if (d < pr * 1.4) {
           const gained = creditMass(player, f.mass, f.x, f.y);
-          if (gained > 0.15) queueFloat('player-gain', player.x, player.y - pr - 4, gained, '#bfe3ff');
+          if (gained > 0.15) queueFloat('gain-fragment', player.x, player.y - pr - 4, gained, '#bfe3ff');
         }
         state.fragments.splice(i, 1);
       }
@@ -759,13 +807,13 @@
         f.vx += nx * 140 * dt; f.vy += ny * 140 * dt;
         if (fd < s.radius * 1.1) {
           const gained = creditMass(player, f.mass, s.x, s.y);
-          if (gained > 0.15) queueFloat('player-gain', s.x, s.y, gained, '#8fe3c9');
+          if (gained > 0.15) queueFloat('gain-satellite', s.x, s.y, gained, '#8fe3c9');
           state.fragments.splice(fi, 1);
         }
       }
 
       if (s.hp <= 0) {
-        spawnFragments(state.fragments, s.x, s.y, s.mass * 0.5, s.palette.base, rng, undefined, 0, 0);
+        spawnFragments(state.fragments, s.x, s.y, s.mass * 0.5, s.palette, rng, undefined, 0, 0);
         player.capturedSatellites.splice(i, 1);
         renderer.addShake(5);
         showToast(s.name + ' の衛星が破壊された…');
@@ -922,6 +970,22 @@
       satEl.classList.remove('hidden');
       satEl.innerHTML = '🛰 ' + player.capturedSatellites.length + ' / ' + cap;
     }
+
+    // エンドレスモード: 総吸収数・質量をHUDに表示する（左上のパネルを縦に積む）。
+    const endlessEl = $('endless-hud');
+    if (player.endless) {
+      endlessEl.classList.remove('hidden');
+      endlessEl.innerHTML = '🕳 総吸収 ' + player.absorbedCount + ' ・ 質量 ' + fmtMass(player.mass);
+    } else {
+      endlessEl.classList.add('hidden');
+    }
+    // 左上のパネル群（ロックオン / 保有衛星 / エンドレス統計）が表示状態に応じて
+    // 重ならないよう、上から順に積み直す。
+    let stackTop = 78;
+    const lockonEl = $('lockon');
+    if (!lockonEl.classList.contains('hidden')) stackTop += 74;
+    if (!satEl.classList.contains('hidden')) { satEl.style.top = stackTop + 'px'; stackTop += 40; }
+    if (player.endless) endlessEl.style.top = stackTop + 'px';
   }
 
   function showToast(text) {
@@ -972,8 +1036,8 @@
       state.camera.x += (player.x - state.camera.x) * Math.min(1, dt * 6);
       state.camera.y += (player.y - state.camera.y) * Math.min(1, dt * 6);
 
-      updateHud(player);
       updateLockonUI(player);
+      updateHud(player);
     }
   }
 
@@ -1139,6 +1203,16 @@
     refreshUpgradeIcons(player);
     updateHud(player);
     if (!state.running) { state.running = true; requestAnimationFrame(step); }
+    // 実機フィードバック対応（第3回・エンドレスモード）: セーブが「ブラックホールに
+    // 到達済みだが、まだ『そのまま遊ぶ』を選んでいない」状態だった場合（クリア後に
+    // リザルト画面を閉じずにリロードした等）、黙って続行せず、もう一度リザルト画面を
+    // 出して選択させる（クリアという区切りをきちんと見せるため）。
+    if (!fresh && !player.endless && player.stageIdx >= STAGES.length - 1) {
+      state.cleared = true;
+      state.paused = true;
+      populateResultStats(player);
+      $('result-screen').classList.remove('hidden');
+    }
   }
 
   function bindUI() {
@@ -1146,19 +1220,30 @@
     $('btn-newgame').addEventListener('click', () => startGame(true, 'normal'));
     $('btn-newgame-fast').addEventListener('click', () => startGame(true, 'fast'));
     $('btn-menu').addEventListener('click', () => {
+      // クリア直後（まだそのまま遊ぶ/やり直すを選んでいない）はメニューを出さない。
+      // エンドレスに移行した後は state.cleared が false に戻るので通常どおり開ける。
       if (state.cleared) return;
       state.paused = true;
+      $('btn-pause-result').classList.toggle('hidden', !(state.player && state.player.endless));
       $('pause-modal').classList.remove('hidden');
     });
     $('btn-resume').addEventListener('click', () => {
       state.paused = false;
       $('pause-modal').classList.add('hidden');
     });
+    $('btn-pause-result').addEventListener('click', () => {
+      $('pause-modal').classList.add('hidden');
+      if (state.player) populateResultStats(state.player);
+      $('result-screen').classList.remove('hidden');
+    });
     $('btn-restart-confirm').addEventListener('click', () => {
       $('pause-modal').classList.add('hidden');
       startGame(true, state.player ? state.player.mode : 'normal');
     });
     $('btn-result-restart').addEventListener('click', () => startGame(true, state.player ? state.player.mode : 'normal'));
+    $('btn-result-endless').addEventListener('click', () => {
+      if (state.player) continueEndless(state.player);
+    });
 
     if (hasSave()) $('btn-continue').classList.remove('hidden');
   }

@@ -37,9 +37,15 @@ function enemyVisualRadius(mass) {
 }
 
 const ENEMY_PALETTES = {
+  // 実機フィードバック対応（第3回・岩石の質感）: 「月や小惑星の写真」寄りの見た目を
+  // 目指し、彩度を抑えたグレー〜茶系のバリエーションを増やす（単色の白斑点は廃止し、
+  // textures.js 側のクレーター生成に置き換えた）。
   asteroid: [
-    { base: '#9a8f7d', dark: '#4c463c', light: '#cfc4ab' },
-    { base: '#8a7e73', dark: '#3d3831', light: '#c2b6a2' },
+    { base: '#8f8578', dark: '#3c372e', light: '#b7ac98' },
+    { base: '#7d7568', dark: '#332f28', light: '#a89e8c' },
+    { base: '#867a68', dark: '#382f24', light: '#ad9c82' },
+    { base: '#75726c', dark: '#2e2c28', light: '#9d998f' },
+    { base: '#8a7362', dark: '#3a2e22', light: '#b0967c' },
   ],
   comet: [
     { base: '#bfe3ff', dark: '#5a86a8', light: '#ffffff' },
@@ -126,6 +132,7 @@ function makePlayer(stage) {
     level: 1,
     reviveUsed: false,
     mode: 'normal',    // 'normal' | 'fast'（加速モード・お試し）
+    endless: false,    // ブラックホール到達後、リザルトで「そのまま遊ぶ」を選んだか
     fx: { veinsTimer: 0, auroraTimer: 0, stormTimer: 0, flareTimer: 0, cmeTimer: 0 },
     satellites: [],           // 「衛星」アップグレードの汎用衛星 {angle, dist, speed, kind}
     capturedSatellites: [],   // 捕獲した天体（惑星以上で解放）
@@ -211,28 +218,35 @@ class FloatTextPool {
 
 /* 破片（吸収可能な質量の粒）。運動量保存: 親天体の速度を引き継いだ上に、
  * 爆発による放射状の速度を加える（衝突の運動量保存則）。以後は減速せず、
- * 個々に回転しながら真空を漂う。 */
-function makeFragment(x, y, mass, color, rng, baseVx, baseVy) {
+ * 個々に回転しながら真空を漂う。
+ * 実機フィードバック対応（第3回・質感）: 以前は色(hex)1つだけを保持し、単色ベタ塗り＋
+ * 白いハイライト1点で描画していた（「のっぺりした安っぽい丸」の直接の原因）。
+ * palette（base/dark/light の3トーン）を保持するようにし、render.js 側で他の天体と
+ * 同じ単一光源シェーディング（大きめの破片はテクスチャ付きの近似天体として、
+ * 小さい破片は陰影付きグラデーションの球として）描画できるようにする。 */
+function makeFragment(x, y, mass, palette, rng, baseVx, baseVy) {
   const ang = rng() * Math.PI * 2;
   const spd = 20 + rng() * 60;
   return {
     x, y,
     vx: (baseVx || 0) + Math.cos(ang) * spd,
     vy: (baseVy || 0) + Math.sin(ang) * spd,
-    mass, color, alive: true,
+    mass, palette, alive: true,
     radius: Math.max(2.2, massToRadius(mass) * 0.6),
     life: 22,
+    age: 0,
     angle: rng() * Math.PI * 2,
     spin: (rng() - 0.5) * 3.2,
+    seedBucket: (rng() * 6) | 0,
   };
 }
 
-function spawnFragments(list, x, y, totalMass, color, rng, count, baseVx, baseVy) {
+function spawnFragments(list, x, y, totalMass, palette, rng, count, baseVx, baseVy) {
   count = count || Math.min(14, Math.max(3, Math.round(Math.sqrt(totalMass))));
   const per = totalMass / count;
   for (let i = 0; i < count; i++) {
     list.push(makeFragment(
-      x + (rng() - 0.5) * 10, y + (rng() - 0.5) * 10, per, color, rng, baseVx, baseVy
+      x + (rng() - 0.5) * 10, y + (rng() - 0.5) * 10, per, palette, rng, baseVx, baseVy
     ));
   }
 }
@@ -252,8 +266,19 @@ const GRAV_MAX_ACCEL = 900;      // 極端なスイングバイで暴れない�
 const ENEMY_GRAV_CONST = 5.2;    // 敵同士の簡易相互重力
 const ENEMY_GRAV_RANGE = 260;    // 敵同士の重力を計算する近傍半径
 
+/* 実機フィードバック対応（第3回）: 重力で引き寄せた「自分より十分小さく吸収可能な」
+ * 獲物が、角運動量を保ったまま安定周回に乗ってしまい、いつまで経っても落ちてこない
+ * （＝吸収できない）問題への対応。プレイヤーの重力を受ける天体のうち、質量比が
+ * BALANCE.gravityPreyRatio 未満の「明確な獲物」（および自機がブラックホールの場合は
+ * 全ての天体＝#4「吸い込んだ天体が螺旋を描いて事象の地平線に落ちる」演出を兼ねる）は、
+ * 速度の接線成分（＝軌道角運動量に相当）を毎フレーム指数的に減衰させる。これは
+ * 動的摩擦・潮汐減衰の簡易近似で、径方向の速度成分はそのまま保つため、数秒以内に
+ * 必ず螺旋を描いて落下する。敵対的・拮抗〜格上の天体（脅威）はこの減衰の対象外とし、
+ * 従来どおりのスイングバイ挙動を維持する。 */
 function applyPlayerGravity(enemies, player, dt, gravityMult) {
   const gm = GRAV_CONST * player.mass * (gravityMult || 1);
+  const isBlackHole = currentStage(player).kind === 'blackhole';
+  const preyMassLimit = player.mass * BALANCE.gravityPreyRatio;
   for (let i = 0; i < enemies.length; i++) {
     const e = enemies[i];
     if (!e.alive) continue;
@@ -262,10 +287,28 @@ function applyPlayerGravity(enemies, player, dt, gravityMult) {
     if (r2 > GRAV_PLAYER_RANGE * GRAV_PLAYER_RANGE) continue;
     const r = Math.sqrt(r2) || 1;
     const rc = Math.max(GRAV_MIN_R, r);
+    const isDamped = isBlackHole || e.mass < preyMassLimit;
     let a = gm / (rc * rc);
+    // 実機フィードバック対応（第3回）: 接線速度を減衰させるだけでは、遠方では重力
+    // そのものが弱いため実際に落ちてくるまで十数秒かかってしまうことが実機検証で
+    // 判明した（角運動量はすぐ0に近づくが、その後の径方向の自由落下が遅い）。
+    // 「明確な獲物」（および自機がブラックホールの場合）に限り、径方向の加速度を
+    // BALANCE.preyGravityBoost 倍に強めることで、真に数秒以内で吸収されるようにする。
+    // スイングバイを維持する脅威・拮抗天体の加速度は変更しない。
+    if (isDamped) a *= BALANCE.preyGravityBoost;
     if (a > GRAV_MAX_ACCEL) a = GRAV_MAX_ACCEL;
-    e.vx += (dx / r) * a * dt;
-    e.vy += (dy / r) * a * dt;
+    const rnx = dx / r, rny = dy / r;
+    e.vx += rnx * a * dt;
+    e.vy += rny * a * dt;
+
+    if (isDamped) {
+      const tnx = -rny, tny = rnx;
+      const vr = e.vx * rnx + e.vy * rny;
+      const vt = e.vx * tnx + e.vy * tny;
+      const dampedVt = vt * Math.exp(-BALANCE.preyOrbitDampRate * dt);
+      e.vx = rnx * vr + tnx * dampedVt;
+      e.vy = rny * vr + tny * dampedVt;
+    }
   }
 }
 
@@ -332,7 +375,7 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
         small.alive = false;
         // 質量上限を超えた分（+ 直接吸収されなかった残り）は破片として放出する。
         // 破片は敵化しない（分裂の連鎖を作らない）ため、これ以上の個体数増加は起きない。
-        spawnFragments(fragments, small.x, small.y, small.mass * 0.6 + overflow, small.palette.base, rng, undefined, small.vx, small.vy);
+        spawnFragments(fragments, small.x, small.y, small.mass * 0.6 + overflow, small.palette, rng, undefined, small.vx, small.vy);
         if (onDestroyed) onDestroyed(small, big);
         continue;
       }
@@ -352,27 +395,48 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
 
 /* 実機フィードバック対応: 敵・破片の合計個体数がワールド全体で上限を超えないよう、
  * プレイヤーから最も遠いものから間引く（分裂連鎖・スポーン過多で画面が埋まるのを防ぐ）。
- * 破片は視覚的な重要度が低いため先に間引き、それでも超過する場合のみ敵を間引く。 */
-function pruneBodyCounts(enemies, fragments, player) {
-  if (fragments.length > BALANCE.maxFragments) {
-    fragments.sort((a, b) => distSq(b, player) - distSq(a, player));
-    fragments.length = BALANCE.maxFragments;
+ * 破片は視覚的な重要度が低いため先に間引き、それでも超過する場合のみ敵を間引く。
+ *
+ * 実機フィードバック対応（第3回）: 「破片がすぐ消滅する」の原因は寿命(life=22秒)では
+ * なく、敵同士の合体連鎖で一瞬に大量の破片が湧いたときにこの間引き処理が生まれたての
+ * 破片ごと即座に削除していたことだった（湧いた直後にちょうど個体数上限を超え、
+ * 遠い順に切り捨てる過程で新しい破片も巻き込まれていた）。生成から
+ * BALANCE.fragmentSpawnGraceSeconds 秒未満の破片は「猶予中」として間引き対象から除外し、
+ * どうしても猶予中の破片だけで上限を超える場合にのみ最後の手段として削る。 */
+const isFragmentInGrace = f => (f.age || 0) < BALANCE.fragmentSpawnGraceSeconds;
+
+/* 破片配列を cap 件以下に切り詰める。生まれたて（猶予中）の破片はできるだけ残し、
+ * 「成熟した」（猶予を過ぎた）破片をプレイヤーから遠い順に優先して間引く。
+ * 猶予中の破片だけで cap を超える極端な場合のみ、最後の手段としてそれも間引く。 */
+function trimFragmentsTo(fragments, player, cap) {
+  if (fragments.length <= cap) return;
+  const grace = fragments.filter(isFragmentInGrace);
+  const mature = fragments.filter(f => !isFragmentInGrace(f));
+  mature.sort((a, b) => distSq(b, player) - distSq(a, player));
+  mature.length = Math.max(0, Math.min(mature.length, cap - grace.length));
+  let merged = mature.concat(grace);
+  if (merged.length > cap) {
+    merged.sort((a, b) => distSq(b, player) - distSq(a, player));
+    merged.length = cap;
   }
+  fragments.length = 0;
+  for (const f of merged) fragments.push(f);
+}
+
+function pruneBodyCounts(enemies, fragments, player) {
+  trimFragmentsTo(fragments, player, BALANCE.maxFragments);
   const aliveEnemies = enemies.filter(e => e.alive);
   if (aliveEnemies.length > BALANCE.maxEnemies) {
     aliveEnemies.sort((a, b) => distSq(b, player) - distSq(a, player));
     const excess = aliveEnemies.length - BALANCE.maxEnemies;
     for (let i = 0; i < excess; i++) aliveEnemies[i].alive = false;
   }
-  let total = enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0) + fragments.length;
+  const total = enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0) + fragments.length;
   if (total > BALANCE.maxTotalBodies) {
     const alive = enemies.filter(e => e.alive).sort((a, b) => distSq(b, player) - distSq(a, player));
     let over = total - BALANCE.maxTotalBodies;
     for (let i = 0; i < alive.length && over > 0; i++) { alive[i].alive = false; over--; }
-    if (over > 0 && fragments.length > 0) {
-      fragments.sort((a, b) => distSq(b, player) - distSq(a, player));
-      fragments.length = Math.max(0, fragments.length - over);
-    }
+    if (over > 0) trimFragmentsTo(fragments, player, Math.max(0, fragments.length - over));
   }
 }
 function distSq(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
