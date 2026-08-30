@@ -124,6 +124,16 @@ const BALANCE = {
   enemyDensity: 1,
   fragmentAbsorbRange: 90,
   fragmentAbsorbSpeed: 260,
-  levelUpGrowth: 1.32,     // レベルアップに必要な質量倍率
+  // レベルアップに必要な質量倍率は levelUpGrowthFor() でレベルに応じて逓増させる
+  levelUpGrowthBase: 1.9,  // レベル1での倍率
+  levelUpGrowthStep: 0.11, // レベルが上がるごとの倍率の増分
+  levelUpGrowthMax: 3.6,   // 倍率の上限（終盤の頭打ち）
   autosaveInterval: 6,     // 秒
 };
+
+/* レベルアップに必要な質量倍率（レベルが進むほど急になる指数カーブ）。
+ * 序盤は控えめな倍率で2〜3分に1回、終盤は倍率が大きくなり4〜5分に1回程度の
+ * ペースを狙う（クリアまで合計15〜18回程度のレベルアップになるよう調整済み）。 */
+function levelUpGrowthFor(level) {
+  return Math.min(BALANCE.levelUpGrowthMax, BALANCE.levelUpGrowthBase + Math.max(1, level) * BALANCE.levelUpGrowthStep);
+}

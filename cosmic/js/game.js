@@ -71,7 +71,7 @@
     p.playTime = data.playTime || 0;
     p.absorbedCount = data.absorbedCount || 0;
     p.totalMassGained = data.totalMassGained || data.mass;
-    p.nextLevelMass = data.nextLevelMass || data.mass * BALANCE.levelUpGrowth;
+    p.nextLevelMass = data.nextLevelMass || data.mass * levelUpGrowthFor(data.level || 1);
     p.level = data.level || 1;
     p.reviveUsed = !!data.reviveUsed;
     p.checkpointMass = data.checkpointMass || data.mass;
@@ -236,7 +236,7 @@
     player.stageIdx = player.checkpointStageIdx;
     player.upgrades = Object.assign({}, player.checkpointUpgrades);
     player.hp = player.checkpointHp;
-    player.nextLevelMass = Math.max(player.mass * BALANCE.levelUpGrowth, player.mass + 1);
+    player.nextLevelMass = Math.max(player.mass * levelUpGrowthFor(player.level), player.mass + 1);
     player.invuln = 2.5;
     player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
     state.enemies = [];
@@ -294,7 +294,7 @@
     if (picks.length === 0) {
       // 取得できる物が無ければそのままレベルだけ進める
       player.level++;
-      player.nextLevelMass = player.mass * BALANCE.levelUpGrowth;
+      player.nextLevelMass = player.mass * levelUpGrowthFor(player.level);
       state.paused = false;
       return;
     }
@@ -314,7 +314,7 @@
         player.upgrades[u.id] = nextLv;
         if (u.id === 'moon' || u.id === 'binary') rebuildSatellites(player);
         player.level++;
-        player.nextLevelMass = player.mass * BALANCE.levelUpGrowth;
+        player.nextLevelMass = player.mass * levelUpGrowthFor(player.level);
         $('levelup-modal').classList.add('hidden');
         state.paused = false;
         refreshUpgradeIcons(player);
@@ -533,6 +533,8 @@
     }
     player.invuln = Math.max(0, player.invuln - dt);
     if (player.hitFlash > 0) player.hitFlash -= dt * 2.2;
+    // 自転（球体テクスチャの流れ用の位相）
+    player.spinPhase = (player.spinPhase || 0) + 0.16 * dt;
   }
 
   function pulseDamage(player, radius, dmg, color, knockback, silent) {
@@ -646,12 +648,12 @@
       updateLockonUI(player);
     }
 
-    render(player);
+    render(player, dt);
   }
 
-  function render(player) {
+  function render(player, dt) {
     renderer.clear();
-    renderer.drawBackground(state.camera);
+    renderer.drawBackground(state.camera, dt || 0, player.stageIdx);
     renderer.beginFrame(1 / 60, state.camera);
     const cam = state.camera;
 
@@ -688,7 +690,7 @@
       const sr = playerRadius(player) * cam.zoom;
       const pseudo = {
         kind: stage.kind, palette: derivePalette(stage.color), seedBucket: stage.key.length * 13 + player.stageIdx,
-        angle: player.angle, hitFlash: player.hitFlash, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
+        angle: player.angle, spinPhase: player.spinPhase || 0, hitFlash: player.hitFlash, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
         vx: player.vx, vy: player.vy,
       };
       if (player.invuln > 0 && Math.floor(player.invuln * 10) % 2 === 0) {
