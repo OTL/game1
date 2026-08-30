@@ -4,7 +4,7 @@
    ============================================================ */
 'use strict';
 
-const SAVE_KEY = 'cosmic-eater-save-v1';
+const SAVE_KEY = 'cosmic-eater-save-v2'; // v2: レベルアップ必要質量カーブ変更のため旧セーブ(v1)は破棄
 
 function serializePlayer(player) {
   return {
