@@ -117,6 +117,18 @@
       const mass = rollEnemyMass(player);
       const body = makeEnemyBody(kind, mass, x, y, rng);
       if (kind === 'planet' && rng() < 0.35) body.hasRing = true;
+      if (kind === 'comet') {
+        // 彗星は速めに視界を横切らせる: プレイヤー付近を通過する直線的な高速軌道
+        const aimAng = rng() * Math.PI * 2;
+        const aimOffset = spawnR * (0.15 + rng() * 0.5);
+        const aimX = player.x + Math.cos(aimAng) * aimOffset;
+        const aimY = player.y + Math.sin(aimAng) * aimOffset;
+        const ddx = aimX - x, ddy = aimY - y;
+        const dd = Math.hypot(ddx, ddy) || 1;
+        const cometSpeed = 240 + rng() * 140;
+        body.vx = (ddx / dd) * cometSpeed;
+        body.vy = (ddy / dd) * cometSpeed;
+      }
       state.enemies.push(body);
     }
   }
@@ -152,7 +164,7 @@
     const direct = enemy.mass * directRatio;
     const gained = creditMass(player, direct, enemy.x, enemy.y);
     showFloat(enemy.x, enemy.y - enemy.radius - 4, '+' + fmtMass(gained), '#8fe3ff');
-    spawnFragments(state.fragments, enemy.x, enemy.y, enemy.mass * (1 - directRatio), enemy.palette.base, rng);
+    spawnFragments(state.fragments, enemy.x, enemy.y, enemy.mass * (1 - directRatio), enemy.palette.base, rng, undefined, enemy.vx, enemy.vy);
     player.absorbedCount++;
     renderer.addShake(clamp(enemy.mass / player.mass * 6, 1, 8));
     for (let i = 0; i < 10; i++) {
@@ -425,7 +437,7 @@
         f.vx += nx * pull * dt * 6; f.vy += ny * pull * dt * 6;
       }
       f.x += f.vx * dt; f.y += f.vy * dt;
-      f.vx *= 0.96; f.vy *= 0.96;
+      f.angle = (f.angle || 0) + (f.spin || 0) * dt;
       if (d < pr * 0.9 || f.life <= 0) {
         if (d < pr * 1.4) {
           const gained = creditMass(player, f.mass, f.x, f.y);
@@ -439,7 +451,13 @@
   function updateEnemyAI(player, dt) {
     for (const e of state.enemies) {
       if (!e.alive) continue;
-      e.angle += e.spin * dt;
+      // タンブリング: 不規則形状の天体は非等速の回転（角速度に周期的なゆらぎ）
+      if (e.spinWobbleAmp) {
+        e.spinWobblePhase += e.spinWobbleFreq * dt;
+        e.angle += (e.spin + e.spinWobbleAmp * Math.sin(e.spinWobblePhase)) * dt;
+      } else {
+        e.angle += e.spin * dt;
+      }
       e.tailPhase += dt;
       if (e.isHostile) {
         e.aiTimer -= dt;
@@ -453,8 +471,8 @@
           e.vy += ny * flee * 70 * dt;
         }
       }
+      // 真空中なので速度は減衰させない（ケプラー運動のまま漂流・公転させる）。
       e.x += e.vx * dt; e.y += e.vy * dt;
-      e.vx *= 0.992; e.vy *= 0.992;
       if (e.hitFlash > 0) e.hitFlash -= dt * 2.2;
     }
   }
@@ -533,8 +551,15 @@
     }
     player.invuln = Math.max(0, player.invuln - dt);
     if (player.hitFlash > 0) player.hitFlash -= dt * 2.2;
-    // 自転（球体テクスチャの流れ用の位相）
-    player.spinPhase = (player.spinPhase || 0) + 0.16 * dt;
+    // 自転（球体テクスチャの流れ用の位相）。序盤2段階は不規則形状のため、
+    // 非等速のタンブリングになるようゆらぎを加える。
+    const stageKey = currentStage(player).key;
+    if (stageKey === 'rock' || stageKey === 'asteroid') {
+      player.spinWobblePhase = (player.spinWobblePhase || 0) + 0.9 * dt;
+      player.spinPhase = (player.spinPhase || 0) + (0.22 + 0.16 * Math.sin(player.spinWobblePhase)) * dt;
+    } else {
+      player.spinPhase = (player.spinPhase || 0) + 0.16 * dt;
+    }
   }
 
   function pulseDamage(player, radius, dmg, color, knockback, silent) {
@@ -627,6 +652,10 @@
       const speedRatio = updatePlayerMovement(player, dt);
       trySpawnEnemies(player);
       despawnFarEnemies(player);
+      applyPlayerGravity(state.enemies, player, dt);
+      updateEnemyMutualGravityAndCollisions(state.enemies, state.fragments, null, rng, dt, (small, big) => {
+        renderer.addShake(clamp(small.mass / Math.max(1, player.mass) * 2, 0.5, 4));
+      });
       updateEnemyAI(player, dt);
       for (const e of state.enemies) resolveCollision(player, e, dt, speedRatio);
       updateFragments(player, dt);
@@ -665,6 +694,7 @@
 
     // 敵（画面外カリング）
     const margin = 140;
+    let nearestEnemy = null, nearestD = Infinity;
     for (const e of state.enemies) {
       if (!e.alive) continue;
       const s = renderer.worldToScreen(cam, e.x, e.y);
@@ -672,6 +702,14 @@
       if (s.x < -margin - sr || s.x > renderer.w + margin + sr || s.y < -margin - sr || s.y > renderer.h + margin + sr) continue;
       renderer.drawBody(e, s.x, s.y, sr, cam);
       if (sr > 6) renderer.drawHpBar(s.x, s.y, sr, e.hp / e.maxHp, e.isHostile ? '#ff6b7a' : '#5ce0a0');
+      const d = dist(e, player);
+      if (d < nearestD) { nearestD = d; nearestEnemy = e; }
+    }
+    // ロックオン対象: 固定のガイド線ではなく、薄くパルスする動的マーカー
+    if (nearestEnemy && nearestD < 900) {
+      const s = renderer.worldToScreen(cam, nearestEnemy.x, nearestEnemy.y);
+      const sr = nearestEnemy.radius * cam.zoom;
+      renderer.drawLockonMarker(s.x, s.y, sr, dt || 0, nearestEnemy.mass > player.mass * INSTAKILL_RATIO);
     }
 
     // 衛星
@@ -692,6 +730,8 @@
         kind: stage.kind, palette: derivePalette(stage.color), seedBucket: stage.key.length * 13 + player.stageIdx,
         angle: player.angle, spinPhase: player.spinPhase || 0, hitFlash: player.hitFlash, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
         vx: player.vx, vy: player.vy,
+        // 序盤2段階（岩石片・小惑星）は不規則形状でタンブリング、準惑星進化時に球になる
+        irregularShape: stage.key === 'rock' || stage.key === 'asteroid',
       };
       if (player.invuln > 0 && Math.floor(player.invuln * 10) % 2 === 0) {
         renderer.ctx.globalAlpha = 0.45;

@@ -30,6 +30,15 @@ html, body {
   touch-action: none;
 }
 
+/* 薄いビネット（写真的な周辺減光）。毎フレームのcanvas再描画コストを避けるため
+   常時表示のCSSオーバーレイとして重ねている（GPU合成のみでコストがほぼ0）。 */
+#vignette {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.38) 100%);
+}
+
 /* ───────── HUD ───────── */
 #hud {
   position: fixed; inset: 0;
