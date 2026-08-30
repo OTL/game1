@@ -469,13 +469,36 @@ class Renderer {
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
   }
 
+  /* 実機フィードバック対応（第3回・質感）: 以前は単色ベタ塗り＋白いハイライト1点だけの
+   * 「のっぺりした安っぽい丸」だった。破片は他の天体と同じ palette（base/dark/light）を
+   * 持つようになったので、ある程度の大きさがある破片はテクスチャ付きの近似天体
+   * （getNearBodyFrame。小惑星と同じクレーター質感、単一光源シェーディング）として描画し、
+   * 極小の破片（1〜2pxで質感を判別できない）だけ軽量な陰影グラデーションの球にする。
+   * どちらの経路も同じ WORLD_LIGHT（ワールド共通の単一光源）を反映する。 */
   drawFragment(f, sx, sy, sr) {
     const ctx = this.ctx;
-    ctx.fillStyle = f.color;
+    const pal = f.palette || derivePalette(f.color || '#8f8578');
+    if (sr > 4.5) {
+      const dpr = this.dpr || 1;
+      const sizePx = Math.max(8, Math.min(NEAR_MAX_SIZE, Math.round(sr * 2 * dpr / 4) * 4));
+      const twoPi = Math.PI * 2;
+      const norm = ((f.angle || 0) % twoPi + twoPi) % twoPi;
+      const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
+      const frame = getNearBodyFrame('asteroid', pal, f.seedBucket || 0, true, sizePx, frameIdx);
+      ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
+      return;
+    }
+    // 極小の破片: 単一光源方向にハイライト、反対方向に陰を置いたグラデーションの球
+    // （テクスチャ生成コストを払う価値のないサイズでも、平坦な単色丸にはしない）。
+    const grad = ctx.createRadialGradient(
+      sx - WORLD_LIGHT.x * sr * 0.4, sy - WORLD_LIGHT.y * sr * 0.4, sr * 0.1,
+      sx, sy, sr * 1.15
+    );
+    grad.addColorStop(0, pal.light || pal.base);
+    grad.addColorStop(0.55, pal.base);
+    grad.addColorStop(1, pal.dark || pal.base);
+    ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
-    // ハイライトは常に光源方向側に置く（全天体・全パーティクル共通の光源で一貫させる）
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath(); ctx.arc(sx + WORLD_LIGHT.x * sr * 0.3, sy + WORLD_LIGHT.y * sr * 0.3, sr * 0.35, 0, Math.PI * 2); ctx.fill();
   }
 
   /* 彗星の尾アップグレードの視覚的な軌跡。自機の直近の移動履歴（player.tailTrail）を

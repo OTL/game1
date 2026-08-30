@@ -4,9 +4,9 @@
    ============================================================ */
 'use strict';
 
-// v3: 実機フィードバック対応（通常/加速モードの追加、捕獲した衛星の永続化、
-// 敵質量上限などバランス変更）のため旧セーブ(v1/v2)は破棄する。
-const SAVE_KEY = 'cosmic-eater-save-v3';
+// v4: 実機フィードバック対応（第3回・エンドレスモード追加、終盤の進化しきい値変更）
+// のため旧セーブ(v1〜v3)は破棄する。
+const SAVE_KEY = 'cosmic-eater-save-v4';
 
 function serializePlayer(player) {
   return {
@@ -21,6 +21,7 @@ function serializePlayer(player) {
     level: player.level,
     reviveUsed: player.reviveUsed,
     mode: player.mode,
+    endless: !!player.endless,
     checkpointMass: player.checkpointMass,
     checkpointStageIdx: player.checkpointStageIdx,
     checkpointUpgrades: player.checkpointUpgrades,

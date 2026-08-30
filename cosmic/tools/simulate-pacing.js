@@ -25,7 +25,7 @@ function mulberry32(seed) {
   };
 }
 
-const STAGE_MASSES = [0, 60, 320, 1600, 8000, 38000, 170000, 750000, 3200000, 13000000];
+const STAGE_MASSES = [0, 60, 320, 1600, 8000, 38000, 170000, 1000000, 4200000, 13000000];
 const STAGE_NAMES = ['岩石片', '小惑星', '準惑星', '惑星', '巨大ガス惑星', '褐色矮星', '恒星', '巨星', '中性子星', 'ブラックホール'];
 
 const INSTAKILL_RATIO = 1.45;
@@ -87,16 +87,26 @@ function summarize(label, multiplierFn, seeds, maxSeconds) {
     console.log(`  平均クリア時間: ${(avgClear / 60).toFixed(1)} 分 (${avgClear.toFixed(0)}秒)`);
   }
   // 各ステージ到達時間の平均（到達できた試行のみ）
+  const avgReach = new Array(STAGE_MASSES.length).fill(null);
   for (let i = 1; i < STAGE_MASSES.length; i++) {
     const times = results.map(r => r.reach[i]).filter(v => v !== null);
     if (!times.length) continue;
     const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    avgReach[i] = avg;
     console.log(`    ${STAGE_NAMES[i].padEnd(8, '　')}: 平均 ${(avg / 60).toFixed(2)} 分 (${times.length}/${seeds.length})`);
+  }
+  // 中性子星「区間だけ」の所要時間（巨星到達 → 中性子星到達 と 中性子星到達 → クリアの2区間）
+  const giantIdx = STAGE_NAMES.indexOf('巨星'), neutronIdx = STAGE_NAMES.indexOf('中性子星');
+  if (avgReach[giantIdx] !== null && avgReach[neutronIdx] !== null) {
+    console.log(`  >>> 中性子星区間（中性子星到達→クリア）= ${((avgReach[neutronIdx + 1] - avgReach[neutronIdx]) / 60).toFixed(2)} 分`);
   }
 }
 
-const NORMAL_STAGE_PACING_MULT = [0.3955, 0.11, 0.088, 0.066, 0.0564, 0.0476, 0.0367, 0.0345, 0.0367];
+const NORMAL_STAGE_PACING_MULT = [0.3955, 0.11, 0.088, 0.066, 0.0564, 0.0476, 0.0367, 0.036, 0.029];
+const FAST_MODE_SPEEDUP = 12.7;
 
-const seeds = Array.from({ length: 40 }, (_, i) => i * 7919 + 13);
-summarize('加速モード（お試し）(massGainMultiplier=1.0 固定)', () => 1.0, seeds, 3600);
-summarize('通常モード（段階別倍率）', (stageIdx) => NORMAL_STAGE_PACING_MULT[Math.min(stageIdx, NORMAL_STAGE_PACING_MULT.length - 1)], seeds, 6000);
+const seeds = Array.from({ length: 200 }, (_, i) => i * 7919 + 13);
+summarize('加速モード（お試し・通常モードと同じ比率で一律短縮）',
+  (stageIdx) => NORMAL_STAGE_PACING_MULT[Math.min(stageIdx, NORMAL_STAGE_PACING_MULT.length - 1)] * FAST_MODE_SPEEDUP,
+  seeds, 3600);
+summarize('通常モード（段階別倍率）', (stageIdx) => NORMAL_STAGE_PACING_MULT[Math.min(stageIdx, NORMAL_STAGE_PACING_MULT.length - 1)], seeds, 8000);

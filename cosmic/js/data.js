@@ -20,8 +20,8 @@ const STAGES = [
   { key: 'gasgiant',  name: '巨大ガス惑星', desc: '渦巻くガスの縞模様をまとう巨大な星。',   mass: 8000,     color: '#d9a35c', radiusBase: 38,  worldScale: 24,     kind: 'gasgiant',maxHp: 280, camZoom: 0.68 },
   { key: 'browndwarf',name: '褐色矮星',     desc: '恒星になり損ねた、燻る赤い星。',         mass: 38000,    color: '#c9573f', radiusBase: 50,  worldScale: 55,     kind: 'browndwarf',maxHp:480, camZoom: 0.6 },
   { key: 'star',      name: '恒星',         desc: '自ら光を放つ、灼熱の炎の球。',           mass: 170000,   color: '#ffd15c', radiusBase: 62,  worldScale: 120,    kind: 'star',    maxHp: 820, camZoom: 0.52 },
-  { key: 'giant',     name: '巨星',         desc: '膨張しきった、老いた巨大な星。',         mass: 750000,   color: '#ff7a45', radiusBase: 80,  worldScale: 260,    kind: 'giant',   maxHp: 1400,camZoom: 0.44 },
-  { key: 'neutron',   name: '中性子星',     desc: '崩壊した芯が放つ、極小で強烈な光。',     mass: 3200000,  color: '#bfe3ff', radiusBase: 34,  worldScale: 560,    kind: 'neutron', maxHp: 2400,camZoom: 0.4 },
+  { key: 'giant',     name: '巨星',         desc: '膨張しきった、老いた巨大な星。',         mass: 1000000,  color: '#ff7a45', radiusBase: 80,  worldScale: 260,    kind: 'giant',   maxHp: 1400,camZoom: 0.44 },
+  { key: 'neutron',   name: '中性子星',     desc: '崩壊した芯が放つ、極小で強烈な光。',     mass: 4200000,  color: '#bfe3ff', radiusBase: 34,  worldScale: 560,    kind: 'neutron', maxHp: 2400,camZoom: 0.4 },
   { key: 'blackhole', name: 'ブラックホール', desc: 'すべてを飲み込む、時空の果て。',       mass: 13000000, color: '#9b6bff', radiusBase: 46,  worldScale: 1200,   kind: 'blackhole', maxHp: 4000, camZoom: 0.36, isFinal: true },
 ];
 
@@ -132,8 +132,13 @@ const BALANCE = {
 
   // ---- 実機フィードバック対応: 個体数・サイズの上限 ----
   maxEnemies: 20,           // ワールド内に同時に存在できる敵の総数上限
-  maxFragments: 40,         // ワールド内の破片（吸収可能な質量粒）総数上限
-  maxTotalBodies: 55,       // 敵+破片の合計上限。超過分は遠方から間引く
+  // 実機フィードバック対応（第3回）: 「破片がすぐ消滅する」問題の原因は寿命(life)ではなく、
+  // 敵同士の合体連鎖で一度に大量の破片が湧いたときに maxFragments の上限で即座に間引かれて
+  // いたこと（fragmentSpawnGraceSeconds 未満の破片も容赦なく削除していた）だった。
+  // 上限そのものも引き上げつつ、新しい破片を一定時間は間引き対象から除外する。
+  maxFragments: 60,         // ワールド内の破片（吸収可能な質量粒）総数上限
+  maxTotalBodies: 80,       // 敵+破片の合計上限。超過分は遠方から間引く
+  fragmentSpawnGraceSeconds: 3.0, // 生成直後の破片は、この秒数の間は個体数上限による間引き対象にしない
   nearViewSoftCap: 13,      // プレイヤー近傍（スポーン圏内側）に同時に居てよい敵の目安上限
   enemyMassCapMult: 2.0,    // 敵1体の質量はプレイヤー質量のこの倍率を超えない（分裂連鎖・肥大化の防止）
 
@@ -163,6 +168,19 @@ const BALANCE = {
   captureMassRatio: 0.35,   // 対象の質量がプレイヤー質量のこの割合以下なら捕獲可能
   captureRangeMin: 260,     // 捕獲可能距離の下限（世界座標）
   captureRangeMult: 9,      // プレイヤー半径に対する捕獲可能距離の係数
+
+  // ---- 実機フィードバック対応（第3回）: 獲物の周回軌道防止 ----
+  // 重力で引き寄せた「自分より十分小さく吸収可能な」天体（および自機がブラックホールの
+  // 場合はすべての天体）は、速度の接線成分（＝軌道角運動量）を毎秒この割合まで
+  // 指数的に減衰させる。安定周回に乗ってしまうのを防ぎ、必ず数秒以内に螺旋を描いて
+  // 落下・吸収されるようにする（動的摩擦・潮汐減衰の簡易近似）。閾値以上の質量比を
+  // 持つ敵対的・拮抗天体は対象外とし、スイングバイ挙動をそのまま維持する。
+  gravityPreyRatio: 0.68,     // この質量比未満の相手にのみ接線減衰を適用する
+  preyOrbitDampRate: 4.5,     // 接線速度の指数減衰レート（1/秒）。値が大きいほど早く落下する
+  preyGravityBoost: 5.0,      // 獲物（およびブラックホール中の全天体）に働く径方向重力の倍率
+
+  // ---- エンドレスモード（ブラックホール到達後の継続プレイ） ----
+  endlessThreatChance: 0,     // エンドレス中に「脅威」個体をスポーンさせる確率（0=出現なし）
 };
 
 /* レベルアップに必要な質量倍率（レベルが進むほど急になる指数カーブ）。 */
@@ -185,14 +203,25 @@ const GAME_MODES = {
 function gameModeOrDefault(id) { return GAME_MODES[id] ? id : 'normal'; }
 
 /* 通常モードの進化段階ごとの質量獲得倍率。序盤（岩石片〜準惑星）は比較的高い倍率で
- * 数分単位のテンポを保ちつつ、後半（恒星以降）は倍率を下げて1段階 8〜10分程度まで
- * 引き伸ばす。cosmic/tools/simulate-pacing.js による実測シミュレーションで
- * 合計クリア時間が約60分になるよう調整済み（詳細はREADME参照）。 */
-const NORMAL_STAGE_PACING_MULT = [0.3955, 0.11, 0.088, 0.066, 0.0564, 0.0476, 0.0367, 0.0345, 0.0367];
+ * 数分単位のテンポを保ちつつ、後半（恒星以降）は倍率を下げて引き伸ばす。
+ * cosmic/tools/simulate-pacing.js による実測シミュレーションで調整済み（詳細はREADME参照）。
+ *
+ * 実機フィードバック対応（第3回）: 「中性子星になってからすぐ終わった」への対応として、
+ * 終盤2段階（巨星・中性子星）の必要質量そのものを引き上げた上で（STAGES参照）、
+ * この2段階の倍率もあわせて下げ、中性子星段階だけの区間（中性子星に進化してから
+ * ブラックホールになるまで）が通常モードで約8〜10分になるよう再配分した
+ * （simulate-pacing.js の実測: 中性子星区間 平均9.3分、合計クリア時間 約61分）。 */
+const NORMAL_STAGE_PACING_MULT = [0.3955, 0.11, 0.088, 0.066, 0.0564, 0.0476, 0.0367, 0.036, 0.029];
+// 加速モード（お試し）: 通常モードと全く同じ段階別カーブの「形」を保ったまま、
+// 全ステージに同じ定数倍率をかけて一様に短縮する。こうすることで各進化段階の
+// 所要時間の「比率」は通常モードと完全に一致したまま、絶対時間だけが短くなる
+// （以前は加速モードだけ段階別倍率を無視した固定値 1.0 を使っており、終盤ほど
+// 通常モードに対して不釣り合いに短くなる＝中性子星区間が消し飛ぶ原因になっていた）。
+const FAST_MODE_SPEEDUP = 12.7;
 function massGainMultiplierFor(modeId, stageIdx) {
-  if (modeId === 'fast') return 1.0;
   const arr = NORMAL_STAGE_PACING_MULT;
-  return arr[Math.min(Math.max(0, stageIdx), arr.length - 1)];
+  const base = arr[Math.min(Math.max(0, stageIdx), arr.length - 1)];
+  return modeId === 'fast' ? base * FAST_MODE_SPEEDUP : base;
 }
 
 /* ---------- 捕獲（衛星化）----------
