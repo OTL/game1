@@ -129,11 +129,63 @@ const BALANCE = {
   levelUpGrowthStep: 0.11, // レベルが上がるごとの倍率の増分
   levelUpGrowthMax: 3.6,   // 倍率の上限（終盤の頭打ち）
   autosaveInterval: 6,     // 秒
+
+  // ---- 実機フィードバック対応: 個体数・サイズの上限 ----
+  maxEnemies: 20,           // ワールド内に同時に存在できる敵の総数上限
+  maxFragments: 40,         // ワールド内の破片（吸収可能な質量粒）総数上限
+  maxTotalBodies: 55,       // 敵+破片の合計上限。超過分は遠方から間引く
+  nearViewSoftCap: 13,      // プレイヤー近傍（スポーン圏内側）に同時に居てよい敵の目安上限
+  enemyMassCapMult: 4,      // 敵1体の質量はプレイヤー質量のこの倍率を超えない（分裂連鎖・肥大化の防止）
+
+  // ---- ダメージ数値・MISS表示のスパム対策 ----
+  floatFlushInterval: 0.35, // この秒数ごとに同一対象への連続ヒットを合算して1回だけ表示する
+  missFlushInterval: 0.5,   // MISS表示の最小間隔
+
+  // ---- 捕獲メカニクス（惑星以上で解放） ----
+  captureMassRatio: 0.35,   // 対象の質量がプレイヤー質量のこの割合以下なら捕獲可能
+  captureRangeMin: 260,     // 捕獲可能距離の下限（世界座標）
+  captureRangeMult: 9,      // プレイヤー半径に対する捕獲可能距離の係数
 };
 
-/* レベルアップに必要な質量倍率（レベルが進むほど急になる指数カーブ）。
- * 序盤は控えめな倍率で2〜3分に1回、終盤は倍率が大きくなり4〜5分に1回程度の
- * ペースを狙う（クリアまで合計15〜18回程度のレベルアップになるよう調整済み）。 */
+/* レベルアップに必要な質量倍率（レベルが進むほど急になる指数カーブ）。 */
 function levelUpGrowthFor(level) {
   return Math.min(BALANCE.levelUpGrowthMax, BALANCE.levelUpGrowthBase + Math.max(1, level) * BALANCE.levelUpGrowthStep);
+}
+
+/* ---------- ゲームモード ----------
+ * 通常モード: クリアまで約60分を狙ったペース。獲得質量に massGainMultiplier を掛けて
+ * 相対成長率（1秒あたり質量が何%増えるか）を下げることで、進化しきい値・レベルカーブは
+ * そのままに全体の所要時間だけを引き伸ばす。
+ * 加速モード（お試し）: 従来の速いペース（実機フィードバックで指摘された「03:53で恒星Lv13」
+ * 相当の速度）をそのまま残し、短時間で最後まで試したいプレイヤー向けに選択可能にする。
+ * ※ 値は node scripts/simulate-pacing.js による実測シミュレーションで調整済み
+ *   （詳細は README.md 参照）。 */
+const GAME_MODES = {
+  normal: { id: 'normal', label: '通常モード' },
+  fast:   { id: 'fast',   label: '加速モード（お試し）' },
+};
+function gameModeOrDefault(id) { return GAME_MODES[id] ? id : 'normal'; }
+
+/* 通常モードの進化段階ごとの質量獲得倍率。序盤（岩石片〜準惑星）は比較的高い倍率で
+ * 数分単位のテンポを保ちつつ、後半（恒星以降）は倍率を下げて1段階 8〜10分程度まで
+ * 引き伸ばす。cosmic/tools/simulate-pacing.js による実測シミュレーションで
+ * 合計クリア時間が約60分になるよう調整済み（詳細はREADME参照）。 */
+const NORMAL_STAGE_PACING_MULT = [0.437, 0.1215, 0.0972, 0.0729, 0.0623, 0.0526, 0.0405, 0.0381, 0.0405];
+function massGainMultiplierFor(modeId, stageIdx) {
+  if (modeId === 'fast') return 1.0;
+  const arr = NORMAL_STAGE_PACING_MULT;
+  return arr[Math.min(Math.max(0, stageIdx), arr.length - 1)];
+}
+
+/* ---------- 捕獲（衛星化）----------
+ * 進化段階が「惑星」(index 3) 以上になったら解放。保有できる捕獲数は進化段階に応じて増える。 */
+function captureUnlockedFor(stageIdx) { return stageIdx >= 3; }
+function captureCapacityFor(stageIdx) {
+  if (stageIdx < 3) return 0;
+  if (stageIdx <= 4) return 1;   // 惑星・巨大ガス惑星
+  if (stageIdx === 5) return 2;  // 褐色矮星
+  if (stageIdx === 6) return 3;  // 恒星
+  if (stageIdx === 7) return 4;  // 巨星
+  if (stageIdx === 8) return 5;  // 中性子星
+  return 6;                      // ブラックホール
 }

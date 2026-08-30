@@ -47,6 +47,10 @@ class Renderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.w = window.innerWidth;
     this.h = window.innerHeight;
+    // 実機フィードバック対応（画質）: 巨大天体をボケさせないためのLODでは
+    // 高解像度テクスチャを都度合成するので、拡大時のスムージング品質を明示しておく。
+    this.ctx.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in this.ctx) this.ctx.imageSmoothingQuality = 'high';
     this.initBackground();
   }
 
@@ -394,6 +398,13 @@ class Renderer {
     // browndwarf/star/giant/neutron/blackhole）は自己重力で丸くなっている前提で常に球体。
     const irregular = !!body.irregularShape;
 
+    // 実機フィードバック対応（画質）: テクスチャの描画解像度(sizePx)は、実際に画面上へ
+    // 何ピクセルで描かれるか（sr*2 に devicePixelRatio を掛けた値）に応じて動的に決める。
+    // 大きく表示される天体ほど高解像度でキャッシュを再生成することで、拡大描画による
+    // モザイク状のボケを防ぐ（LOD: Level of Detail）。
+    const dpr = this.dpr || 1;
+    const neededPx = sr * 2 * dpr;
+
     if (sr < FULL_QUALITY_MIN_SR || kind === 'comet' || irregular) {
       // 近似描画: 形状（アルベド）はタンブリングで自由に回転させ、その上に
       // 常に同じ光源方向を向いた固定シェーディングマスクを重ねる。
@@ -401,7 +412,7 @@ class Renderer {
       // ワールド全体で常に同じ向きになる＝単一光源の一貫性を保てる。
       // 描画コストを抑えるため、回転位相を離散化した合成済みフレームを
       // キャッシュして drawImage 1回で済ませる（renderGlobeFrame と同じ手法）。
-      const sizePx = Math.max(8, Math.min(64, Math.round((sr * 2) / 4) * 4));
+      const sizePx = Math.max(8, Math.min(NEAR_MAX_SIZE, Math.round(neededPx / 4) * 4));
       const twoPi = Math.PI * 2;
       const norm = ((spinPhase % twoPi) + twoPi) % twoPi;
       const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
@@ -410,7 +421,7 @@ class Renderer {
       return;
     }
 
-    const sizePx = Math.max(32, Math.min(220, Math.round((sr * 2) / 8) * 8));
+    const sizePx = Math.max(32, Math.min(GLOBE_MAX_SIZE, Math.round(neededPx / 8) * 8));
     const twoPi = Math.PI * 2;
     const norm = ((spinPhase % twoPi) + twoPi) % twoPi;
     const frameIdx = Math.floor((norm / twoPi) * GLOBE_FRAMES) % GLOBE_FRAMES;
@@ -467,20 +478,37 @@ class Renderer {
     ctx.beginPath(); ctx.arc(sx + WORLD_LIGHT.x * sr * 0.3, sy + WORLD_LIGHT.y * sr * 0.3, sr * 0.35, 0, Math.PI * 2); ctx.fill();
   }
 
-  /* ロックオン対象を示す動的マーカー。固定のリング／ガイド線ではなく、
-   * 薄くパルスする点線の輪を対象の周りに描く。 */
-  drawLockonMarker(sx, sy, sr, dt, danger) {
-    this.lockonPulse = (this.lockonPulse + dt * 2.2) % (Math.PI * 2);
+  /* 彗星の尾アップグレードの視覚的な軌跡。自機の直近の移動履歴（player.tailTrail）を
+   * フェードするプラズマの帯として描く。半径はダメージ判定（pulseDamageの半径）と
+   * 一致させ、見た目＝判定範囲になるようにしている。 */
+  drawTail(cam, trail, dmgRadius) {
     const ctx = this.ctx;
-    const pulse = 0.5 + 0.5 * Math.sin(this.lockonPulse);
-    const r = sr + 10 + pulse * 5;
-    const color = danger ? '255,110,120' : '140,230,255';
+    const n = trail.length;
+    if (n < 2) return;
     ctx.save();
-    ctx.strokeStyle = `rgba(${color},${(0.22 + pulse * 0.32).toFixed(2)})`;
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([6, 7]);
-    ctx.lineDashOffset = -this.time * 26;
-    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < n - 1; i++) {
+      const a = trail[i], b = trail[i + 1];
+      const ta = Math.max(0, 1 - a.age / 0.7);
+      const sa = this.worldToScreen(cam, a.x, a.y);
+      const sb = this.worldToScreen(cam, b.x, b.y);
+      const w = Math.max(1, dmgRadius * cam.zoom * (0.3 + ta * 0.7));
+      const grad = ctx.createLinearGradient(sa.x, sa.y, sb.x, sb.y);
+      grad.addColorStop(0, `rgba(160,220,255,${(ta * 0.55).toFixed(2)})`);
+      grad.addColorStop(1, `rgba(210,240,255,${(ta * 0.7).toFixed(2)})`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y); ctx.stroke();
+    }
+    // 先端（自機に近い側）に明るいコアを重ねる
+    const tail = trail[n - 1];
+    const st = this.worldToScreen(cam, tail.x, tail.y);
+    const coreR = Math.max(1.5, dmgRadius * cam.zoom * 0.45);
+    const grad2 = ctx.createRadialGradient(st.x, st.y, 0, st.x, st.y, coreR);
+    grad2.addColorStop(0, 'rgba(230,250,255,0.75)');
+    grad2.addColorStop(1, 'rgba(230,250,255,0)');
+    ctx.fillStyle = grad2;
+    ctx.beginPath(); ctx.arc(st.x, st.y, coreR, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 

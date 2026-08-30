@@ -33,8 +33,12 @@
     <div class="lockon-sub" id="lockon-sub"></div>
   </div>
 
+  <div id="satellite-hud" class="hidden" aria-label="保有衛星"></div>
+  <div id="mode-badge" aria-label="ゲームモード"></div>
+
   <div id="upgrade-list" aria-label="取得アップグレード"></div>
 
+  <button id="btn-capture" class="hidden" title="捕獲 (Q)" aria-label="捕獲">🛰</button>
   <button id="btn-menu" title="メニュー" aria-label="メニュー">☰</button>
 </div>
 
@@ -54,9 +58,10 @@
     <p class="title-desc">岩のかけらから始まり、あらゆる天体を喰らい、<br>やがてブラックホールとなれ。</p>
     <div class="title-buttons">
       <button id="btn-continue" class="btn btn-primary hidden">つづきから</button>
-      <button id="btn-newgame" class="btn btn-ghost">はじめから</button>
+      <button id="btn-newgame" class="btn btn-ghost">はじめから（通常モード）</button>
+      <button id="btn-newgame-fast" class="btn btn-ghost btn-fast">はじめから（加速モード・お試し）</button>
     </div>
-    <p class="title-hint">マウスドラッグ / タッチで移動。小さな天体に体当たりして吸収しよう。</p>
+    <p class="title-hint">通常モードはクリアまで約60分。加速モードは短時間で最後まで試せます（お試し用）。<br>マウスドラッグ / タッチで移動。小さな天体に体当たりして吸収しよう。<br>惑星以上に進化すると、弱い敵を「捕獲」して衛星にできます（PC: Qキー / スマホ: 🛰ボタン）。</p>
   </div>
 </div>
 

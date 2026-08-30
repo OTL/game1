@@ -83,6 +83,28 @@ function updateWorldLight(t) {
 
 const TEX_SIZE = 128;
 
+/* ============================================================
+ * LOD（テクスチャ解像度の段階） — 実機フィードバック対応
+ * ------------------------------------------------------------
+ * 「巨大な敵がモザイク状にボケる」問題は、固定の低解像度テクスチャキャッシュを
+ * 引き伸ばして描画していたことが原因だった。画面上での表示半径（sizePx、
+ * devicePixelRatio 込み）に応じて、元になるソーステクスチャの解像度そのものを
+ * 段階的に上げることで、近くで大きく見える天体ほどクレーターなどのディテールが
+ * きちんと見えるようにする。 */
+const NEAR_MAX_SIZE = 160;  // 近似描画（小さい／不規則天体）の最大キャンバスサイズ
+const GLOBE_MAX_SIZE = 480; // フル品質球体描画の最大キャンバスサイズ
+function albedoTexSizeFor(sizePx) {
+  if (sizePx <= 40) return 96;
+  if (sizePx <= 90) return 160;
+  return 256;
+}
+function equiResFor(sizePx) {
+  if (sizePx <= 64) return { w: 140, h: 70 };
+  if (sizePx <= 140) return { w: 240, h: 120 };
+  if (sizePx <= 260) return { w: 420, h: 210 };
+  return { w: 680, h: 340 };
+}
+
 /* ---------- 不規則形状（岩石片〜小惑星クラス） ----------
  * 多角形＋ノイズ変形の輪郭を、方向ごとの半径係数（調和級数の和）として
  * シード固定で保持する。これをテクスチャのクリップ形状にも、当たり判定の
@@ -111,23 +133,24 @@ function irregularRadiusFactor(params, theta) {
  * 自転／タンブリングで自由に回転させても、後段で固定方向のシェーディング
  * マスクを重ねるだけで常に同じ光源方向を保てるようにするための土台。
  * irregular=true の場合は不規則な輪郭でクリップし、ジャガイモ型になる。 */
-function generateAlbedoShapeTexture(kind, palette, seed, irregular) {
+function generateAlbedoShapeTexture(kind, palette, seed, irregular, texSize) {
+  texSize = texSize || TEX_SIZE;
   const cv = document.createElement('canvas');
-  cv.width = cv.height = TEX_SIZE;
+  cv.width = cv.height = texSize;
   const ctx = cv.getContext('2d');
   const rng = mulberry32(seed);
   const noises = [makeValueNoise(rng, 6), makeValueNoise(rng, 12), makeValueNoise(rng, 24)];
-  const cx = TEX_SIZE / 2, cy = TEX_SIZE / 2, R = TEX_SIZE / 2 - 1;
-  const img = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+  const cx = texSize / 2, cy = texSize / 2, R = texSize / 2 - 1;
+  const img = ctx.createImageData(texSize, texSize);
   const base = hexToRgb(palette.base);
   const dark = hexToRgb(palette.dark || palette.base);
   const light = hexToRgb(palette.light || '#ffffff');
   const shapeParams = irregular ? getIrregularShapeParams(seed) : null;
 
-  for (let py = 0; py < TEX_SIZE; py++) {
-    for (let px = 0; px < TEX_SIZE; px++) {
+  for (let py = 0; py < texSize; py++) {
+    for (let px = 0; px < texSize; px++) {
       const nx = (px - cx) / R, ny = (py - cy) / R;
-      const idx = (py * TEX_SIZE + px) * 4;
+      const idx = (py * texSize + px) * 4;
       const d = Math.hypot(nx, ny);
       let edge = 1;
       if (shapeParams) edge = irregularRadiusFactor(shapeParams, Math.atan2(ny, nx));
@@ -164,11 +187,12 @@ function generateAlbedoShapeTexture(kind, palette, seed, irregular) {
 
 /* テクスチャキャッシュ: kind+パレット+シードバケット+不規則フラグごとに使い回す */
 const _albedoCache = new Map();
-function getAlbedoTexture(kind, palette, seedBucket, irregular) {
-  const key = kind + '|' + palette.base + '|' + seedBucket + '|' + (irregular ? 1 : 0);
+function getAlbedoTexture(kind, palette, seedBucket, irregular, texSize) {
+  texSize = texSize || TEX_SIZE;
+  const key = kind + '|' + palette.base + '|' + seedBucket + '|' + (irregular ? 1 : 0) + '|' + texSize;
   let t = _albedoCache.get(key);
   if (!t) {
-    t = generateAlbedoShapeTexture(kind, palette, seedBucket * 7919 + 13, !!irregular);
+    t = generateAlbedoShapeTexture(kind, palette, seedBucket * 7919 + 13, !!irregular, texSize);
     _albedoCache.set(key, t);
   }
   return t;
@@ -184,7 +208,7 @@ function getNearBodyFrame(kind, palette, seedBucket, irregular, sizePx, frameIdx
   const key = kind + '|' + palette.base + '|' + seedBucket + '|' + (irregular ? 1 : 0) + '|' + sizePx + '|' + frameIdx + '|' + bucket;
   let cv = _nearFrameCache.get(key);
   if (cv) return cv;
-  const tex = getAlbedoTexture(kind, palette, seedBucket, irregular);
+  const tex = getAlbedoTexture(kind, palette, seedBucket, irregular, albedoTexSizeFor(sizePx));
   cv = document.createElement('canvas');
   cv.width = cv.height = sizePx;
   const ctx = cv.getContext('2d');
@@ -219,21 +243,25 @@ function getNearBodyFrame(kind, palette, seedBucket, irregular, sizePx, frameIdx
 const EQUI_W = 200, EQUI_H = 100;
 const GLOBE_FRAMES = 48; // 自転を離散化するフレーム数（1周 = 48フレーム）
 
-function generateEquirectTexture(kind, palette, seed) {
+function generateEquirectTexture(kind, palette, seed, w, h) {
+  w = w || EQUI_W; h = h || EQUI_H;
   const cv = document.createElement('canvas');
-  cv.width = EQUI_W; cv.height = EQUI_H;
+  cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d');
   const rng = mulberry32(seed);
+  // 高解像度タイル（大きく表示される天体）ほど、より細かいノイズ格子を1段追加して
+  // クレーター等のディテールが潰れないようにする。
   const noises = [makeValueNoise(rng, 6), makeValueNoise(rng, 12), makeValueNoise(rng, 24)];
+  if (w > EQUI_W) noises.push(makeValueNoise(rng, 48));
   const base = hexToRgb(palette.base);
   const dark = hexToRgb(palette.dark || palette.base);
   const light = hexToRgb(palette.light || '#ffffff');
-  const img = ctx.createImageData(EQUI_W, EQUI_H);
-  for (let py = 0; py < EQUI_H; py++) {
-    const v = py / EQUI_H; // 0..1 緯度
-    for (let px = 0; px < EQUI_W; px++) {
-      const u = px / EQUI_W; // 0..1 経度（周期的＝シームレス）
-      const idx = (py * EQUI_W + px) * 4;
+  const img = ctx.createImageData(w, h);
+  for (let py = 0; py < h; py++) {
+    const v = py / h; // 0..1 緯度
+    for (let px = 0; px < w; px++) {
+      const u = px / w; // 0..1 経度（周期的＝シームレス）
+      const idx = (py * w + px) * 4;
       const n = fbm(noises, u, v * 2);
       let col;
       if (kind === 'gasgiant' || kind === 'browndwarf' || kind === 'giant') {
@@ -254,10 +282,11 @@ function generateEquirectTexture(kind, palette, seed) {
 }
 
 const _equiCache = new Map();
-function getEquirectTexture(kind, palette, seedBucket) {
-  const key = kind + '|' + palette.base + '|' + seedBucket;
+function getEquirectTexture(kind, palette, seedBucket, w, h) {
+  w = w || EQUI_W; h = h || EQUI_H;
+  const key = kind + '|' + palette.base + '|' + seedBucket + '|' + w + 'x' + h;
   let t = _equiCache.get(key);
-  if (!t) { t = generateEquirectTexture(kind, palette, seedBucket * 7919 + 31); _equiCache.set(key, t); }
+  if (!t) { t = generateEquirectTexture(kind, palette, seedBucket * 7919 + 31, w, h); _equiCache.set(key, t); }
   return t;
 }
 
@@ -337,7 +366,8 @@ function renderGlobeFrame(kind, palette, seedBucket, sizePx, frameIdx, hasAtmosp
   let cv = _globeFrameCache.get(key);
   if (cv) return cv;
 
-  const equi = getEquirectTexture(kind, palette, seedBucket);
+  const res = equiResFor(sizePx);
+  const equi = getEquirectTexture(kind, palette, seedBucket, res.w, res.h);
   const R = sizePx / 2;
   cv = document.createElement('canvas');
   cv.width = cv.height = sizePx;
