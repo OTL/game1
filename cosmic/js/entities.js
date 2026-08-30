@@ -27,13 +27,30 @@ function massToRadius(mass) {
  * プレイヤーと敵とで見た目のスケールが一致しておらず、「敵は常に自分よりデカく見える」
  * 体感の直接の原因だった。この関数はプレイヤーと全く同じSTAGESベースの補間を使うことで、
  * 同じ質量なら同じ見た目の大きさになることを保証する。 */
-function enemyVisualRadius(mass) {
+function enemyVisualRadius(mass, player) {
   const idx = stageIndexForMass(mass);
   const stage = STAGES[idx];
   const nextStage = STAGES[Math.min(idx + 1, STAGES.length - 1)];
   const span = Math.max(nextStage.mass - stage.mass, 1);
   const t = idx >= STAGES.length - 1 ? 1 : Math.min(1, Math.max(0, (mass - stage.mass) / span));
-  return stage.radiusBase * (0.85 + t * 0.3);
+  let r = stage.radiusBase * (0.85 + t * 0.3);
+  // 実機フィードバック対応（エンドレスモードの敵が大きすぎる）: STAGESは質量に
+  // 上限（ブラックホールの閾値）があるため、それを超える質量（エンドレスモードで
+  // 際限なく増え続けるプレイヤー質量や、それに追従する敵の基準質量）は idx が
+  // 最終段で頭打ちになり、質量に関わらず常に同じ半径（プレイヤーの最大表示半径と
+  // 同一）になってしまっていた。これがエンドレスモードで「敵がプレイヤーと同じ
+  // 大きさに見える」（=「すべてを呑む爽快感」を損なう）バグの直接の原因。
+  // エンドレス中はプレイヤーとの質量比に応じて追加で縮小し、常にプレイヤーより
+  // 明確に小さく（半径でプレイヤーの半分以下）見えるようにする。
+  if (player && player.endless && idx >= STAGES.length - 1) {
+    const ratio = Math.max(0, Math.min(1, mass / Math.max(1, player.mass)));
+    const pr = playerRadius(player);
+    // 質量比の立方根（体積→半径のスケーリングに準拠）でなめらかに縮小しつつ、
+    // 上限をプレイヤー半径の0.5倍に固定する。
+    const shrunk = pr * 0.5 * Math.pow(ratio, 1 / 3);
+    r = Math.min(r, shrunk);
+  }
+  return r;
 }
 
 const ENEMY_PALETTES = {
@@ -75,7 +92,7 @@ function isSphericalKind(kind) {
     kind === 'star' || kind === 'giant' || kind === 'neutron' || kind === 'blackhole' || kind === 'dwarf';
 }
 
-function makeEnemyBody(kind, mass, x, y, rng) {
+function makeEnemyBody(kind, mass, x, y, rng, player) {
   const pal = paletteFor(kind, rng);
   const hostile = kind === 'hostile';
   const irregular = !isSphericalKind(kind); // asteroid / comet(核) / hostile は不規則形状
@@ -88,7 +105,7 @@ function makeEnemyBody(kind, mass, x, y, rng) {
     mass,
     hp: mass,
     maxHp: mass,
-    radius: enemyVisualRadius(mass),
+    radius: enemyVisualRadius(mass, player),
     angle: rng() * Math.PI * 2,
     spin: (rng() - 0.5) * (hostile ? 0.7 : 0.32),
     // タンブリング用の不規則な角速度ゆらぎ（非等速回転）
@@ -224,6 +241,19 @@ class FloatTextPool {
  * palette（base/dark/light の3トーン）を保持するようにし、render.js 側で他の天体と
  * 同じ単一光源シェーディング（大きめの破片はテクスチャ付きの近似天体として、
  * 小さい破片は陰影付きグラデーションの球として）描画できるようにする。 */
+// 実機フィードバック対応（最優先・描画はみ出しバグの真因）: 破片の表示半径は
+// massToRadius(mass)（質量の単純な立方根）でそのまま決めており、上限が一切
+// 無かった。エンドレスモードでは敵の質量上限（enemyMassCapMult×プレイヤー質量、
+// 数十億に達する）を超えた分が「あふれた質量」としてそのまま破片の質量に
+// なるため（updateEnemyMutualGravityAndCollisionsのoverflow）、破片1個の質量が
+// 数億〜数十億になり得て、massToRadiusがワールド半径で数千という桁外れの値を
+// 返していた。screenRadiusCapFor による上限クランプは敵専用で破片には適用され
+// ておらず、これがスクリーンショットで報告された「テクスチャが円からはみ出して
+// 画面を覆う」不具合の直接の原因だった。破片はもともと「吸収可能な質量の欠片」
+// という演出上の存在であり、実際の質量が巨大でも見た目まで巨大にする必要はない
+// ため、表示半径そのものに小さな絶対上限を設ける（質量の報酬価値＝mass値は
+// そのまま保持し、見た目だけを頭打ちにする）。
+const FRAGMENT_MAX_RADIUS = 22;
 function makeFragment(x, y, mass, palette, rng, baseVx, baseVy) {
   const ang = rng() * Math.PI * 2;
   const spd = 20 + rng() * 60;
@@ -232,7 +262,7 @@ function makeFragment(x, y, mass, palette, rng, baseVx, baseVy) {
     vx: (baseVx || 0) + Math.cos(ang) * spd,
     vy: (baseVy || 0) + Math.sin(ang) * spd,
     mass, palette, alive: true,
-    radius: Math.max(2.2, massToRadius(mass) * 0.6),
+    radius: Math.min(FRAGMENT_MAX_RADIUS, Math.max(2.2, massToRadius(mass) * 0.6)),
     life: 22,
     age: 0,
     angle: rng() * Math.PI * 2,
@@ -259,12 +289,20 @@ function spawnFragments(list, x, y, totalMass, palette, rng, count, baseVx, base
  *  2) 敵天体どうしの近傍限定の簡易引力（緩やかに引き合い、近づきすぎると衝突・破壊）
  * を毎フレーム計算する。天体数は上限が決まっているため O(n^2) でも 60fps を維持できる。
  * ============================================================ */
-const GRAV_CONST = 46;           // プレイヤー重力の強さ（見た目重視の調整値。実際のGではない）
-const GRAV_PLAYER_RANGE = 1400;  // この距離を超えたら重力計算を打ち切る（遠方カリング）
+// 実機フィードバック対応（重力が強すぎる）: 以前の値（GRAV_CONST=46, RANGE=1400,
+// MAX_ACCEL=900, preyGravityBoost=5.0）では、質量が大きい終盤・エンドレスほど
+// GRAV_CONST×player.massが桁違いに大きくなり、有効範囲(RANGE)の内側ではほぼ
+// 常に加速度上限(MAX_ACCEL)に張り付く＝「範囲に入った瞬間、画面半分先からでも
+// 一瞬で吹き飛ぶように突っ込んでくる」挙動になっていた（実測シミュレーションで確認）。
+// 「近づいたものがすっと吸われる」体感にするため、(1)有効範囲そのものを画面の半分
+// より十分狭くし、(2)張り付く先の加速度上限自体も大きく下げた。
+// 序盤の螺旋落下吸収（径方向ブースト＋接線減衰）の仕組み自体は維持する。
+const GRAV_CONST = 30;           // プレイヤー重力の強さ（見た目重視の調整値。実際のGではない）
+const GRAV_PLAYER_RANGE = 350;   // この距離を超えたら重力計算を打ち切る（遠方カリング）
 const GRAV_MIN_R = 40;           // 加速度が発散しないための最小距離
-const GRAV_MAX_ACCEL = 900;      // 極端なスイングバイで暴れないための加速度上限
-const ENEMY_GRAV_CONST = 5.2;    // 敵同士の簡易相互重力
-const ENEMY_GRAV_RANGE = 260;    // 敵同士の重力を計算する近傍半径
+const GRAV_MAX_ACCEL = 140;      // 極端なスイングバイで暴れないための加速度上限
+const ENEMY_GRAV_CONST = 3.0;    // 敵同士の簡易相互重力
+const ENEMY_GRAV_RANGE = 190;    // 敵同士の重力を計算する近傍半径
 
 /* 実機フィードバック対応（第3回）: 重力で引き寄せた「自分より十分小さく吸収可能な」
  * 獲物が、角運動量を保ったまま安定周回に乗ってしまい、いつまで経っても落ちてこない
@@ -368,7 +406,7 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
           big.mass += gainedMass;
           big.maxHp += gainedMass;
           big.hp = Math.min(big.maxHp, big.hp + gainedMass);
-          big.radius = Math.min(enemyVisualRadius(big.mass), screenRadiusCap || Infinity);
+          big.radius = Math.min(enemyVisualRadius(big.mass, player), screenRadiusCap || Infinity);
         }
         big.vx = totalVx; big.vy = totalVy;
         big.mergeCooldown = MERGE_COOLDOWN_SEC;
@@ -383,7 +421,7 @@ function updateEnemyMutualGravityAndCollisions(enemies, fragments, palette, rng,
       const gm = ENEMY_GRAV_CONST * (a.mass + b.mass);
       const rc = Math.max(24, r);
       let acc = gm / (rc * rc);
-      if (acc > 260) acc = 260;
+      if (acc > 160) acc = 160; // 実機フィードバック対応（重力が強すぎる）: 敵同士の軌道の乱れも穏やかに
       const nx = dx / r, ny = dy / r;
       a.vx += nx * acc * (b.mass / (a.mass + b.mass)) * dt;
       a.vy += ny * acc * (b.mass / (a.mass + b.mass)) * dt;

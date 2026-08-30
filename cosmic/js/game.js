@@ -185,7 +185,7 @@
       const r = spawnR * (farBias + rng() * (0.98 - farBias));
       const x = player.x + Math.cos(ang) * r;
       const y = player.y + Math.sin(ang) * r;
-      const body = makeEnemyBody(kind, mass, x, y, rng);
+      const body = makeEnemyBody(kind, mass, x, y, rng, player);
       // 画面短辺の40%を超える表示半径にはしない（近接に巨大な敵を出さない安全弁）。
       if (body.radius > radiusCap) body.radius = radiusCap;
       if (kind === 'planet' && rng() < 0.35) body.hasRing = true;
@@ -1057,11 +1057,18 @@
     renderer.drawBackground(state.camera, dt || 0, player.stageIdx);
     renderer.beginFrame(1 / 60, state.camera);
     const cam = state.camera;
+    // 実機フィードバック対応（最優先・描画はみ出しバグ）: ワールド半径やカメラズームの
+    // 計算がどこかで想定外の値になったとしても、画面上に描く天体の表示半径は
+    // 常にこの絶対上限（画面短辺の42%＝直径で84%）で頭打ちにする。真因は破片の
+    // 半径に上限が無かったことだった（FRAGMENT_MAX_RADIUS参照）が、screenRadiusCapFor()
+    // による敵専用のワールド側クランプと合わせて、想定外の巨大表示を構造的に
+    // 発生させないための二重・三重の安全弁として残す。
+    const hardMaxSr = Math.min(renderer.w, renderer.h) * 0.42;
 
     // 破片
     for (const f of state.fragments) {
       const s = renderer.worldToScreen(cam, f.x, f.y);
-      renderer.drawFragment(f, s.x, s.y, Math.max(1.5, f.radius * cam.zoom));
+      renderer.drawFragment(f, s.x, s.y, Math.min(hardMaxSr, Math.max(1.5, f.radius * cam.zoom)));
     }
 
     // 敵（画面外カリング）
@@ -1069,7 +1076,7 @@
     for (const e of state.enemies) {
       if (!e.alive) continue;
       const s = renderer.worldToScreen(cam, e.x, e.y);
-      const sr = e.radius * cam.zoom;
+      const sr = Math.min(hardMaxSr, e.radius * cam.zoom);
       if (s.x < -margin - sr || s.x > renderer.w + margin + sr || s.y < -margin - sr || s.y > renderer.h + margin + sr) continue;
       renderer.drawBody(e, s.x, s.y, sr, cam);
       if (sr > 6) renderer.drawHpBar(s.x, s.y, sr, e.hp / e.maxHp, e.isHostile ? '#ff6b7a' : '#5ce0a0');
@@ -1091,7 +1098,7 @@
       const capMaxR = playerRadius(player) * 1.1;
       for (const sat of player.capturedSatellites) {
         const s = renderer.worldToScreen(cam, sat.x, sat.y);
-        const sr = Math.min(sat.radius, capMaxR) * cam.zoom;
+        const sr = Math.min(hardMaxSr, Math.min(sat.radius, capMaxR) * cam.zoom);
         renderer.drawBody(sat, s.x, s.y, sr, cam);
         renderer.ctx.strokeStyle = 'rgba(140,230,190,0.8)';
         renderer.ctx.lineWidth = 1.6;
@@ -1108,7 +1115,7 @@
     {
       const stage = currentStage(player);
       const s = renderer.worldToScreen(cam, player.x, player.y);
-      const sr = playerRadius(player) * cam.zoom;
+      const sr = Math.min(hardMaxSr, playerRadius(player) * cam.zoom);
       // 加速衝突アップグレード: 最大速度に近いほど自機後方に加速光を灯す（「高速移動」の体感化）。
       const ramLv = upLevel(player, 'ramspeed');
       const spdR = state.speedRatio || 0;

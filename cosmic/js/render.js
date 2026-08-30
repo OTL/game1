@@ -398,6 +398,21 @@ class Renderer {
     // browndwarf/star/giant/neutron/blackhole）は自己重力で丸くなっている前提で常に球体。
     const irregular = !!body.irregularShape;
 
+    // 実機フィードバック対応（最優先・描画はみ出しバグ）: 巨大な表示半径のとき、
+    // LODキャッシュ用オフスクリーンキャンバス（getNearBodyFrame/renderGlobeFrame）の
+    // 内容が実機（メモリ制約の強いモバイルGPU）でごくまれに破損し、本来の円形の
+    // 輪郭を無視してキャンバスの矩形いっぱいにギザギザのテクスチャが描かれてしまう
+    // 不具合が実機スクリーンショットで確認された。原因がテクスチャキャッシュ側の
+        // 破損であっても描画結果が必ず円形に収まるよう、ここで安全弁として明示的に
+    // ctx.clip() を掛けてから drawImage する。不規則形状（ジャガイモ型、輪郭が最大で
+    // 公称半径の1.38倍まで張り出す）や惑星の大気の縁光（最大1.06倍）を誤って
+    // 切り取らないよう、公称半径よりわずかに広い半径でクリップする。
+    const clipR = Math.max(0.5, sr * 1.45);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(sx, sy, clipR, 0, Math.PI * 2);
+    ctx.clip();
+
     // 実機フィードバック対応（画質）: テクスチャの描画解像度(sizePx)は、実際に画面上へ
     // 何ピクセルで描かれるか（sr*2 に devicePixelRatio を掛けた値）に応じて動的に決める。
     // 大きく表示される天体ほど高解像度でキャッシュを再生成することで、拡大描画による
@@ -418,6 +433,7 @@ class Renderer {
       const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
       const frame = getNearBodyFrame(kind, body.palette, body.seedBucket % 6, irregular, sizePx, frameIdx);
       ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
+      ctx.restore();
       return;
     }
 
@@ -437,6 +453,7 @@ class Renderer {
     } else {
       ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
     }
+    ctx.restore();
   }
 
   drawBlackHole(body, sx, sy, sr) {
@@ -485,7 +502,14 @@ class Renderer {
       const norm = ((f.angle || 0) % twoPi + twoPi) % twoPi;
       const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
       const frame = getNearBodyFrame('asteroid', pal, f.seedBucket || 0, true, sizePx, frameIdx);
+      // 実機フィードバック対応（最優先・描画はみ出しバグ）: drawRotatingGlobeと同じ理由で、
+      // テクスチャキャッシュが万一破損しても円形の外へは絶対にはみ出さないよう安全弁を掛ける。
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(0.5, sr * 1.45), 0, Math.PI * 2);
+      ctx.clip();
       ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
+      ctx.restore();
       return;
     }
     // 極小の破片: 単一光源方向にハイライト、反対方向に陰を置いたグラデーションの球

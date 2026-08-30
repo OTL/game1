@@ -268,6 +268,13 @@ function getAlbedoTexture(kind, palette, seedBucket, irregular, texSize) {
   if (!t) {
     t = generateAlbedoShapeTexture(kind, palette, seedBucket * 7919 + 13, !!irregular, texSize);
     _albedoCache.set(key, t);
+    // 実機フィードバック対応（最優先・描画はみ出しバグ）: このキャッシュは以前は無制限に
+    // 増え続けており（kind×パレット×seedBucket×形状×解像度の組み合わせ分）、長時間の
+    // プレイやエンドレスモードでオフスクリーンcanvasの総メモリ使用量が肥大化し続けていた。
+    // モバイル実機ではcanvasの総メモリが上限を超えるとGPU側でテクスチャが破損・差し替え
+    // られる不具合が起きうるため、他のLODキャッシュ（_nearFrameCache等）と同様に
+    // 上限件数を設けて古いものから破棄する。
+    if (_albedoCache.size > 200) _albedoCache.delete(_albedoCache.keys().next().value);
   }
   return t;
 }
@@ -381,7 +388,14 @@ function getEquirectTexture(kind, palette, seedBucket, w, h) {
   w = w || EQUI_W; h = h || EQUI_H;
   const key = kind + '|' + palette.base + '|' + seedBucket + '|' + w + 'x' + h;
   let t = _equiCache.get(key);
-  if (!t) { t = generateEquirectTexture(kind, palette, seedBucket * 7919 + 31, w, h); _equiCache.set(key, t); }
+  if (!t) {
+    t = generateEquirectTexture(kind, palette, seedBucket * 7919 + 31, w, h);
+    _equiCache.set(key, t);
+    // 実機フィードバック対応（最優先・描画はみ出しバグ）: 正距円筒図法テクスチャは
+    // 最大680x340pxとサイズが大きく、無制限に溜め続けるとメモリ使用量が肥大化する
+    // （_albedoCacheと同じ理由）。上限件数を設けて古いものから破棄する。
+    if (_equiCache.size > 150) _equiCache.delete(_equiCache.keys().next().value);
+  }
   return t;
 }
 
@@ -449,6 +463,7 @@ function getAtmosphereOverlay(sizePx, colorHex) {
   ctx.fillStyle = grad;
   ctx.beginPath(); ctx.arc(R, R, R * 1.06, 0, Math.PI * 2); ctx.fill();
   _atmoCache.set(key, cv);
+  if (_atmoCache.size > 100) _atmoCache.delete(_atmoCache.keys().next().value);
   return cv;
 }
 
