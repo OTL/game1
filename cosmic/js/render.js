@@ -809,11 +809,15 @@ class Renderer {
       this.applyHitFlash(slot.sphereMat, body);
       this.applyAlpha(slot.sphereMat);
 
-      const hasAtmo = kind === 'planet' || kind === 'gasgiant' || kind === 'browndwarf' || kind === 'star' || kind === 'giant' || kind === 'neutron';
-      if (hasAtmo) {
-        slot.atmoMesh.visible = true;
-        slot.atmoMesh.scale.setScalar(worldR * 1.08);
-        slot.atmoMat.uniforms.uColor.value.set(palette.light || '#bfe3ff');
+      // 大気は柔らかいグロースプライトで表現する。
+      // 旧実装（裏面シェーダのシェル球）は縁のグラデーションにならず、天体の周りに
+      // 硬い輪郭の円環として見える不具合があったため廃止（恒星系は既にglowSpriteあり）。
+      const hasAtmo = kind === 'planet' || kind === 'gasgiant';
+      if (hasAtmo && !isGlowKind) {
+        slot.glowSprite.visible = true;
+        slot.glowMat.color.set(palette.light || '#bfe3ff');
+        slot.glowMat.opacity = 0.16;
+        slot.glowSprite.scale.setScalar(worldR * 3.4);
       }
     }
 
@@ -832,9 +836,13 @@ class Renderer {
       slot.glowMat.opacity = 0.32;
       slot.glowSprite.scale.setScalar(worldR * 3.2);
     }
-    if (body.isHostile) {
-      slot.hostileRing.visible = true;
-      slot.hostileRing.scale.setScalar(worldR * 1.08);
+    // 敵対天体の警告は硬い円のワイヤではなく、赤い淡いグローの脈動で示す
+    // （実機フィードバック「惑星に◯がついてるの変」対応）
+    if (body.isHostile && !slot.glowSprite.visible) {
+      slot.glowSprite.visible = true;
+      slot.glowMat.color.set('#ff5560');
+      slot.glowMat.opacity = 0.2 + 0.08 * Math.sin(this.time * 5 + (body.seedBucket || 0));
+      slot.glowSprite.scale.setScalar(worldR * 3.0);
     }
   }
 

@@ -1296,9 +1296,8 @@
         const s = renderer.worldToScreen(cam, sat.x, sat.y);
         const sr = Math.min(hardMaxSr, Math.min(sat.radius, capMaxR) * cam.zoom);
         renderer.drawBody(sat, s.x, s.y, sr, cam);
-        renderer.ctx.strokeStyle = 'rgba(140,230,190,0.8)';
-        renderer.ctx.lineWidth = 1.6;
-        renderer.ctx.beginPath(); renderer.ctx.arc(s.x, s.y, sr + 2.5, 0, Math.PI * 2); renderer.ctx.stroke();
+        // 所有マークの線の円は「惑星に◯がついてるの変」フィードバックで廃止。
+        // 捕獲衛星は自機周回の動きとHUD（保有数）で識別できる。
       }
     }
 
