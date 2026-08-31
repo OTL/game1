@@ -8,9 +8,17 @@
  *
  * モデル: 毎秒 ATTEMPT_RATE 回、プレイヤーは近傍の天体と接触を試みる。
  * 相手の質量は rollEnemyMass() と同じ分布でプレイヤー質量からロールする。
- *  - ratio(effMass/enemyMass) >= 1.45          → 即吸収（killEnemy と同じ 55% を直接獲得）
- *  - ratio <= 1/1.45                            → 危険なので離脱（質量獲得なし）
- *  - それ以外（拮抗）                            → CONTESTED_WIN_RATE の確率で撃破成功
+ *  - ratio(effMass/enemyMass) >= INSTAKILL_RATIO → 即吸収（killEnemy と同じ 55% を直接獲得）
+ *  - それ以外（拮抗〜脅威）                        → CONTESTED_WIN_RATE の確率で撃破成功
+ * 実機フィードバック対応（HPバーが機能していない・一撃死かほぼ無傷かの二択）で
+ * 実際の戦闘（game.js の resolveCollision）を「即死/即吸収」と「相手の最大HPに対する
+ * 割合ダメージで持久戦になる拮抗」の二区分に再設計し、INSTAKILL_RATIOを1.45→5へ
+ * 引き上げた（豆粒級の格下＝質量比およそ0.2以下だけを一撃にする）。このシミュレータも
+ * 同じ閾値に合わせ、以前「retreat（質量比0.69以下は離脱・質量獲得ゼロ）」としていた
+ * 帯を含めて全て「拮抗」（根気よく当たれば通常は撃破できる＝CONTESTED_WIN_RATEの確率で
+ * 成功）として扱う（実際の新戦闘は格上相手でも必ずいくらかは削れるため、離脱一択には
+ * ならない）。CONTESTED_WIN_RATEは変更前とほぼ同じ全体ペーシング（通常61分/加速5.4分）
+ * になるよう再較正した値。
  * 実行: node cosmic/tools/simulate-pacing.js
  * ============================================================ */
 'use strict';
@@ -28,11 +36,11 @@ function mulberry32(seed) {
 const STAGE_MASSES = [0, 60, 320, 1600, 8000, 38000, 170000, 1000000, 4200000, 13000000];
 const STAGE_NAMES = ['岩石片', '小惑星', '準惑星', '惑星', '巨大ガス惑星', '褐色矮星', '恒星', '巨星', '中性子星', 'ブラックホール'];
 
-const INSTAKILL_RATIO = 1.45;
+const INSTAKILL_RATIO = 5;
 const DIRECT_RATIO = 0.55;
 const EFFICIENCY_AVG_BONUS = 0.18; // 質量転換効率アップグレード等の平均上乗せを大まかに織り込む
 const ATTEMPT_RATE = 0.281;        // 1秒あたりの接触試行回数（実機フィードバックの実測値: 03:53で恒星Lv13到達 から逆算）
-const CONTESTED_WIN_RATE = 0.4;    // 拮抗した相手を退けて吸収できる確率
+const CONTESTED_WIN_RATE = 0.66;   // 拮抗（旧・離脱帯を含む）を根気よく削り切って吸収できる確率
 const ENEMY_MASS_CAP_MULT = 2.0;   // data.js の BALANCE.enemyMassCapMult と合わせる（実機フィードバック第2回で4→2に引き下げ）
 // data.js の BALANCE.prey/even/threatMassMultRange, prey/evenChance と合わせる（サイズ分布の再設計）
 const PREY_RANGE = [0.15, 0.65], EVEN_RANGE = [0.7, 1.3], THREAT_RANGE = [1.4, 2.0];
@@ -63,7 +71,8 @@ function simulate(multiplierFn, seed, maxSeconds) {
       let gained = 0;
       if (ratio >= INSTAKILL_RATIO) {
         gained = enemyMass * DIRECT_RATIO;
-      } else if (ratio > 1 / INSTAKILL_RATIO) {
+      } else {
+        // 拮抗〜脅威（旧・離脱帯を含む）: 根気よく当たり続ければ通常は撃破できる。
         if (rng() < CONTESTED_WIN_RATE) gained = enemyMass * DIRECT_RATIO;
       }
       if (gained > 0) mass += gained * (1 + EFFICIENCY_AVG_BONUS) * massGainMultiplier;

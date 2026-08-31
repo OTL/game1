@@ -40,8 +40,33 @@
     enemyScaleLogMass: Math.log(BALANCE.startMass),
   };
 
-  const CONTACT_DPS = 20;      // 基準戦闘ダメージ/秒（同質量同士）
-  const INSTAKILL_RATIO = 1.45; // これ以上大きければ即吸収
+  const CONTACT_DPS = 20;      // 衛星（satellites）が敵に削られる際の基準値としてのみ使用
+  // 実機フィードバック対応（HPバーが機能していない・一撃死かほぼ無傷かの二択）:
+  // 以前は1.45という低い倍率で「即吸収」と「拮抗（かつ絶対量ダメージで実質減らない）」
+  // に二分されており、質量比0.7〜1.0程度の獲物すら常に一撃だった。ここは「本当に
+  // 豆粒のような格下（質量比およそ0.2以下）だけをテンポ維持のため一撃にする」
+  // 閾値まで引き上げ、それ以外はすべて後述の割合ベースの拮抗ダメージ処理に回す。
+  const INSTAKILL_RATIO = 5; // これ以上大きければ即吸収（相手が自分のおよそ1/5以下の質量）
+  // 拮抗ダメージ（相手の最大HPに対する割合/秒）。質量の絶対値に依存させず「質量比」
+  // だけで討伐に必要な接触回数が決まるようにする（大きな敵ほど絶対量として何十秒も
+  // 削れない、という不具合の直接の修正）。ratio(=有効質量/相手質量)が1（同格）で
+  // 5〜10回、2（相手が半分弱）で2〜4回程度の接触で倒せることを目安に調整した値。
+  const ENEMY_DMG_FRAC = 3.3;    // ratio=1 のとき、相手の最大HPの約330%/秒を削る基準値
+  // （実機フィードバック対応: 実際の接触は「くっつき続ける」のではなく、押し返し・
+  // 軌道の乱れにより1フレーム前後の短い接触が繰り返される「連続タップ」に近い挙動
+  // だったため、当初の理論値（継続接触0.4秒あたり1ヒット想定）の約9倍に較正し直した。
+  // 実機（Playwright操作）計測で質量比0.8/0.3/同格/脅威それぞれの実際の接触回数を
+  // 確認して調整した値。cosmic/README.md 参照。）
+  const ENEMY_DMG_EXP_HI = 1.427; // ratio>=1（有利）側は急に強くなる（格下ほど速く倒せる）
+  const ENEMY_DMG_EXP_LO = 0.12;  // ratio<1（不利）側はゆるやかに（脅威でも根気よく削れば倒せる）
+  // 被ダメージ（自分の最大HPに対する割合/秒）。1/ratio（相手が自分よりどれだけ格上か）
+  // が1（同格）のとき約108%/秒、格上になるほど急激に危険になるようにする（同上の較正）。
+  const PLAYER_DMG_FRAC = 1.08;
+  const PLAYER_DMG_EXP_HI = 1.427;
+  const PLAYER_DMG_EXP_LO = 0.12;
+  function ratioDamageFactor(ratio, frac, expHi, expLo) {
+    return ratio >= 1 ? frac * Math.pow(ratio, expHi) : frac * Math.pow(Math.max(ratio, 0.001), expLo);
+  }
 
   /* ---------- ユーティリティ ---------- */
   const $ = id => document.getElementById(id);
@@ -305,36 +330,60 @@
     spawnFragments(state.fragments, enemy.x, enemy.y, enemy.mass * (1 - directRatio), enemy.palette, rng, undefined, enemy.vx, enemy.vy);
     player.absorbedCount++;
     renderer.addShake(clamp(enemy.mass / player.mass * 6, 1, 8));
-    for (let i = 0; i < 10; i++) {
-      const a = rng() * Math.PI * 2, spd = 40 + rng() * 120;
+    // 吸収エフェクト: 破壊した天体の見かけ半径に応じて火花の数・速度・フラッシュの
+    // 規模をスケールする（大物ほど派手に、豆粒ほど控えめに）。
+    const destroyScale = clamp(enemy.radius / 14, 0.6, 3.2);
+    const sparkCount = Math.round(clamp(8 + enemy.radius * 0.9, 8, 34));
+    for (let i = 0; i < sparkCount; i++) {
+      const a = rng() * Math.PI * 2, spd = (60 + rng() * 220) * (0.6 + destroyScale * 0.25);
       state.particles.spawn({
         x: enemy.x, y: enemy.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
-        size: 2 + rng() * 3, color: enemy.palette.light || '#fff', life: 0.5 + rng() * 0.4,
+        size: (2 + rng() * 3) * (0.8 + destroyScale * 0.3), color: enemy.palette.light || '#fff',
+        life: 0.32 + rng() * 0.28, gravity: 26,
       });
     }
+    renderer.spawnImpactFlash(enemy.x, enemy.y, enemy.radius * (1 + destroyScale * 0.25), enemy.palette.light || '#fff6d8');
+    if (enemy.radius > 16) renderer.spawnShockwave(enemy.x, enemy.y, enemy.radius, enemy.palette.light || '#dff2ff');
     checkLevelUp(player);
   }
 
-  function damageEnemy(enemy, amount, player) {
+  function damageEnemy(enemy, amount, player, sparkColor) {
     // 溶岩惑星: 与えたダメージ（実際に削れたHP分。オーバーキル分は含めない）の
     // 一定割合を自分の質量に変換する。以前は即吸収時のみの特殊処理だったが、
     // 説明文「与えたダメージの%を自分の質量に変換する」に合わせ、あらゆる
     // ダメージ源（接触・波動・衛星など）に一律で効くようにした。
     const lavaLv = upLevel(player, 'lava');
+    let lavaHit = false;
     if (lavaLv > 0) {
       const realDealt = Math.min(amount, Math.max(0, enemy.hp));
       if (realDealt > 0) {
         const bonus = creditMass(player, realDealt * (upVal('lava', lavaLv) / 100), enemy.x, enemy.y);
-        if (bonus > 0.15) queueFloat('gain-lava', enemy.x, enemy.y + 12, bonus, '#ff9a5c');
+        if (bonus > 0.15) { queueFloat('gain-lava', enemy.x, enemy.y + 12, bonus, '#ff9a5c'); lavaHit = true; }
       }
     }
+    // 被弾フラッシュの立ち上がり（前フレームまで消えていた）だけを検出し、接触点に
+    // 小さな火花を出す。接触が続く間は毎フレーム再点火しないため、連続ヒットでも
+    // パーティクルが際限なく増えない。
+    const wasFresh = enemy.hitFlash <= 0;
     enemy.hp -= amount;
     enemy.hitFlash = 0.25;
     queueFloat('enemy-' + enemy.uid, enemy.x, enemy.y - enemy.radius - 14, amount, '#ffd9a0');
+    if (wasFresh && amount > 0.2) {
+      const dx = player.x - enemy.x, dy = player.y - enemy.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const cx = enemy.x + (dx / d) * enemy.radius, cy = enemy.y + (dy / d) * enemy.radius;
+      // 属性色分け: 溶岩ダメージ変換が発動していれば橙、指定色（オーロラ/磁気嵐/フレア等）
+      // があればそれ、なければ対象自身のパレット色。
+      const color = sparkColor || (lavaHit ? '#ff8a3c' : (enemy.palette.light || '#ffd9a0'));
+      for (let i = 0; i < 4; i++) {
+        const a = rng() * Math.PI * 2, spd = 30 + rng() * 70;
+        state.particles.spawn({ x: cx, y: cy, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, size: 1.6 + rng() * 2, color, life: 0.22 + rng() * 0.16, gravity: 10 });
+      }
+    }
     if (enemy.hp <= 0 && enemy.alive) killEnemy(enemy, player);
   }
 
-  function applyPlayerDamage(player, amount) {
+  function applyPlayerDamage(player, amount, source) {
     if (player.invuln > 0) return;
     const shieldLv = upLevel(player, 'shield');
     if (shieldLv > 0 && rng() * 100 < upVal('shield', shieldLv)) {
@@ -347,9 +396,27 @@
     const crustLv = upLevel(player, 'crust');
     const reduce = upVal('crust', crustLv) / 100;
     const dmg = amount * (1 - reduce);
+    // 被弾フラッシュの立ち上がりだけを検出して接触点に控えめな火花・赤いリムフラッシュ・
+    // ごく小さめの画面シェイクを出す（連続接触中は毎フレーム再点火しない）。
+    const wasFresh = player.hitFlash <= 0;
     player.hp -= dmg;
     player.hitFlash = 0.3;
     if (dmg > 0.4) queueFloat('player-dmg', player.x, player.y - playerRadius(player) - 6, dmg, '#ff6b7a');
+    if (wasFresh && dmg > 0.15) {
+      const pr = playerRadius(player);
+      let cx = player.x, cy = player.y;
+      if (source) {
+        const dx = source.x - player.x, dy = source.y - player.y;
+        const d = Math.hypot(dx, dy) || 1;
+        cx = player.x + (dx / d) * pr; cy = player.y + (dy / d) * pr;
+      }
+      for (let i = 0; i < 6; i++) {
+        const a = rng() * Math.PI * 2, spd = 40 + rng() * 90;
+        state.particles.spawn({ x: cx, y: cy, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, size: 1.8 + rng() * 2.4, color: '#ff8a7a', life: 0.26 + rng() * 0.18, gravity: 14 });
+      }
+      renderer.spawnImpactFlash(cx, cy, pr * 0.55, '#ff5a5a');
+      renderer.addShake(clamp(dmg * 0.35, 0.4, 3));
+    }
     if (player.hp <= 0) handlePlayerDeath(player);
   }
 
@@ -363,23 +430,29 @@
     const ratio = effMass / enemy.mass;
 
     if (ratio >= INSTAKILL_RATIO) {
+      // 豆粒のような格下はテンポ維持のため一撃で吸収する。
       damageEnemy(enemy, enemy.hp * 99, player);
-    } else if (ratio <= 1 / INSTAKILL_RATIO) {
-      // 押し返し
-      const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
-      player.vx += nx * 40 * dt * 30;
-      player.vy += ny * 40 * dt * 30;
-      const dmg = CONTACT_DPS * (enemy.mass / effMass) * 0.55 * dt;
-      applyPlayerDamage(player, dmg);
+      return;
+    }
+
+    // 拮抗〜脅威: 相手の最大HPに対する割合ダメージ/秒として計算するため、質量の
+    // 絶対値に関わらず「質量比」だけで討伐に必要な接触回数が決まる。相手がどれほど
+    // 格上でも(ENEMY_DMG_EXP_LOによりゆるやかに)常に多少は削れるため、根気よく
+    // 当たり続ければいずれ倒せる（＝以前の「押し返すだけで一切減らない」を解消）。
+    const off = offenseMultiplier(player, speedRatio);
+    const dmgToEnemy = enemy.maxHp * ratioDamageFactor(ratio, ENEMY_DMG_FRAC, ENEMY_DMG_EXP_HI, ENEMY_DMG_EXP_LO) * off.mult * dt;
+    const dmgToPlayer = playerMaxHp(player) * ratioDamageFactor(1 / ratio, PLAYER_DMG_FRAC, PLAYER_DMG_EXP_HI, PLAYER_DMG_EXP_LO) * dt;
+    damageEnemy(enemy, dmgToEnemy, player);
+    if (off.isCrit) showFloat(enemy.x, enemy.y - enemy.radius - 26, '会心!', '#ffe066');
+    applyPlayerDamage(player, dmgToPlayer, enemy);
+
+    const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
+    if (ratio < 1) {
+      // 相手が格上なほど強く押し返される（従来の「押し返し」挙動を維持）。
+      const push = Math.min(3, 1 / ratio);
+      player.vx += nx * 40 * dt * 30 * push;
+      player.vy += ny * 40 * dt * 30 * push;
     } else {
-      // 拮抗した戦闘
-      const off = offenseMultiplier(player, speedRatio);
-      const dmgToEnemy = CONTACT_DPS * ratio * off.mult * dt;
-      const dmgToPlayer = CONTACT_DPS / ratio * dt;
-      damageEnemy(enemy, dmgToEnemy, player);
-      if (off.isCrit) showFloat(enemy.x, enemy.y - enemy.radius - 26, '会心!', '#ffe066');
-      applyPlayerDamage(player, dmgToPlayer);
-      const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
       enemy.x -= nx * 30 * dt; enemy.y -= ny * 30 * dt;
     }
   }
@@ -668,6 +741,65 @@
     }
   }
 
+  /* ---------- 彗星の尾（発光パーティクルの連続放出） ----------
+   * 実機フィードバック対応（3D化後の彗星の尾がチープ・向き確認）: 以前は先細りの
+   * 平面2枚を核に追従させるだけの表現で単調だった。核から反太陽方向
+   * （-WORLD_LIGHT、太陽の方向 WORLD_LIGHT の逆）へ発光パーティクルを連続放出し、
+   * 拡散・フェードしながら流れる「写真で見る彗星の尾」に近い見た目にする。
+   * イオンの尾: 反太陽方向へまっすぐ・細く・青白く。
+   * ダストの尾: 反太陽方向から進行方向の逆側へ少し曲げ、太く・白っぽく・緩くカーブ。
+   * 既存の衝突エフェクトと同じ state.particles プール（上限あり、短寿命）を共有する。
+   * 核から離れた（画面外遠方の）彗星では放出しない。 */
+  function updateCometTails(dt) {
+    for (const e of state.enemies) {
+      if (!e.alive || e.kind !== 'comet') continue;
+      const camDx = e.x - state.camera.x, camDy = e.y - state.camera.y;
+      if (camDx * camDx + camDy * camDy > 2800 * 2800) continue;
+      // 反太陽方向（太陽の方向 WORLD_LIGHT の逆）
+      const adx = -WORLD_LIGHT.x, ady = -WORLD_LIGHT.y;
+      const spd = Math.hypot(e.vx || 0, e.vy || 0);
+      const vdx = spd > 1 ? e.vx / spd : adx, vdy = spd > 1 ? e.vy / spd : ady;
+      // ダストの尾: 反太陽方向を軸に、進行方向の逆側へわずかに曲げる
+      const bendX = adx * 0.72 - vdx * 0.28, bendY = ady * 0.72 - vdy * 0.28;
+      const bendLen = Math.hypot(bendX, bendY) || 1;
+      const bx = bendX / bendLen, by = bendY / bendLen;
+      const sizeScale = clamp(e.radius / 14, 0.5, 3.2);
+      const speedScale = clamp(0.6 + spd / 260, 0.6, 1.8);
+
+      // イオンの尾: 細く・速く・青白い粒子をまっすぐ反太陽方向へ
+      e.ionTailAcc = (e.ionTailAcc || 0) + dt;
+      const ionInterval = 0.045 / speedScale;
+      const ionAng = Math.atan2(ady, adx);
+      while (e.ionTailAcc >= ionInterval) {
+        e.ionTailAcc -= ionInterval;
+        const ang = ionAng + (rng() - 0.5) * 0.10;
+        const spdP = (120 + rng() * 90) * sizeScale;
+        state.particles.spawn({
+          x: e.x + adx * e.radius * 0.5, y: e.y + ady * e.radius * 0.5,
+          vx: Math.cos(ang) * spdP + e.vx * 0.15, vy: Math.sin(ang) * spdP + e.vy * 0.15,
+          size: (1.1 + rng() * 1.2) * sizeScale, color: '#bfe3ff',
+          life: 0.32 + rng() * 0.22, gravity: 0,
+        });
+      }
+
+      // ダストの尾: 太く・遅く・白っぽい粒子を緩くカーブする方向へ、広がりを持たせて
+      e.dustTailAcc = (e.dustTailAcc || 0) + dt;
+      const dustInterval = 0.075 / speedScale;
+      const dustAng = Math.atan2(by, bx);
+      while (e.dustTailAcc >= dustInterval) {
+        e.dustTailAcc -= dustInterval;
+        const ang = dustAng + (rng() - 0.5) * 0.55;
+        const spdP = (50 + rng() * 55) * sizeScale;
+        state.particles.spawn({
+          x: e.x + bx * e.radius * 0.5, y: e.y + by * e.radius * 0.5,
+          vx: Math.cos(ang) * spdP + e.vx * 0.1, vy: Math.sin(ang) * spdP + e.vy * 0.1,
+          size: (2 + rng() * 2.2) * sizeScale, color: '#eef2fb',
+          life: 0.5 + rng() * 0.3, gravity: 0,
+        });
+      }
+    }
+  }
+
   function updateEnemyAI(player, dt) {
     for (const e of state.enemies) {
       if (!e.alive) continue;
@@ -739,7 +871,7 @@
       fx.flareTimer -= dt;
       if (fx.flareTimer <= 0) {
         fx.flareTimer = 5;
-        coneDamage(player, playerRadius(player) * 8, upVal('flare', flareLv), 1.05);
+        coneDamage(player, playerRadius(player) * 8, upVal('flare', flareLv), 1.05, '#ff8a3c');
         const dir = Math.hypot(player.vx, player.vy) > 5 ? Math.atan2(player.vy, player.vx) : player.angle;
         for (let i = -3; i <= 3; i++) {
           const a = dir + i * 0.15;
@@ -753,7 +885,7 @@
       fx.cmeTimer -= dt;
       if (fx.cmeTimer <= 0) {
         fx.cmeTimer = 3.2;
-        coneDamage(player, playerRadius(player) * 9, upVal('cme', cmeLv));
+        coneDamage(player, playerRadius(player) * 9, upVal('cme', cmeLv), 0.6, '#ffe066');
       }
     }
     // 彗星の尾
@@ -779,7 +911,7 @@
       if (!e.alive) continue;
       const d = dist(player, e);
       if (d < radius) {
-        damageEnemy(e, dmg, player);
+        damageEnemy(e, dmg, player, color);
         if (knockback && e.mass < player.mass * 0.5) {
           const nx = (e.x - player.x) / (d || 1), ny = (e.y - player.y) / (d || 1);
           e.vx += nx * 90; e.vy += ny * 90;
@@ -890,7 +1022,7 @@
     if (player.tailTrail.length > 60) player.tailTrail.splice(0, player.tailTrail.length - 60);
   }
 
-  function coneDamage(player, range, dmg, halfAngle) {
+  function coneDamage(player, range, dmg, halfAngle, color) {
     halfAngle = halfAngle || 0.6;
     const dir = Math.hypot(player.vx, player.vy) > 5 ? Math.atan2(player.vy, player.vx) : player.angle;
     for (const e of state.enemies) {
@@ -900,7 +1032,7 @@
       const ang = Math.atan2(e.y - player.y, e.x - player.x);
       let diff = Math.abs(ang - dir);
       if (diff > Math.PI) diff = Math.PI * 2 - diff;
-      if (diff < halfAngle) damageEnemy(e, dmg, player);
+      if (diff < halfAngle) damageEnemy(e, dmg, player, color);
     }
   }
 
@@ -1061,9 +1193,25 @@
       applyPlayerGravity(state.enemies, player, dt, gwaveMult);
       updateEnemyMutualGravityAndCollisions(state.enemies, state.fragments, null, rng, dt, (small, big) => {
         renderer.addShake(clamp(small.mass / Math.max(1, player.mass) * 2, 0.5, 4));
+        // 敵同士の衝突・破壊: 大きめの天体同士ほど派手に（火花＋閃光＋薄い衝撃波リング）。
+        const scale = clamp(small.radius / 14, 0.6, 3);
+        const sparkCount = Math.round(clamp(6 + small.radius * 0.7, 6, 26));
+        for (let i = 0; i < sparkCount; i++) {
+          const a = rng() * Math.PI * 2, spd = (50 + rng() * 180) * (0.6 + scale * 0.25);
+          state.particles.spawn({
+            x: small.x, y: small.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+            size: (1.8 + rng() * 2.6) * (0.8 + scale * 0.25), color: small.palette.light || '#fff',
+            life: 0.3 + rng() * 0.25, gravity: 20,
+          });
+        }
+        renderer.spawnImpactFlash(small.x, small.y, small.radius * (1 + scale * 0.2), big.palette.light || '#fff6d8');
+        if (small.radius > 14 || big.radius > 22) {
+          renderer.spawnShockwave(small.x, small.y, Math.max(small.radius, big.radius * 0.6), '#dff2ff');
+        }
       }, player, screenRadiusCapFor());
       pruneBodyCounts(state.enemies, state.fragments, player);
       updateEnemyAI(player, dt);
+      updateCometTails(dt);
       for (const e of state.enemies) resolveCollision(player, e, dt, speedRatio);
       updateFragments(player, dt);
       updatePassives(player, dt);
@@ -1181,7 +1329,8 @@
       }
       const pseudo = {
         kind: stage.kind, palette: derivePalette(stage.color), seedBucket: stage.key.length * 13 + player.stageIdx,
-        angle: player.angle, spinPhase: player.spinPhase || 0, hitFlash: player.hitFlash, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
+        angle: player.angle, spinPhase: player.spinPhase || 0, hitFlash: player.hitFlash,
+        hitFlashColor: player.hitFlashColor, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
         vx: player.vx, vy: player.vy,
         // 序盤2段階（岩石片・小惑星）は不規則形状でタンブリング、準惑星進化時に球になる
         irregularShape: stage.key === 'rock' || stage.key === 'asteroid',
