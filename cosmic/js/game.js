@@ -590,13 +590,23 @@
   /* ---------- 更新処理 ---------- */
   function updatePlayerMovement(player, dt) {
     if (state.pointerActive) {
-      const dx = state.pointerX - renderer.w / 2, dy = state.pointerY - renderer.h / 2;
+      // 画面座標の差分をそのままワールドに使うと3Dカメラでは上下が反転するため、
+      // タッチ位置をワールド座標に射影してから方向を求める
+      let dx, dy;
+      if (renderer.ready) {
+        const wt = renderer.screenToWorld(state.pointerX, state.pointerY);
+        const wc = renderer.screenToWorld(renderer.w / 2, renderer.h / 2);
+        dx = wt.x - wc.x; dy = wt.y - wc.y;
+      } else {
+        dx = state.pointerX - renderer.w / 2; dy = state.pointerY - renderer.h / 2;
+      }
+      const dScreen = Math.hypot(state.pointerX - renderer.w / 2, state.pointerY - renderer.h / 2);
       const d = Math.hypot(dx, dy);
-      if (d > 6) {
+      if (dScreen > 6 && d > 0.0001) {
         const thrustBonus = upVal('thrust', upLevel(player, 'thrust')) / 100;
         const accel = BALANCE.moveAccel * (1 + thrustBonus);
         const nx = dx / d, ny = dy / d;
-        const pull = clamp(d / 160, 0.25, 1);
+        const pull = clamp(dScreen / 160, 0.25, 1);
         player.vx += nx * accel * pull * dt;
         player.vy += ny * accel * pull * dt;
       }
