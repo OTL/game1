@@ -919,7 +919,12 @@
       }
     }
     if (!silent) {
-      state.particles.spawn({ x: player.x, y: player.y, size: radius * 0.02, color, life: 0.5, vx: 0, vy: 0, kind: 'ring' });
+      // パルスの効果範囲は3D側の衝撃波リングで可視化する。
+      // 旧: kind:'ring' のパーティクルは3D描画では点として扱われ実質見えなかった
+      // （「オーロラ帯でてなくない？」フィードバックの原因）。
+      // spawnShockwave は radius*0.5→*2.6 に拡大するため、0.4倍を渡すと
+      // 最終的におおよそ効果範囲まで広がる。
+      renderer.spawnShockwave(player.x, player.y, radius * 0.4, color);
       for (let i = 0; i < 8; i++) {
         const a = rng() * Math.PI * 2;
         state.particles.spawn({ x: player.x + Math.cos(a) * radius * 0.3, y: player.y + Math.sin(a) * radius * 0.3, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40, color, size: 3, life: 0.4 });
