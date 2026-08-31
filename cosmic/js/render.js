@@ -1,8 +1,18 @@
 /* ============================================================
    COSMIC EATER - render.js
-   背景・天体・エフェクトの描画
+   WebGL (Three.js) による3D描画レイヤー
+   ------------------------------------------------------------
+   ゲームロジック（game.js / entities.js）は2Dの位置・速度・衝突判定のまま
+   何も変えず、この Renderer だけが「2D世界の座標」を実際の3D空間の
+   XY平面（Z=0）上に配置されたメッシュとして描画する。
+   カメラは高い位置から見下ろす狭FOVの Perspective カメラ（わずかに傾けて
+   立体感を出す）。HPバー・浮遊ダメージ数・ロックオン矢印・彗星の尾
+   アップグレードの軌跡など、画面に張り付くUI的な表現は引き続き
+   2Dオーバーレイ canvas（#overlay-canvas、WebGLキャンバスの上に重ねる）で描く。
    ============================================================ */
 'use strict';
+
+let THREE = null;
 
 function derivePalette(hex) {
   const base = hexToRgb(hex);
@@ -12,82 +22,542 @@ function derivePalette(hex) {
   return { base: hex, dark: toHex(dark), light: toHex(light) };
 }
 
+/* ---------- シェーダ ---------- */
+const STAR_VERT = `
+uniform vec2 uCamera;
+uniform float uFactor;
+uniform float uTile;
+uniform float uSize;
+uniform float uDepth;
+varying float vAlpha;
+void main() {
+  vec2 shift = uCamera * uFactor;
+  vec2 wrapped = mod(position.xy - shift + uTile * 0.5, uTile) - uTile * 0.5;
+  vec3 worldPos = vec3(wrapped + uCamera, -uDepth);
+  vec4 mvPosition = modelViewMatrix * vec4(worldPos, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  float d = max(1.0, -mvPosition.z);
+  gl_PointSize = uSize * (900.0 / d);
+  vAlpha = clamp(1.3 - d / 6000.0, 0.2, 1.0);
+}`;
+const STAR_FRAG = `
+precision mediump float;
+uniform vec3 uColor;
+uniform float uOpacity;
+varying float vAlpha;
+void main() {
+  vec2 uv = gl_PointCoord - 0.5;
+  float d = length(uv);
+  if (d > 0.5) discard;
+  float a = smoothstep(0.5, 0.0, d);
+  gl_FragColor = vec4(uColor, a * uOpacity * vAlpha);
+}`;
+
+const PARTICLE_VERT = `
+attribute vec3 aColor;
+attribute float aSize;
+attribute float aAlpha;
+varying vec3 vColor;
+varying float vAlpha;
+void main() {
+  vColor = aColor;
+  vAlpha = aAlpha;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = aSize * (700.0 / max(1.0, -mv.z));
+  gl_Position = projectionMatrix * mv;
+}`;
+const PARTICLE_FRAG = `
+precision mediump float;
+varying vec3 vColor;
+varying float vAlpha;
+void main() {
+  vec2 uv = gl_PointCoord - 0.5;
+  float d = length(uv);
+  if (d > 0.5) discard;
+  float a = smoothstep(0.5, 0.0, d);
+  gl_FragColor = vec4(vColor, a * vAlpha);
+}`;
+
+const ATMO_VERT = `
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+  vNormal = normalize(normalMatrix * normal);
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vViewDir = normalize(-mv.xyz);
+  gl_Position = projectionMatrix * mv;
+}`;
+const ATMO_FRAG = `
+precision mediump float;
+uniform vec3 uColor;
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+  float rim = 1.0 - max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
+  float a = pow(rim, 2.1);
+  gl_FragColor = vec4(uColor, a * 0.85);
+}`;
+
+/* ---------- ジオメトリ生成ヘルパー ---------- */
+function buildRadialRingGeometry(innerR, outerR, segments) {
+  const positions = [], uvs = [], indices = [];
+  for (let i = 0; i <= segments; i++) {
+    const th = (i / segments) * Math.PI * 2;
+    const ct = Math.cos(th), st = Math.sin(th);
+    positions.push(ct * innerR, st * innerR, 0); uvs.push(i / segments, 0);
+    positions.push(ct * outerR, st * outerR, 0); uvs.push(i / segments, 1);
+  }
+  for (let i = 0; i < segments; i++) {
+    const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
+    indices.push(a, b, c, b, d, c);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setIndex(indices);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+/* 降着円盤用: 正方形画像(x,yで生成した見下ろし円盤)をそのまま貼れるよう、
+ * UVを「中心からの直交座標」に対応させる（角度×半径の帯ではなく円盤画像として貼る）。 */
+function buildPolarDiskGeometry(innerR, outerR, segments) {
+  const positions = [], uvs = [], indices = [];
+  for (let i = 0; i <= segments; i++) {
+    const th = (i / segments) * Math.PI * 2;
+    const ct = Math.cos(th), st = Math.sin(th);
+    positions.push(ct * innerR, st * innerR, 0);
+    uvs.push(0.5 + 0.5 * (ct * innerR / outerR), 0.5 + 0.5 * (st * innerR / outerR));
+    positions.push(ct * outerR, st * outerR, 0);
+    uvs.push(0.5 + 0.5 * ct, 0.5 + 0.5 * st);
+  }
+  for (let i = 0; i < segments; i++) {
+    const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
+    indices.push(a, b, c, b, d, c);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setIndex(indices);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+/* 不規則な岩塊（小惑星・破片・彗星核・敵対天体）: Icosahedron を球面調和風の
+ * 正弦波の合成で変形し、ジャガイモ型のローポリ形状を作る。シードごとに数種を
+ * キャッシュして使い回す（インスタンス的な使い回し。フルの InstancedMesh 化は
+ * 未実装だが、天体総数の上限が低いため個別 Mesh のままでも 60fps を維持できる）。 */
+function buildIrregularGeometry(seedBucket) {
+  const geo = new THREE.IcosahedronGeometry(1, 2);
+  const rng = mulberry32(seedBucket * 104729 + 7);
+  const nTerms = 4 + ((rng() * 3) | 0);
+  const terms = [];
+  for (let i = 0; i < nTerms; i++) {
+    terms.push({
+      ax: rng() * 2 - 1, ay: rng() * 2 - 1, az: rng() * 2 - 1,
+      freq: 1 + ((rng() * 3) | 0), amp: 0.09 + rng() * 0.16, phase: rng() * Math.PI * 2,
+    });
+  }
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize();
+    let f = 1;
+    for (const t of terms) {
+      const d = v.x * t.ax + v.y * t.ay + v.z * t.az;
+      f += t.amp * Math.sin(d * t.freq * Math.PI * 2 + t.phase);
+    }
+    f = Math.max(0.55, Math.min(1.32, f));
+    v.multiplyScalar(f);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+/* 彗星の尾: ローカルX方向0→1に伸びる先細りの平面。UV.xがそのまま先端までの
+ * グラデーション（アルファ用の1Dテクスチャ）を参照する。 */
+function buildTailGeometry() {
+  const geo = new THREE.PlaneGeometry(1, 1, 1, 1);
+  geo.translate(0.5, 0, 0);
+  return geo;
+}
+function buildTailGradientTexture(rgbaFn) {
+  const w = 64, h = 4;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, rgbaFn(0.9));
+  grad.addColorStop(1, rgbaFn(0));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  return cv;
+}
+
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.bgLayers = null;
-    this.nebulaLayers = null;
-    this.ringTex = generateRingTexture(42);
-    this.diskTex = generateAccretionDisk(7);
-    this.shake = 0;
+    this.ready = false;
+    this.webglError = false;
     this.time = 0;
     this.bgTime = 0;
-    this.shootingStars = [];
-    this.shootingTimer = 3 + Math.random() * 5;
-    this.tint = { r: 5, g: 7, b: 16 };
-    this.milkyWay = generateMilkyWayBand(1600, 900, 909);
-    this.dust = [
-      { field: generateDustField(46, 8001), factor: 0.22, tile: 1400, size: 1.0 },
-      { field: generateDustField(58, 8002), factor: 0.42, tile: 1100, size: 1.4 },
-      { field: generateDustField(40, 8003), factor: 0.68, tile: 800, size: 1.9 },
-    ];
-    this.lockonPulse = 0;
-    this.prevCamX = 0; this.prevCamY = 0;
-    this.camVelX = 0; this.camVelY = 0;
-  }
-
-  resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.canvas.width = Math.floor(window.innerWidth * dpr);
-    this.canvas.height = Math.floor(window.innerHeight * dpr);
-    this.canvas.style.width = window.innerWidth + 'px';
-    this.canvas.style.height = window.innerHeight + 'px';
-    this.dpr = dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.shake = 0;
     this.w = window.innerWidth;
     this.h = window.innerHeight;
-    // 実機フィードバック対応（画質）: 巨大天体をボケさせないためのLODでは
-    // 高解像度テクスチャを都度合成するので、拡大時のスムージング品質を明示しておく。
-    this.ctx.imageSmoothingEnabled = true;
-    if ('imageSmoothingQuality' in this.ctx) this.ctx.imageSmoothingQuality = 'high';
-    this.initBackground();
+    this.dpr = 1;
+    this._lastZoom = 1;
+    this.tint = { r: 5, g: 7, b: 16 };
+    this.shootingStars = [];
+    this.shootingTimer = 3 + Math.random() * 5;
+    this._bodyCursor = 0;
+    this._fragCursor = 0;
+
+    this.overlayCanvas = document.getElementById('overlay-canvas');
+    if (!this.overlayCanvas) {
+      this.overlayCanvas = document.createElement('canvas');
+      this.overlayCanvas.id = 'overlay-canvas';
+      canvas.insertAdjacentElement('afterend', this.overlayCanvas);
+    }
+    this.octx = this.overlayCanvas.getContext('2d');
+    this.ctx = this.octx; // game.js は renderer.ctx を直接使ってオーバーレイに描く
+
+    import('../vendor/three.module.min.js').then(mod => {
+      THREE = mod;
+      try {
+        this.initThree();
+      } catch (e) {
+        console.error('WebGL初期化に失敗しました', e);
+        this.showWebglFallback();
+      }
+    }).catch(err => {
+      console.error('three.js の読み込みに失敗しました', err);
+      this.showWebglFallback();
+    });
   }
 
-  initBackground() {
-    const w = 900, h = 900;
-    // 3層以上のパララックス星空。奥のレイヤーほど factor が小さくカメラ追従が弱い＝遠く見える。
-    this.bgLayers = [
-      { cv: generateStarfieldLayer(w, h, 3, 101), factor: 0.015, size: w, twinkle: false },
-      { cv: generateStarfieldLayer(w, h, 7, 202), factor: 0.06, size: w, twinkle: true,
-        stars: generateTwinkleStars(w, 26, 5001) },
-      { cv: generateStarfieldLayer(w, h, 13, 303), factor: 0.16, size: w, twinkle: true,
-        stars: generateTwinkleStars(w, 34, 6002) },
+  showWebglFallback() {
+    this.webglError = true;
+    if (this._fallbackShown) return;
+    this._fallbackShown = true;
+    const div = document.createElement('div');
+    div.id = 'webgl-fallback';
+    div.style.cssText = 'position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;' +
+      'background:#05040f;color:#eef0ff;text-align:center;padding:24px;font:16px/1.7 system-ui,sans-serif;';
+    div.innerHTML = '<div>この端末・ブラウザは WebGL に対応していないため、<br>コズミック・イーターの3D描画を表示できません。<br>' +
+      '別のブラウザ（Chrome / Safari 最新版など）でお試しください。</div>';
+    document.body.appendChild(div);
+  }
+
+  /* ============================================================
+   * 初期化（Three.js 読み込み後）
+   * ============================================================ */
+  initThree() {
+    let gl3d;
+    try {
+      gl3d = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance', alpha: false });
+    } catch (e) { this.showWebglFallback(); return; }
+    if (!gl3d || !gl3d.getContext()) { this.showWebglFallback(); return; }
+    this.renderer3d = gl3d;
+    this.renderer3d.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer3d.autoClear = true;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x03040c);
+    this.fov = 24;      // 狭FOV = 望遠寄り。奥行きの歪みを抑えつつ立体感を出す
+    this.tilt = 0.20;   // 見下ろしからのわずかな傾き（ラジアン、約11.5度）
+    this.camera = new THREE.PerspectiveCamera(this.fov, this.w / this.h, 1, 200000);
+    this.camera.up.set(0, 0, 1);
+
+    this.sun = new THREE.DirectionalLight(0xffffff, 2.6);
+    this.scene.add(this.sun);
+    this.scene.add(this.sun.target);
+    this.ambient = new THREE.AmbientLight(0x3a4468, 0.55);
+    this.scene.add(this.ambient);
+
+    this.worldGroup = new THREE.Group(); this.scene.add(this.worldGroup);
+    this.bgGroup = new THREE.Group(); this.scene.add(this.bgGroup);
+
+    this._texCache = new Map();
+    this.glowTex = new THREE.CanvasTexture(generateGlowSpriteTexture());
+
+    this.buildSharedAssets();
+    this.buildBackground();
+    this.bodyPool = [];
+    for (let i = 0; i < 48; i++) this.bodyPool.push(this.buildBodySlot());
+    this.fragPool = [];
+    for (let i = 0; i < 70; i++) this.fragPool.push(this.buildBodySlot());
+    this.buildParticleSystem();
+
+    this._v3 = new THREE.Vector3();
+    this.ready = true;
+    if (this._pendingSize) this._applyThreeSize();
+  }
+
+  buildSharedAssets() {
+    this.sphereGeo = new THREE.SphereGeometry(1, 28, 18);
+    this.irregularGeos = [];
+    for (let i = 0; i < 6; i++) this.irregularGeos.push(buildIrregularGeometry(i));
+    this.ringGeo = buildRadialRingGeometry(1.3, 2.3, 64);
+    this.ringMat = new THREE.MeshStandardMaterial({
+      map: new THREE.CanvasTexture(generateRingBandTexture(42)),
+      transparent: true, side: THREE.DoubleSide, roughness: 1, metalness: 0, depthWrite: false,
+    });
+    this.ringMat.map.wrapS = THREE.RepeatWrapping;
+    this.ringMat.map.wrapT = THREE.ClampToEdgeWrapping;
+
+    this.diskGeo = buildPolarDiskGeometry(1.15, 2.6, 64);
+    this.diskMat = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(generateAccretionDisk(7)),
+      transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+
+    this.circleGeo = new THREE.BufferGeometry();
+    { const pts = []; const N = 48; for (let i = 0; i <= N; i++) { const a = (i / N) * Math.PI * 2; pts.push(Math.cos(a), Math.sin(a), 0); }
+      this.circleGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); }
+    this.hostileMat = new THREE.LineBasicMaterial({ color: 0xff505a, transparent: true, opacity: 0.85 });
+
+    this.tailGeo = buildTailGeometry();
+    this.ionTailMat = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(buildTailGradientTexture(a => `rgba(150,190,255,${a.toFixed(2)})`)),
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    });
+    this.dustTailMat = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(buildTailGradientTexture(a => `rgba(235,235,240,${a.toFixed(2)})`)),
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    });
+
+    this.bhHorizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    this.bhGlowMat = new THREE.SpriteMaterial({
+      map: this.glowTex, color: 0x9b6bff, transparent: true, opacity: 0.35,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+  }
+
+  /* ---------- 背景: 星空(Points, カメラ追従の無限タイル) + 星雲/天の川(スプライト) ---------- */
+  buildBackground() {
+    this.starLayers = [];
+    const specs = [
+      { count: 900, size: 1.6, depth: 3400, factor: 0.05, opacity: 0.8, color: 0xffffff, tile: 3400, seed: 101 },
+      { count: 700, size: 2.1, depth: 1900, factor: 0.14, opacity: 0.85, color: 0xdfe6ff, tile: 2400, seed: 202 },
+      { count: 480, size: 2.6, depth: 950, factor: 0.30, opacity: 0.95, color: 0xffffff, tile: 1700, seed: 303 },
     ];
-    // 星雲: 星空とは独立に、ごくゆっくりドリフト＋アルファゆらぎする専用レイヤー
-    const nw = 1100, nh = 1100;
-    this.nebulaLayers = [
-      { cv: generateNebulaLayer(nw, nh, 401), factor: 0.03, size: nw, driftX: 3.2, driftY: -1.6, offX: 0, offY: 0, alphaPhase: 0, alphaSpeed: 0.10 },
-      { cv: generateNebulaLayer(nw, nh, 707), factor: 0.05, size: nw, driftX: -2.1, driftY: 2.4, offX: 0, offY: 0, alphaPhase: 2.4, alphaSpeed: 0.07 },
-    ];
+    for (const sp of specs) {
+      const positions = new Float32Array(sp.count * 3);
+      const rng = mulberry32(sp.seed);
+      for (let i = 0; i < sp.count; i++) {
+        positions[i * 3] = (rng() - 0.5) * sp.tile;
+        positions[i * 3 + 1] = (rng() - 0.5) * sp.tile;
+        positions[i * 3 + 2] = 0;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uCamera: { value: new THREE.Vector2() }, uFactor: { value: sp.factor }, uTile: { value: sp.tile },
+          uSize: { value: sp.size }, uDepth: { value: sp.depth }, uColor: { value: new THREE.Color(sp.color) },
+          uOpacity: { value: sp.opacity },
+        },
+        vertexShader: STAR_VERT, fragmentShader: STAR_FRAG,
+        transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+      });
+      const pts = new THREE.Points(geo, mat);
+      pts.frustumCulled = false;
+      pts.renderOrder = -100;
+      this.bgGroup.add(pts);
+      this.starLayers.push(pts);
+    }
+
+    // 星雲（固定配置のビルボード。実際のカメラ移動による本物の遠近パララックスに任せる）
+    const nebColors = [0x3a2a6d, 0x1a3a6d, 0x5a2a5d, 0x204a5a, 0x3a1a4a];
+    const nrng = mulberry32(909);
+    this.nebulaSprites = [];
+    for (let i = 0; i < 10; i++) {
+      const tex = new THREE.CanvasTexture(generateGlowSpriteTexture());
+      const mat = new THREE.SpriteMaterial({
+        map: tex, color: nebColors[i % nebColors.length], transparent: true, opacity: 0.4 + nrng() * 0.2,
+        depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+      });
+      const spr = new THREE.Sprite(mat);
+      spr.position.set((nrng() - 0.5) * 9000, (nrng() - 0.5) * 9000, -(3500 + nrng() * 2500));
+      spr.scale.set(2600 + nrng() * 2600, 2600 + nrng() * 2600, 1);
+      spr.renderOrder = -95;
+      this.bgGroup.add(spr);
+      this.nebulaSprites.push(spr);
+    }
+
+    // 天の川（横長の帯を1枚、遠景に固定配置）
+    const mwCv = this.buildMilkyWayTexture();
+    const mwMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(mwCv), transparent: true, opacity: 0.6, depthWrite: false, depthTest: false });
+    this.milkyWaySprite = new THREE.Sprite(mwMat);
+    this.milkyWaySprite.scale.set(16000, 16000 * (mwCv.height / mwCv.width), 1);
+    this.milkyWaySprite.position.set(0, 0, -8000);
+    this.milkyWaySprite.renderOrder = -99;
+    this.bgGroup.add(this.milkyWaySprite);
+  }
+
+  buildMilkyWayTexture() {
+    const w = 1600, h = 900;
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d');
+    const rng = mulberry32(909);
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(-0.32);
+    const bw = w * 1.25, bh = h * 0.42;
+    const grad = ctx.createLinearGradient(0, -bh / 2, 0, bh / 2);
+    grad.addColorStop(0, 'rgba(180,190,220,0)');
+    grad.addColorStop(0.5, 'rgba(200,205,230,0.5)');
+    grad.addColorStop(1, 'rgba(180,190,220,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+    for (let i = 0; i < 3000; i++) {
+      const x = (rng() - 0.5) * bw;
+      const yFold = Math.pow(rng(), 1.8) * (rng() < 0.5 ? -1 : 1);
+      const y = yFold * bh / 2;
+      const b = 0.08 + rng() * 0.3;
+      ctx.fillStyle = `rgba(210,215,235,${b.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(x, y, 0.5 + rng() * 0.9, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let i = 0; i < 4; i++) {
+      const x = (rng() - 0.5) * bw, y = (rng() - 0.5) * bh * 0.6;
+      const rw = bw * (0.08 + rng() * 0.1), rh = bh * (0.4 + rng() * 0.3);
+      const dgrad = ctx.createRadialGradient(x, y, 0, x, y, rw);
+      dgrad.addColorStop(0, 'rgba(3,4,10,0.5)');
+      dgrad.addColorStop(1, 'rgba(3,4,10,0)');
+      ctx.fillStyle = dgrad;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1, rh / rw); ctx.beginPath(); ctx.arc(0, 0, rw, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    ctx.restore();
+    return cv;
+  }
+
+  /* ---------- 天体1体分の使い回しスロット ---------- */
+  buildBodySlot() {
+    const group = new THREE.Group();
+    const sphereMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, transparent: true });
+    const sphereMesh = new THREE.Mesh(this.sphereGeo, sphereMat);
+    const irrMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, transparent: true });
+    const irrMesh = new THREE.Mesh(this.irregularGeos[0], irrMat);
+    irrMesh.visible = false;
+    const atmoMat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(0xbfe3ff) } },
+      vertexShader: ATMO_VERT, fragmentShader: ATMO_FRAG,
+      transparent: true, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const atmoMesh = new THREE.Mesh(this.sphereGeo, atmoMat);
+    atmoMesh.visible = false;
+    const glowMat = new THREE.SpriteMaterial({ map: this.glowTex, color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending });
+    const glowSprite = new THREE.Sprite(glowMat);
+    glowSprite.visible = false;
+    const ringMesh = new THREE.Mesh(this.ringGeo, this.ringMat);
+    ringMesh.visible = false;
+    const hostileRing = new THREE.LineLoop(this.circleGeo, this.hostileMat);
+    hostileRing.visible = false;
+    const bhHorizon = new THREE.Mesh(this.sphereGeo, this.bhHorizonMat); bhHorizon.visible = false;
+    const bhDisk = new THREE.Mesh(this.diskGeo, this.diskMat); bhDisk.visible = false;
+    const bhGlow = new THREE.Sprite(this.bhGlowMat.clone()); bhGlow.visible = false;
+    const ionTail = new THREE.Mesh(this.tailGeo, this.ionTailMat); ionTail.visible = false;
+    const dustTail = new THREE.Mesh(this.tailGeo, this.dustTailMat); dustTail.visible = false;
+
+    group.add(sphereMesh, irrMesh, atmoMesh, glowSprite, ringMesh, hostileRing, bhHorizon, bhDisk, bhGlow, ionTail, dustTail);
+    group.visible = false;
+    this.worldGroup.add(group);
+    return {
+      group, sphereMesh, sphereMat, irrMesh, irrMat, atmoMesh, atmoMat, glowSprite, glowMat,
+      ringMesh, hostileRing, bhHorizon, bhDisk, bhGlow, ionTail, dustTail,
+      texKey: null, irrGeoIdx: -1,
+    };
+  }
+
+  buildParticleSystem() {
+    const MAX = 500;
+    this._particleMax = MAX;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array(MAX * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(MAX), 1).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(MAX), 1).setUsage(THREE.DynamicDrawUsage));
+    geo.setDrawRange(0, 0);
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PARTICLE_VERT, fragmentShader: PARTICLE_FRAG,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.particlePoints = new THREE.Points(geo, mat);
+    this.particlePoints.frustumCulled = false;
+    this.worldGroup.add(this.particlePoints);
+  }
+
+  /* ============================================================
+   * サイズ・カメラ
+   * ============================================================ */
+  resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = dpr;
+    this.w = window.innerWidth;
+    this.h = window.innerHeight;
+    this.overlayCanvas.width = Math.floor(this.w * dpr);
+    this.overlayCanvas.height = Math.floor(this.h * dpr);
+    this.overlayCanvas.style.width = this.w + 'px';
+    this.overlayCanvas.style.height = this.h + 'px';
+    this.octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!this.ready) { this._pendingSize = true; return; }
+    this._applyThreeSize();
+  }
+  _applyThreeSize() {
+    this.renderer3d.setPixelRatio(this.dpr);
+    this.renderer3d.setSize(this.w, this.h, true);
+    this.camera.aspect = this.w / this.h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  updateCamera(cam) {
+    this._lastZoom = cam.zoom || 1;
+    const fovRad = this.fov * Math.PI / 180;
+    const d = (this.h * 0.5) / (Math.max(0.02, this._lastZoom) * Math.tan(fovRad / 2));
+    let shakeX = 0, shakeY = 0;
+    if (this.shake > 0.05) {
+      shakeX = (Math.random() - 0.5) * this.shake;
+      shakeY = (Math.random() - 0.5) * this.shake;
+    }
+    const camY = cam.y - d * Math.sin(this.tilt) + shakeY;
+    const camZ = d * Math.cos(this.tilt);
+    this.camera.position.set(cam.x + shakeX, camY, camZ);
+    this.camera.lookAt(cam.x, cam.y, 0);
+    this.camera.updateMatrixWorld();
+
+    const lightDist = 600;
+    this.sun.position.set(cam.x + WORLD_LIGHT.x * lightDist, cam.y + WORLD_LIGHT.y * lightDist, 260);
+    this.sun.target.position.set(cam.x, cam.y, 0);
+    this.sun.target.updateMatrixWorld();
+
+    for (const p of this.starLayers) p.material.uniforms.uCamera.value.set(cam.x, cam.y);
   }
 
   worldToScreen(cam, x, y) {
-    return {
-      x: (x - cam.x) * cam.zoom + this.w / 2,
-      y: (y - cam.y) * cam.zoom + this.h / 2,
-    };
+    if (!this.ready) {
+      return { x: (x - cam.x) * cam.zoom + this.w / 2, y: (y - cam.y) * cam.zoom + this.h / 2 };
+    }
+    this._v3.set(x, y, 0).project(this.camera);
+    return { x: (this._v3.x * 0.5 + 0.5) * this.w, y: (1 - (this._v3.y * 0.5 + 0.5)) * this.h };
+  }
+
+  screenToWorld(sx, sy) {
+    const ndcX = (sx / this.w) * 2 - 1;
+    const ndcY = -(sy / this.h) * 2 + 1;
+    const v = new THREE.Vector3(ndcX, ndcY, 0.5).unproject(this.camera);
+    const dir = v.sub(this.camera.position).normalize();
+    const t = dir.z !== 0 ? -this.camera.position.z / dir.z : 0;
+    return { x: this.camera.position.x + dir.x * t, y: this.camera.position.y + dir.y * t };
   }
 
   addShake(v) { this.shake = Math.min(18, this.shake + v); }
 
   clear() {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#03040c';
-    ctx.fillRect(0, 0, this.w, this.h);
+    if (this.octx) this.octx.clearRect(0, 0, this.w, this.h);
   }
 
-  /* 進化段階に応じた背景の色調（序盤は暗青 → 恒星帯は暖色寄り → 終盤は深い紫） */
+  /* ============================================================
+   * 背景（星空・星雲・天の川は3D、色調ワッシュ・流れ星はオーバーレイ）
+   * ============================================================ */
   targetTintFor(stageIdx) {
     const stops = [
       { s: 0, c: { r: 4, g: 7, b: 18 } },
@@ -104,11 +574,7 @@ class Renderer {
     }
     const span = Math.max(1, b.s - a.s);
     const t = Math.max(0, Math.min(1, (stageIdx - a.s) / span));
-    return {
-      r: lerp(a.c.r, b.c.r, t),
-      g: lerp(a.c.g, b.c.g, t),
-      b: lerp(a.c.b, b.c.b, t),
-    };
+    return { r: lerp(a.c.r, b.c.r, t), g: lerp(a.c.g, b.c.g, t), b: lerp(a.c.b, b.c.b, t) };
   }
 
   updateShootingStars(dt) {
@@ -120,23 +586,16 @@ class Renderer {
       const y = fromTop ? -20 : Math.random() * this.h * 0.6;
       const ang = Math.PI * 0.22 + Math.random() * 0.35 + (x > this.w / 2 ? Math.PI * 0.5 : 0);
       const spd = 620 + Math.random() * 340;
-      this.shootingStars.push({
-        x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
-        life: 0, maxLife: 0.55 + Math.random() * 0.35,
-      });
+      this.shootingStars.push({ x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 0, maxLife: 0.55 + Math.random() * 0.35 });
     }
     for (let i = this.shootingStars.length - 1; i >= 0; i--) {
       const s = this.shootingStars[i];
-      s.life += dt;
-      s.x += s.vx * dt; s.y += s.vy * dt;
-      if (s.life >= s.maxLife || s.x < -60 || s.x > this.w + 60 || s.y > this.h + 60) {
-        this.shootingStars.splice(i, 1);
-      }
+      s.life += dt; s.x += s.vx * dt; s.y += s.vy * dt;
+      if (s.life >= s.maxLife || s.x < -60 || s.x > this.w + 60 || s.y > this.h + 60) this.shootingStars.splice(i, 1);
     }
   }
-
   drawShootingStars() {
-    const ctx = this.ctx;
+    const ctx = this.octx;
     for (const s of this.shootingStars) {
       const t = 1 - s.life / s.maxLife;
       const len = 90 * (0.5 + t * 0.5);
@@ -145,8 +604,7 @@ class Renderer {
       const grad = ctx.createLinearGradient(s.x, s.y, s.x + dx * len, s.y + dy * len);
       grad.addColorStop(0, `rgba(255,255,255,${(0.9 * t).toFixed(2)})`);
       grad.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = grad; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + dx * len, s.y + dy * len); ctx.stroke();
       ctx.fillStyle = `rgba(255,255,255,${(0.9 * t).toFixed(2)})`;
       ctx.beginPath(); ctx.arc(s.x, s.y, 1.6, 0, Math.PI * 2); ctx.fill();
@@ -157,379 +615,205 @@ class Renderer {
     dt = dt || 0;
     this.bgTime += dt;
     updateWorldLight(this.bgTime);
-    // カメラ（≒プレイヤー）の速度を推定 — 進行方向と逆に星の流れを作るスピード感演出に使う
-    if (dt > 0) {
-      this.camVelX = (cam.x - this.prevCamX) / dt;
-      this.camVelY = (cam.y - this.prevCamY) / dt;
+    if (this.ready) {
+      for (const p of this.starLayers) p.material.uniforms.uCamera.value.set(cam.x, cam.y);
     }
-    this.prevCamX = cam.x; this.prevCamY = cam.y;
-    const ctx = this.ctx;
-
-    // 天の川：背景の最も遠いレイヤーとして、ごく薄い視差でドリフト表示。
-    // 巨大な1枚絵を画面より十分大きく引き伸ばして描画し、タイルの継ぎ目を作らないぶん
-    // 描画コール数も1回に抑える（毎フレームのラスタコスト対策）。
-    {
-      const mw = this.milkyWay;
-      const factor = 0.01;
-      const drawW = Math.max(this.w, this.h) * 2.6;
-      const drawH = drawW * (mw.height / mw.width);
-      const ox = -(cam.x * factor) % (drawW * 0.5);
-      const oy = -(cam.y * factor) % (drawH * 0.5);
-      ctx.globalAlpha = 0.85;
-      ctx.drawImage(mw, this.w / 2 - drawW / 2 + ox, this.h / 2 - drawH / 2 + oy, drawW, drawH);
-      ctx.globalAlpha = 1;
-    }
-
-    // 星空（3層パララックス、星の瞬き付き）
-    for (const layer of this.bgLayers) {
-      const size = layer.size;
-      const ox = -((cam.x * layer.factor) % size + size) % size;
-      const oy = -((cam.y * layer.factor) % size + size) % size;
-      for (let x = ox - size; x < this.w + size; x += size) {
-        for (let y = oy - size; y < this.h + size; y += size) {
-          ctx.drawImage(layer.cv, x, y, size, size);
-          if (layer.twinkle && layer.stars) {
-            for (const st of layer.stars) {
-              const b = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(this.bgTime * st.speed + st.phase));
-              ctx.fillStyle = `rgba(255,255,255,${b.toFixed(2)})`;
-              ctx.beginPath(); ctx.arc(x + st.x, y + st.y, st.r, 0, Math.PI * 2); ctx.fill();
-            }
-          }
-        }
-      }
-    }
-
-    // 星雲（独自にゆっくりドリフト＋アルファゆらぎ、星空より遠い視差でスクロール）
-    for (const layer of this.nebulaLayers) {
-      layer.offX += layer.driftX * dt;
-      layer.offY += layer.driftY * dt;
-      layer.alphaPhase += dt * layer.alphaSpeed;
-      const size = layer.size;
-      const parallaxX = cam.x * layer.factor + layer.offX;
-      const parallaxY = cam.y * layer.factor + layer.offY;
-      const ox = -((parallaxX % size) + size) % size;
-      const oy = -((parallaxY % size) + size) % size;
-      ctx.globalAlpha = 0.75 + 0.25 * Math.sin(layer.alphaPhase);
-      for (let x = ox - size; x < this.w + size; x += size) {
-        for (let y = oy - size; y < this.h + size; y += size) {
-          ctx.drawImage(layer.cv, x, y, size, size);
-        }
-      }
-    }
-    ctx.globalAlpha = 1;
-
-    // 漂う微細な塵（多層パララックス、光源方向で明るさが変化。プレイヤー移動時は
-    // 進行方向と逆に微かに流れてスピード感を出す）
-    this.drawDust(cam, dt);
-
-    // 流れ星
     this.updateShootingStars(dt);
     this.drawShootingStars();
 
-    // 進化段階に応じた色調変化（序盤は暗青 → 恒星帯は暖色 → 終盤は深い紫）。
-    // 彩度を抑えたトーンに寄せ、暗部を締める。
     const target = this.targetTintFor(stageIdx || 0);
     const k = 1 - Math.exp(-dt * 0.5);
     this.tint.r = lerp(this.tint.r, target.r, k);
     this.tint.g = lerp(this.tint.g, target.g, k);
     this.tint.b = lerp(this.tint.b, target.b, k);
-    ctx.fillStyle = `rgba(${this.tint.r | 0},${this.tint.g | 0},${this.tint.b | 0},0.24)`;
+    const ctx = this.octx;
+    ctx.fillStyle = `rgba(${this.tint.r | 0},${this.tint.g | 0},${this.tint.b | 0},0.20)`;
     ctx.fillRect(0, 0, this.w, this.h);
-    // 薄いビネット（画面端をわずかに締める）は毎フレームのcanvas再描画コストを避けるため
-    // CSSのオーバーレイ要素（#vignette）で常時表示している（game.jsの起動処理でDOMに追加）。
   }
 
-  /* 漂う塵：カメラ相対のタイル空間にラップして配置し、各層ごとに独立した視差係数で
-   * スクロールさせる。各粒は自身の法線をゆっくり回転させ、WORLD_LIGHT との内積で
-   * 明るさが変化する（=単一光源で「光を受けて煌めく」ように見える）。
-   * プレイヤーの実速度（カメラ速度で近似）が大きいほど、進行方向と逆向きに
-   * わずかに尾を引かせてスピード感を出す。 */
-  drawDust(cam, dt) {
-    const ctx = this.ctx;
-    const spd = Math.hypot(this.camVelX, this.camVelY);
-    const streak = Math.min(1, spd / 260);
-    const sdx = spd > 1 ? -this.camVelX / spd : 0, sdy = spd > 1 ? -this.camVelY / spd : 0;
-    for (const layer of this.dust) {
-      const tile = layer.tile;
-      const px = ((cam.x * layer.factor) % tile + tile) % tile;
-      const py = ((cam.y * layer.factor) % tile + tile) % tile;
-      for (const d of layer.field) {
-        d.normal += d.spin * dt;
-        let wx = d.x * tile - px, wy = d.y * tile - py;
-        wx = ((wx % tile) + tile * 1.5) % tile - tile * 0.5;
-        wy = ((wy % tile) + tile * 1.5) % tile - tile * 0.5;
-        const sx = wx + this.w / 2, sy = wy + this.h / 2;
-        if (sx < -20 || sx > this.w + 20 || sy < -20 || sy > this.h + 20) continue;
-        const nx = Math.cos(d.normal), ny = Math.sin(d.normal);
-        const lit = Math.max(0, nx * WORLD_LIGHT.x + ny * WORLD_LIGHT.y);
-        const bright = 0.10 + 0.55 * lit;
-        const sz = d.size * layer.size;
-        if (streak > 0.08) {
-          // 速度線: グラデーションを毎粒子ごとに生成すると重いので単色半透明の線で近似
-          const len = sz * (1 + streak * 9);
-          ctx.strokeStyle = `rgba(220,226,255,${(bright * 0.6).toFixed(2)})`;
-          ctx.lineWidth = Math.max(0.6, sz * 0.6);
-          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + sdx * len, sy + sdy * len); ctx.stroke();
-        } else {
-          ctx.fillStyle = `rgba(220,226,255,${bright.toFixed(2)})`;
-          ctx.beginPath(); ctx.arc(sx, sy, sz, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-    }
-  }
-
+  /* ============================================================
+   * フレーム制御
+   * ============================================================ */
   beginFrame(dt, cam) {
     this.time += dt;
     this.shake = Math.max(0, this.shake - dt * 40);
-    const ctx = this.ctx;
-    ctx.save();
-    if (this.shake > 0.05) {
-      const s = this.shake;
-      ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
+    this._bodyCursor = 0;
+    this._fragCursor = 0;
+    if (!this.ready) return;
+    this.updateCamera(cam);
+  }
+  endFrame() {
+    if (!this.ready) return;
+    for (let i = this._bodyCursor; i < this.bodyPool.length; i++) this.bodyPool[i].group.visible = false;
+    for (let i = this._fragCursor; i < this.fragPool.length; i++) this.fragPool[i].group.visible = false;
+    this.renderer3d.render(this.scene, this.camera);
+  }
+
+  /* ============================================================
+   * テクスチャ適用
+   * ============================================================ */
+  applyTexture(material, kind, palette, seedBucket) {
+    const w = 256, h = 128;
+    const cv = getEquirectTexture(kind, palette, seedBucket, w, h);
+    let tex = this._texCache.get(cv);
+    if (!tex) {
+      tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.anisotropy = 4;
+      this._texCache.set(cv, tex);
+    }
+    material.map = tex;
+    const ncv = getNormalTextureFromEquirect(kind, palette, seedBucket, w, h);
+    let ntex = this._texCache.get(ncv);
+    if (!ntex) {
+      ntex = new THREE.CanvasTexture(ncv);
+      ntex.wrapS = THREE.RepeatWrapping;
+      this._texCache.set(ncv, ntex);
+    }
+    material.normalMap = ntex;
+    material.normalScale = material.normalScale || new THREE.Vector2(0.55, 0.55);
+    material.needsUpdate = true;
+  }
+
+  applyHitFlash(material, body) {
+    const hf = body.hitFlash || 0;
+    if (hf > 0) {
+      material.emissive.set(0xffffff);
+      material.emissiveMap = null;
+      material.emissiveIntensity = Math.min(1.0, hf * 1.3);
     }
   }
-  endFrame() { this.ctx.restore(); }
+  applyAlpha(material) {
+    const a = this.ctx.globalAlpha;
+    material.opacity = (typeof a === 'number') ? a : 1;
+  }
 
-  /* 汎用天体描画 (敵・プレイヤー共通) */
-  drawBody(body, sx, sy, sr, cam, opts) {
-    opts = opts || {};
-    const ctx = this.ctx;
-    const kind = body.kind;
-    if (sr < 0.4) return;
+  updateCometTail(slot, wr, body) {
+    const adx = -WORLD_LIGHT.x, ady = -WORLD_LIGHT.y;
+    const len = wr * 7;
+    const ang = Math.atan2(ady, adx);
+    slot.ionTail.visible = true;
+    slot.ionTail.position.set(0, 0, 0.02);
+    slot.ionTail.rotation.z = ang;
+    slot.ionTail.scale.set(len, Math.max(0.5, wr * 0.7), 1);
 
-    // グロー系(恒星・巨星・褐色矮星・中性子星)
-    if (kind === 'star' || kind === 'giant' || kind === 'browndwarf' || kind === 'neutron') {
-      const flick = 0.9 + Math.sin(this.time * 3 + body.seedBucket) * 0.08;
-      const glowR = sr * (kind === 'neutron' ? 5.5 : 2.4) * flick;
-      const grad = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, glowR);
-      const c = hexToRgb(body.palette ? body.palette.light : '#fff');
-      grad.addColorStop(0, rgbStr(c, 0.55));
-      grad.addColorStop(0.4, rgbStr(c, 0.22));
-      grad.addColorStop(1, rgbStr(c, 0));
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(sx, sy, glowR, 0, Math.PI * 2); ctx.fill();
-    }
+    const spd = Math.hypot(body.vx || 0, body.vy || 0);
+    const vdx = spd > 1 ? (body.vx / spd) : adx, vdy = spd > 1 ? (body.vy / spd) : ady;
+    const bendX = adx * 0.72 - vdx * 0.28, bendY = ady * 0.72 - vdy * 0.28;
+    const bendLen = Math.hypot(bendX, bendY) || 1;
+    const dustAng = Math.atan2(bendY / bendLen, bendX / bendLen);
+    slot.dustTail.visible = true;
+    slot.dustTail.position.set(0, 0, 0.01);
+    slot.dustTail.rotation.z = dustAng;
+    slot.dustTail.scale.set(len * 0.85, Math.max(0.9, wr * 1.5), 1);
+  }
+
+  /* ============================================================
+   * 天体描画（プレイヤー・敵・捕獲衛星 / 破片）
+   * ============================================================ */
+  updateBodySlot(slot, body, kind, worldX, worldY, worldR, opts) {
+    slot.group.position.set(worldX, worldY, 0);
+    slot.group.visible = true;
+    slot.sphereMesh.visible = false; slot.irrMesh.visible = false; slot.atmoMesh.visible = false;
+    slot.glowSprite.visible = false; slot.ringMesh.visible = false; slot.hostileRing.visible = false;
+    slot.bhHorizon.visible = false; slot.bhDisk.visible = false; slot.bhGlow.visible = false;
+    slot.ionTail.visible = false; slot.dustTail.visible = false;
 
     if (kind === 'blackhole') {
-      this.drawBlackHole(body, sx, sy, sr);
+      slot.bhHorizon.visible = true; slot.bhHorizon.scale.setScalar(worldR);
+      slot.bhDisk.visible = true; slot.bhDisk.scale.setScalar(worldR);
+      slot.bhDisk.rotation.x = 1.15;
+      slot.bhDisk.rotation.z = this.time * 0.5;
+      slot.bhGlow.visible = true; slot.bhGlow.scale.setScalar(worldR * 5.2);
       return;
     }
 
-    this.drawRotatingGlobe(body, sx, sy, sr);
-
-    // 環（惑星の一部にのみ）
-    if (body.hasRing) {
-      ctx.save();
-      ctx.translate(sx, sy);
-      ctx.rotate((body.angle || 0) * 0.3 + 0.5);
-      ctx.scale(1, 0.34);
-      const rr = sr * 1.9;
-      ctx.globalAlpha = 0.85;
-      ctx.drawImage(this.ringTex, -rr, -rr * 0.5, rr * 2, rr);
-      ctx.restore();
-    }
-
-    // 彗星の尾：進行方向の逆ではなく、恒星（WORLD_LIGHT）の反対方向へ伸びる。
-    // イオンの尾はまっすぐ青く、ダストの尾はやや進行方向寄りに曲がって白い。
-    if (kind === 'comet') {
-      const adx = -WORLD_LIGHT.x, ady = -WORLD_LIGHT.y;
-      const len = sr * 7;
-      // イオンの尾（まっすぐ、青）
-      {
-        const ex = sx + adx * len, ey = sy + ady * len;
-        const grad = ctx.createLinearGradient(sx, sy, ex, ey);
-        grad.addColorStop(0, 'rgba(150,190,255,0.5)');
-        grad.addColorStop(1, 'rgba(150,190,255,0)');
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = Math.max(1, sr * 0.35);
-        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-      }
-      // ダストの尾（速度方向に少し引きずられて曲がる、白っぽく太い）
-      {
-        const spd = Math.hypot(body.vx || 0, body.vy || 0);
-        const vdx = spd > 1 ? (body.vx / spd) : adx, vdy = spd > 1 ? (body.vy / spd) : ady;
-        const bendX = adx * 0.72 - vdx * 0.28, bendY = ady * 0.72 - vdy * 0.28;
-        const bendLen = Math.hypot(bendX, bendY) || 1;
-        const dlen = len * 0.85;
-        const midX = sx + (adx * 0.5 + bendX / bendLen * 0.5) * dlen * 0.55;
-        const midY = sy + (ady * 0.5 + bendY / bendLen * 0.5) * dlen * 0.55;
-        const endX = sx + bendX / bendLen * dlen, endY = sy + bendY / bendLen * dlen;
-        const grad = ctx.createLinearGradient(sx, sy, endX, endY);
-        grad.addColorStop(0, 'rgba(235,235,240,0.42)');
-        grad.addColorStop(1, 'rgba(235,235,240,0)');
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = Math.max(1.5, sr * 0.75);
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        ctx.quadraticCurveTo(midX, midY, endX, endY);
-        ctx.stroke();
-      }
-    }
-
-    // ヒットフラッシュ
-    if (body.hitFlash > 0) {
-      ctx.save();
-      ctx.globalAlpha = Math.min(0.7, body.hitFlash);
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-
-    // 敵対フラグの縁取り
-    if (body.isHostile) {
-      ctx.strokeStyle = 'rgba(255,80,90,0.75)';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(sx, sy, sr + 1.5, 0, Math.PI * 2); ctx.stroke();
-    }
-  }
-
-  /* 天体を自転する球体として描画する。
-   * 一定サイズ以上（画面内で大きく見える天体）はスライス単位の球面射影＋
-   * ライティング／縁の減光／大気の縁光をキャッシュ済みフレームで描き、
-   * それ未満の小さい・遠い天体は事前生成テクスチャを単純に回転させる
-   * 近似描画にとどめて 60fps を維持する。 */
-  drawRotatingGlobe(body, sx, sy, sr) {
-    const ctx = this.ctx;
-    const kind = body.kind;
-    const spinPhase = (body.spinPhase !== undefined ? body.spinPhase : body.angle) || 0;
-    const FULL_QUALITY_MIN_SR = 15;
-    // 不規則形状（ジャガイモ型）にするかどうか。準惑星以上の kind（dwarf/planet/gasgiant/
-    // browndwarf/star/giant/neutron/blackhole）は自己重力で丸くなっている前提で常に球体。
+    const palette = body.palette || derivePalette(body.color || '#8f8578');
+    const seedBucket = (body.seedBucket || 0) % 6;
+    const texKey = kind + '|' + palette.base + '|' + seedBucket;
     const irregular = !!body.irregularShape;
+    const spinPhase = (body.spinPhase !== undefined ? body.spinPhase : body.angle) || 0;
 
-    // 実機フィードバック対応（最優先・描画はみ出しバグ）: 巨大な表示半径のとき、
-    // LODキャッシュ用オフスクリーンキャンバス（getNearBodyFrame/renderGlobeFrame）の
-    // 内容が実機（メモリ制約の強いモバイルGPU）でごくまれに破損し、本来の円形の
-    // 輪郭を無視してキャンバスの矩形いっぱいにギザギザのテクスチャが描かれてしまう
-    // 不具合が実機スクリーンショットで確認された。原因がテクスチャキャッシュ側の
-        // 破損であっても描画結果が必ず円形に収まるよう、ここで安全弁として明示的に
-    // ctx.clip() を掛けてから drawImage する。不規則形状（ジャガイモ型、輪郭が最大で
-    // 公称半径の1.38倍まで張り出す）や惑星の大気の縁光（最大1.06倍）を誤って
-    // 切り取らないよう、公称半径よりわずかに広い半径でクリップする。
-    const clipR = Math.max(0.5, sr * 1.45);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(sx, sy, clipR, 0, Math.PI * 2);
-    ctx.clip();
-
-    // 実機フィードバック対応（画質）: テクスチャの描画解像度(sizePx)は、実際に画面上へ
-    // 何ピクセルで描かれるか（sr*2 に devicePixelRatio を掛けた値）に応じて動的に決める。
-    // 大きく表示される天体ほど高解像度でキャッシュを再生成することで、拡大描画による
-    // モザイク状のボケを防ぐ（LOD: Level of Detail）。
-    const dpr = this.dpr || 1;
-    const neededPx = sr * 2 * dpr;
-
-    if (sr < FULL_QUALITY_MIN_SR || kind === 'comet' || irregular) {
-      // 近似描画: 形状（アルベド）はタンブリングで自由に回転させ、その上に
-      // 常に同じ光源方向を向いた固定シェーディングマスクを重ねる。
-      // これにより自転・タンブリングしていても明暗境界（ターミネーター）は
-      // ワールド全体で常に同じ向きになる＝単一光源の一貫性を保てる。
-      // 描画コストを抑えるため、回転位相を離散化した合成済みフレームを
-      // キャッシュして drawImage 1回で済ませる（renderGlobeFrame と同じ手法）。
-      const sizePx = Math.max(8, Math.min(NEAR_MAX_SIZE, Math.round(neededPx / 4) * 4));
-      const twoPi = Math.PI * 2;
-      const norm = ((spinPhase % twoPi) + twoPi) % twoPi;
-      const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
-      const frame = getNearBodyFrame(kind, body.palette, body.seedBucket % 6, irregular, sizePx, frameIdx);
-      ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
-      ctx.restore();
-      return;
-    }
-
-    const sizePx = Math.max(32, Math.min(GLOBE_MAX_SIZE, Math.round(neededPx / 8) * 8));
-    const twoPi = Math.PI * 2;
-    const norm = ((spinPhase % twoPi) + twoPi) % twoPi;
-    const frameIdx = Math.floor((norm / twoPi) * GLOBE_FRAMES) % GLOBE_FRAMES;
-    const hasAtmosphere = kind === 'planet' || kind === 'gasgiant' || kind === 'browndwarf' ||
-      kind === 'star' || kind === 'giant' || kind === 'neutron';
-    const frame = renderGlobeFrame(kind, body.palette, body.seedBucket % 6, sizePx, frameIdx, hasAtmosphere);
-
-    if (kind === 'star') {
-      // 表面の対流ゆらぎを安価に近似（明るさの微小な明滅）
-      ctx.globalAlpha = 0.92 + Math.sin(this.time * 2.4 + body.seedBucket) * 0.08;
-      ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
-      ctx.globalAlpha = 1;
+    if (irregular) {
+      if (slot.irrGeoIdx !== seedBucket) { slot.irrMesh.geometry = this.irregularGeos[seedBucket]; slot.irrGeoIdx = seedBucket; }
+      if (slot.texKey !== texKey) { this.applyTexture(slot.irrMat, kind, palette, seedBucket); slot.texKey = texKey; }
+      slot.irrMesh.visible = true;
+      slot.irrMesh.scale.setScalar(worldR);
+      slot.irrMesh.rotation.z = spinPhase;
+      slot.irrMesh.rotation.x = spinPhase * 0.37;
+      slot.irrMat.emissive.set(0x000000); slot.irrMat.emissiveMap = null;
+      this.applyHitFlash(slot.irrMat, body);
+      this.applyAlpha(slot.irrMat);
     } else {
-      ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
+      if (slot.texKey !== texKey) { this.applyTexture(slot.sphereMat, kind, palette, seedBucket); slot.texKey = texKey; }
+      slot.sphereMesh.visible = true;
+      slot.sphereMesh.scale.setScalar(worldR);
+      slot.sphereMesh.rotation.z = spinPhase;
+
+      const isGlowKind = kind === 'star' || kind === 'giant' || kind === 'browndwarf' || kind === 'neutron';
+      if (isGlowKind) {
+        slot.sphereMat.emissive.set(palette.light || '#ffffff');
+        slot.sphereMat.emissiveMap = slot.sphereMat.map;
+        slot.sphereMat.emissiveIntensity = (kind === 'neutron' ? 1.5 : 0.95) * (0.9 + Math.sin(this.time * 2.4 + seedBucket) * 0.08);
+        slot.glowSprite.visible = true;
+        slot.glowMat.color.set(palette.light || '#ffffff');
+        slot.glowMat.opacity = 0.6;
+        slot.glowSprite.scale.setScalar(worldR * (kind === 'neutron' ? 5.5 : 2.6) * 2);
+      } else {
+        slot.sphereMat.emissive.set(0x000000);
+        slot.sphereMat.emissiveMap = null;
+      }
+      this.applyHitFlash(slot.sphereMat, body);
+      this.applyAlpha(slot.sphereMat);
+
+      const hasAtmo = kind === 'planet' || kind === 'gasgiant' || kind === 'browndwarf' || kind === 'star' || kind === 'giant' || kind === 'neutron';
+      if (hasAtmo) {
+        slot.atmoMesh.visible = true;
+        slot.atmoMesh.scale.setScalar(worldR * 1.08);
+        slot.atmoMat.uniforms.uColor.value.set(palette.light || '#bfe3ff');
+      }
     }
-    ctx.restore();
+
+    if (body.hasRing) {
+      slot.ringMesh.visible = true;
+      slot.ringMesh.scale.setScalar(worldR);
+      slot.ringMesh.rotation.x = 1.15;
+      slot.ringMesh.rotation.z = (body.angle || 0) * 0.3 + 0.5;
+    }
+    if (kind === 'comet') this.updateCometTail(slot, worldR, body);
+    if (body.isHostile) {
+      slot.hostileRing.visible = true;
+      slot.hostileRing.scale.setScalar(worldR * 1.08);
+    }
   }
 
-  drawBlackHole(body, sx, sy, sr) {
-    const ctx = this.ctx;
-    // 重力レンズ風の暈しリング
-    const lensR = sr * 2.6;
-    const lens = ctx.createRadialGradient(sx, sy, sr * 0.9, sx, sy, lensR);
-    lens.addColorStop(0, 'rgba(155,107,255,0.0)');
-    lens.addColorStop(0.55, 'rgba(120,90,220,0.18)');
-    lens.addColorStop(0.75, 'rgba(180,150,255,0.10)');
-    lens.addColorStop(1, 'rgba(180,150,255,0)');
-    ctx.fillStyle = lens;
-    ctx.beginPath(); ctx.arc(sx, sy, lensR, 0, Math.PI * 2); ctx.fill();
-
-    // 降着円盤
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(this.time * 0.5);
-    const dr = sr * 2.1;
-    ctx.globalAlpha = 0.9;
-    ctx.drawImage(this.diskTex, -dr, -dr, dr * 2, dr * 2);
-    ctx.restore();
-
-    // 事象の地平線（真っ黒）
-    const eh = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-    eh.addColorStop(0, '#000000');
-    eh.addColorStop(0.85, '#000000');
-    eh.addColorStop(1, 'rgba(0,0,0,0.6)');
-    ctx.fillStyle = eh;
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+  drawBody(body, sx, sy, sr, cam, opts) {
+    if (!this.ready) return;
+    if (sr < 0.4) return;
+    if (this._bodyCursor >= this.bodyPool.length) return;
+    const slot = this.bodyPool[this._bodyCursor++];
+    const world = this.screenToWorld(sx, sy);
+    const wr = Math.max(0.3, sr / Math.max(0.0001, this._lastZoom));
+    this.updateBodySlot(slot, body, body.kind, world.x, world.y, wr, opts);
   }
 
-  /* 実機フィードバック対応（第3回・質感）: 以前は単色ベタ塗り＋白いハイライト1点だけの
-   * 「のっぺりした安っぽい丸」だった。破片は他の天体と同じ palette（base/dark/light）を
-   * 持つようになったので、ある程度の大きさがある破片はテクスチャ付きの近似天体
-   * （getNearBodyFrame。小惑星と同じクレーター質感、単一光源シェーディング）として描画し、
-   * 極小の破片（1〜2pxで質感を判別できない）だけ軽量な陰影グラデーションの球にする。
-   * どちらの経路も同じ WORLD_LIGHT（ワールド共通の単一光源）を反映する。 */
   drawFragment(f, sx, sy, sr) {
-    const ctx = this.ctx;
+    if (!this.ready) return;
+    if (this._fragCursor >= this.fragPool.length) return;
+    const slot = this.fragPool[this._fragCursor++];
+    const world = this.screenToWorld(sx, sy);
+    const wr = Math.max(0.25, sr / Math.max(0.0001, this._lastZoom));
     const pal = f.palette || derivePalette(f.color || '#8f8578');
-    if (sr > 4.5) {
-      const dpr = this.dpr || 1;
-      const sizePx = Math.max(8, Math.min(NEAR_MAX_SIZE, Math.round(sr * 2 * dpr / 4) * 4));
-      const twoPi = Math.PI * 2;
-      const norm = ((f.angle || 0) % twoPi + twoPi) % twoPi;
-      const frameIdx = Math.floor((norm / twoPi) * NEAR_FRAMES) % NEAR_FRAMES;
-      const frame = getNearBodyFrame('asteroid', pal, f.seedBucket || 0, true, sizePx, frameIdx);
-      // 実機フィードバック対応（最優先・描画はみ出しバグ）: drawRotatingGlobeと同じ理由で、
-      // テクスチャキャッシュが万一破損しても円形の外へは絶対にはみ出さないよう安全弁を掛ける。
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(0.5, sr * 1.45), 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(frame, sx - sr, sy - sr, sr * 2, sr * 2);
-      ctx.restore();
-      return;
-    }
-    // 極小の破片: 単一光源方向にハイライト、反対方向に陰を置いたグラデーションの球
-    // （テクスチャ生成コストを払う価値のないサイズでも、平坦な単色丸にはしない）。
-    const grad = ctx.createRadialGradient(
-      sx - WORLD_LIGHT.x * sr * 0.4, sy - WORLD_LIGHT.y * sr * 0.4, sr * 0.1,
-      sx, sy, sr * 1.15
-    );
-    grad.addColorStop(0, pal.light || pal.base);
-    grad.addColorStop(0.55, pal.base);
-    grad.addColorStop(1, pal.dark || pal.base);
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    const pseudo = { irregularShape: true, seedBucket: f.seedBucket || 0, palette: pal, spinPhase: f.angle || 0, hitFlash: 0 };
+    this.updateBodySlot(slot, pseudo, 'asteroid', world.x, world.y, wr, {});
   }
 
-  /* 彗星の尾アップグレードの視覚的な軌跡。自機の直近の移動履歴（player.tailTrail）を
-   * フェードするプラズマの帯として描く。半径はダメージ判定（pulseDamageの半径）と
-   * 一致させ、見た目＝判定範囲になるようにしている。 */
+  /* ============================================================
+   * オーバーレイ（HPバー・浮遊テキスト・彗星の尾アップグレードの軌跡）
+   * ============================================================ */
   drawTail(cam, trail, dmgRadius) {
-    const ctx = this.ctx;
+    const ctx = this.octx;
     const n = trail.length;
     if (n < 2) return;
     ctx.save();
@@ -543,11 +827,9 @@ class Renderer {
       const grad = ctx.createLinearGradient(sa.x, sa.y, sb.x, sb.y);
       grad.addColorStop(0, `rgba(160,220,255,${(ta * 0.55).toFixed(2)})`);
       grad.addColorStop(1, `rgba(210,240,255,${(ta * 0.7).toFixed(2)})`);
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = w;
+      ctx.strokeStyle = grad; ctx.lineWidth = w;
       ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y); ctx.stroke();
     }
-    // 先端（自機に近い側）に明るいコアを重ねる
     const tail = trail[n - 1];
     const st = this.worldToScreen(cam, tail.x, tail.y);
     const coreR = Math.max(1.5, dmgRadius * cam.zoom * 0.45);
@@ -560,7 +842,7 @@ class Renderer {
   }
 
   drawHpBar(sx, sy, sr, ratio, color) {
-    const ctx = this.ctx;
+    const ctx = this.octx;
     const w = Math.max(24, sr * 1.6), h = 4;
     const x = sx - w / 2, y = sy - sr - 12;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -572,29 +854,35 @@ class Renderer {
   }
 
   drawParticles(pool, cam) {
-    const ctx = this.ctx;
+    if (!this.ready) return;
+    const g = this.particlePoints.geometry;
+    const pos = g.attributes.position.array;
+    const col = g.attributes.aColor.array;
+    const siz = g.attributes.aSize.array;
+    const alp = g.attributes.aAlpha.array;
+    let i = 0;
+    const max = this._particleMax;
     pool.forEachActive(p => {
-      const s = this.worldToScreen(cam, p.x, p.y);
+      if (i >= max) return;
       const t = 1 - p.age / p.life;
-      ctx.globalAlpha = p.fade ? Math.max(0, t) : 1;
-      const size = (p.shrink ? Math.max(0.2, t) : 1) * p.size * cam.zoom;
-      if (p.kind === 'spark') {
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = size * 0.6;
-        ctx.beginPath();
-        ctx.moveTo(s.x - p.vx * 0.01, s.y - p.vy * 0.01);
-        ctx.lineTo(s.x, s.y);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(s.x, s.y, size, 0, Math.PI * 2); ctx.fill();
-      }
+      const a = p.fade ? Math.max(0, t) : 1;
+      const sizeMul = p.shrink ? Math.max(0.2, t) : 1;
+      const c = hexToRgb(p.color || '#ffffff');
+      pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = 0.03;
+      col[i * 3] = c.r / 255; col[i * 3 + 1] = c.g / 255; col[i * 3 + 2] = c.b / 255;
+      siz[i] = Math.max(0.6, p.size * sizeMul * 2.4);
+      alp[i] = Math.max(0, Math.min(1, a));
+      i++;
     });
-    ctx.globalAlpha = 1;
+    g.setDrawRange(0, i);
+    g.attributes.position.needsUpdate = true;
+    g.attributes.aColor.needsUpdate = true;
+    g.attributes.aSize.needsUpdate = true;
+    g.attributes.aAlpha.needsUpdate = true;
   }
 
   drawFloatTexts(pool, cam) {
-    const ctx = this.ctx;
+    const ctx = this.octx;
     ctx.textAlign = 'center';
     ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
     pool.forEachActive(p => {

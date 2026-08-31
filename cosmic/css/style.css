@@ -28,6 +28,17 @@ html, body {
   position: fixed; inset: 0;
   display: block;
   touch-action: none;
+  z-index: 0;
+}
+
+/* WebGL(#game-canvas)の上に重ねる2Dオーバーレイ。HPバー・浮遊ダメージ数・
+   彗星の尾アップグレードの軌跡・色調ワッシュ・流れ星などの画面に張り付く
+   表現を描く。クリック等はすべて下のWebGLキャンバスへ通す。 */
+#overlay-canvas {
+  position: fixed; inset: 0;
+  display: block;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* 薄いビネット（写真的な周辺減光）。毎フレームのcanvas再描画コストを避けるため
