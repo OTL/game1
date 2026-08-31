@@ -139,6 +139,7 @@ function makePlayer(stage) {
     spinWobblePhase: 0,
     seedBucket: 1,
     hitFlash: 0,
+    hitFlashColor: '#ff4a56', // 被ダメージ時のリムフラッシュは赤系に固定（敵の白系フラッシュと区別）
     invuln: 0,
     tailTrail: [],
     upgrades: {},      // id -> level

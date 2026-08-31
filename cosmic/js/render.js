@@ -172,25 +172,6 @@ function buildIrregularGeometry(seedBucket) {
   geo.computeVertexNormals();
   return geo;
 }
-/* 彗星の尾: ローカルX方向0→1に伸びる先細りの平面。UV.xがそのまま先端までの
- * グラデーション（アルファ用の1Dテクスチャ）を参照する。 */
-function buildTailGeometry() {
-  const geo = new THREE.PlaneGeometry(1, 1, 1, 1);
-  geo.translate(0.5, 0, 0);
-  return geo;
-}
-function buildTailGradientTexture(rgbaFn) {
-  const w = 64, h = 4;
-  const cv = document.createElement('canvas');
-  cv.width = w; cv.height = h;
-  const ctx = cv.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, w, 0);
-  grad.addColorStop(0, rgbaFn(0.9));
-  grad.addColorStop(1, rgbaFn(0));
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
-  return cv;
-}
 
 class Renderer {
   constructor(canvas) {
@@ -285,6 +266,7 @@ class Renderer {
     this.fragPool = [];
     for (let i = 0; i < 70; i++) this.fragPool.push(this.buildBodySlot());
     this.buildParticleSystem();
+    this.buildImpactPools();
 
     this._v3 = new THREE.Vector3();
     this.ready = true;
@@ -313,16 +295,6 @@ class Renderer {
     { const pts = []; const N = 48; for (let i = 0; i <= N; i++) { const a = (i / N) * Math.PI * 2; pts.push(Math.cos(a), Math.sin(a), 0); }
       this.circleGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); }
     this.hostileMat = new THREE.LineBasicMaterial({ color: 0xff505a, transparent: true, opacity: 0.85 });
-
-    this.tailGeo = buildTailGeometry();
-    this.ionTailMat = new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(buildTailGradientTexture(a => `rgba(150,190,255,${a.toFixed(2)})`)),
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    this.dustTailMat = new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(buildTailGradientTexture(a => `rgba(235,235,240,${a.toFixed(2)})`)),
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
 
     this.bhHorizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
     this.bhGlowMat = new THREE.SpriteMaterial({
@@ -455,15 +427,13 @@ class Renderer {
     const bhHorizon = new THREE.Mesh(this.sphereGeo, this.bhHorizonMat); bhHorizon.visible = false;
     const bhDisk = new THREE.Mesh(this.diskGeo, this.diskMat); bhDisk.visible = false;
     const bhGlow = new THREE.Sprite(this.bhGlowMat.clone()); bhGlow.visible = false;
-    const ionTail = new THREE.Mesh(this.tailGeo, this.ionTailMat); ionTail.visible = false;
-    const dustTail = new THREE.Mesh(this.tailGeo, this.dustTailMat); dustTail.visible = false;
 
-    group.add(sphereMesh, irrMesh, atmoMesh, glowSprite, ringMesh, hostileRing, bhHorizon, bhDisk, bhGlow, ionTail, dustTail);
+    group.add(sphereMesh, irrMesh, atmoMesh, glowSprite, ringMesh, hostileRing, bhHorizon, bhDisk, bhGlow);
     group.visible = false;
     this.worldGroup.add(group);
     return {
       group, sphereMesh, sphereMat, irrMesh, irrMat, atmoMesh, atmoMat, glowSprite, glowMat,
-      ringMesh, hostileRing, bhHorizon, bhDisk, bhGlow, ionTail, dustTail,
+      ringMesh, hostileRing, bhHorizon, bhDisk, bhGlow,
       texKey: null, irrGeoIdx: -1,
     };
   }
@@ -484,6 +454,97 @@ class Renderer {
     this.particlePoints = new THREE.Points(geo, mat);
     this.particlePoints.frustumCulled = false;
     this.worldGroup.add(this.particlePoints);
+  }
+
+  /* ---------- 衝突エフェクト: 閃光スプライト・衝撃波リングの使い回しプール ----------
+   * 火花（岩片スパーク）は既存の state.particles（ParticlePool→Points）をそのまま使い、
+   * ここでは「短寿命の閃光」と「広がる衝撃波リング」のみを少数のオブジェクトを
+   * 使い回すプールとして持つ（衝突のたびに新規Meshを生成しない）。 */
+  buildImpactPools() {
+    const FLASH_MAX = 14;
+    this.flashPool = [];
+    for (let i = 0; i < FLASH_MAX; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: this.glowTex, color: 0xffffff, transparent: true, opacity: 0,
+        depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.visible = false;
+      sprite.renderOrder = 40;
+      this.worldGroup.add(sprite);
+      this.flashPool.push({ sprite, mat, life: 0, maxLife: 0.001, baseScale: 1, active: false });
+    }
+    this._flashCursor = 0;
+
+    const SHOCK_MAX = 6;
+    this.shockGeo = buildRadialRingGeometry(0.82, 1, 48);
+    this.shockPool = [];
+    for (let i = 0; i < SHOCK_MAX; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(this.shockGeo, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 39;
+      this.worldGroup.add(mesh);
+      this.shockPool.push({ mesh, mat, life: 0, maxLife: 0.001, r0: 1, r1: 2, active: false });
+    }
+    this._shockCursor = 0;
+  }
+
+  /* 接触点の短い閃光（数フレームで消える）。radiusは天体の見かけ半径（ワールド単位）。 */
+  spawnImpactFlash(x, y, radius, color) {
+    if (!this.ready) return;
+    const slot = this.flashPool[this._flashCursor];
+    this._flashCursor = (this._flashCursor + 1) % this.flashPool.length;
+    slot.active = true;
+    slot.life = 0;
+    slot.maxLife = 0.16 + Math.min(0.14, radius * 0.004);
+    slot.baseScale = Math.max(3, radius * 2.4);
+    slot.sprite.position.set(x, y, 0.06);
+    slot.sprite.scale.setScalar(slot.baseScale);
+    slot.mat.color.set(color || '#fff6d8');
+    slot.mat.opacity = 0.95;
+    slot.sprite.visible = true;
+  }
+
+  /* ワールド平面上に広がって急速にフェードする薄い衝撃波リング。 */
+  spawnShockwave(x, y, radius, color) {
+    if (!this.ready) return;
+    const slot = this.shockPool[this._shockCursor];
+    this._shockCursor = (this._shockCursor + 1) % this.shockPool.length;
+    slot.active = true;
+    slot.life = 0;
+    slot.maxLife = 0.42;
+    slot.r0 = Math.max(1, radius * 0.5);
+    slot.r1 = Math.max(slot.r0 * 1.5, radius * 2.6);
+    slot.mesh.position.set(x, y, 0.045);
+    slot.mesh.scale.setScalar(slot.r0);
+    slot.mat.color.set(color || '#dff2ff');
+    slot.mat.opacity = 0.5;
+    slot.mesh.visible = true;
+  }
+
+  updateImpactEffects(dt) {
+    if (!this.ready) return;
+    for (const s of this.flashPool) {
+      if (!s.active) continue;
+      s.life += dt;
+      const t = s.life / s.maxLife;
+      if (t >= 1) { s.active = false; s.sprite.visible = false; continue; }
+      s.mat.opacity = 0.95 * (1 - t * t);
+      s.sprite.scale.setScalar(s.baseScale * (1 + t * 0.6));
+    }
+    for (const s of this.shockPool) {
+      if (!s.active) continue;
+      s.life += dt;
+      const t = s.life / s.maxLife;
+      if (t >= 1) { s.active = false; s.mesh.visible = false; continue; }
+      const r = lerp(s.r0, s.r1, 1 - (1 - t) * (1 - t));
+      s.mesh.scale.setScalar(r);
+      s.mat.opacity = 0.5 * (1 - t);
+    }
   }
 
   /* ============================================================
@@ -641,6 +702,7 @@ class Renderer {
     this._fragCursor = 0;
     if (!this.ready) return;
     this.updateCamera(cam);
+    this.updateImpactEffects(dt);
   }
   endFrame() {
     if (!this.ready) return;
@@ -679,7 +741,8 @@ class Renderer {
   applyHitFlash(material, body) {
     const hf = body.hitFlash || 0;
     if (hf > 0) {
-      material.emissive.set(0xffffff);
+      // プレイヤーは赤いリムフラッシュ（hitFlashColor）、敵などは既定で白系フラッシュ。
+      material.emissive.set(body.hitFlashColor || '#ffffff');
       material.emissiveMap = null;
       material.emissiveIntensity = Math.min(1.0, hf * 1.3);
     }
@@ -687,26 +750,6 @@ class Renderer {
   applyAlpha(material) {
     const a = this.ctx.globalAlpha;
     material.opacity = (typeof a === 'number') ? a : 1;
-  }
-
-  updateCometTail(slot, wr, body) {
-    const adx = -WORLD_LIGHT.x, ady = -WORLD_LIGHT.y;
-    const len = wr * 7;
-    const ang = Math.atan2(ady, adx);
-    slot.ionTail.visible = true;
-    slot.ionTail.position.set(0, 0, 0.02);
-    slot.ionTail.rotation.z = ang;
-    slot.ionTail.scale.set(len, Math.max(0.5, wr * 0.7), 1);
-
-    const spd = Math.hypot(body.vx || 0, body.vy || 0);
-    const vdx = spd > 1 ? (body.vx / spd) : adx, vdy = spd > 1 ? (body.vy / spd) : ady;
-    const bendX = adx * 0.72 - vdx * 0.28, bendY = ady * 0.72 - vdy * 0.28;
-    const bendLen = Math.hypot(bendX, bendY) || 1;
-    const dustAng = Math.atan2(bendY / bendLen, bendX / bendLen);
-    slot.dustTail.visible = true;
-    slot.dustTail.position.set(0, 0, 0.01);
-    slot.dustTail.rotation.z = dustAng;
-    slot.dustTail.scale.set(len * 0.85, Math.max(0.9, wr * 1.5), 1);
   }
 
   /* ============================================================
@@ -718,7 +761,6 @@ class Renderer {
     slot.sphereMesh.visible = false; slot.irrMesh.visible = false; slot.atmoMesh.visible = false;
     slot.glowSprite.visible = false; slot.ringMesh.visible = false; slot.hostileRing.visible = false;
     slot.bhHorizon.visible = false; slot.bhDisk.visible = false; slot.bhGlow.visible = false;
-    slot.ionTail.visible = false; slot.dustTail.visible = false;
 
     if (kind === 'blackhole') {
       slot.bhHorizon.visible = true; slot.bhHorizon.scale.setScalar(worldR);
@@ -781,7 +823,15 @@ class Renderer {
       slot.ringMesh.rotation.x = 1.15;
       slot.ringMesh.rotation.z = (body.angle || 0) * 0.3 + 0.5;
     }
-    if (kind === 'comet') this.updateCometTail(slot, worldR, body);
+    // 彗星のコマ（核を包む淡いガス状の光暈）。尾本体は game.js 側で反太陽方向へ
+    // 連続放出される発光パーティクル（既存の state.particles プールを共有）で表現する
+    // （以前の「先細り平面2枚」は単調でチープだったため置き換えた）。
+    if (kind === 'comet') {
+      slot.glowSprite.visible = true;
+      slot.glowMat.color.set(palette.light || '#cfe8ff');
+      slot.glowMat.opacity = 0.32;
+      slot.glowSprite.scale.setScalar(worldR * 3.2);
+    }
     if (body.isHostile) {
       slot.hostileRing.visible = true;
       slot.hostileRing.scale.setScalar(worldR * 1.08);
