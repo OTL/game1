@@ -100,9 +100,19 @@
   /* ---------- 敵生成 ---------- */
   function pickEnemyKind(player) {
     const r = rng();
-    if (player.stageIdx >= 1 && r < 0.10) return 'hostile';
-    if (r < 0.10 + 0.16) return 'comet';
-    if (player.stageIdx >= 2 && r < 0.10 + 0.16 + 0.30) return 'planet';
+    // 実機フィードバック対応: 以前は「hostileがstageIdx>=1限定」なせいで、stageIdx===0の
+    // ときだけ hostile 用に予約されていたはずの r<0.10 の範囲もそのまま comet 判定に
+    // 落ちてしまい（累積しきい値がずれていた）、序盤ほど彗星が多く出る逆転現象が起きていた。
+    // 各区分の確率を明示的な累積しきい値で計算し直し、あわせて序盤（岩石片〜小惑星）は
+    // 彗星の出現頻度そのものを抑える（ユーザーフィードバック「狙いすぎ・序盤で受動的に
+    // 大量の質量を得てしまう」への対応）。
+    const hostileChance = player.stageIdx >= 1 ? 0.10 : 0;
+    const cometChance = player.stageIdx <= 1 ? 0.06 : 0.16;
+    const planetChance = player.stageIdx >= 2 ? 0.30 : 0;
+    let acc = 0;
+    if (r < (acc += hostileChance)) return 'hostile';
+    if (r < (acc += cometChance)) return 'comet';
+    if (r < (acc += planetChance)) return 'planet';
     return 'asteroid';
   }
 
@@ -176,7 +186,12 @@
       // 何でも吸い込めるブラックホールとして遊べるようにする。
       const forceNonThreat = threatsNear >= BALANCE.maxThreatsNear ||
         (player.endless && rng() >= BALANCE.endlessThreatChance);
-      const mass = rollEnemyMass(state.enemyScaleMass, forceNonThreat);
+      let mass = rollEnemyMass(state.enemyScaleMass, forceNonThreat);
+      // 実機フィードバック対応: 序盤（岩石片〜小惑星）の彗星は質量そのものも抑え、
+      // 「最初に彗星に突撃されて食われ、勝手にレベルアップしてしまう」ことを防ぐ。
+      if (kind === 'comet' && player.stageIdx <= 1) {
+        mass *= player.stageIdx === 0 ? 0.35 : 0.6;
+      }
       // 質量比が大きい「脅威」個体ほど、外周寄りの遠い位置にのみスポーンさせる。
       // ＝ プレイヤーより大幅に大きい敵は近接遭遇せず「遠くの存在」として現れる。
       const threatRatio = mass / player.mass;
@@ -190,16 +205,28 @@
       if (body.radius > radiusCap) body.radius = radiusCap;
       if (kind === 'planet' && rng() < 0.35) body.hasRing = true;
       if (kind === 'comet') {
-        // 彗星は速めに視界を横切らせる: プレイヤー付近を通過する直線的な高速軌道
-        const aimAng = rng() * Math.PI * 2;
-        const aimOffset = spawnR * (0.15 + rng() * 0.5);
-        const aimX = player.x + Math.cos(aimAng) * aimOffset;
-        const aimY = player.y + Math.sin(aimAng) * aimOffset;
-        const ddx = aimX - x, ddy = aimY - y;
-        const dd = Math.hypot(ddx, ddy) || 1;
+        // 実機フィードバック対応（「彗星が自機に向かって突撃してくる。狙いすぎ」）:
+        // 以前はプレイヤー位置から一定オフセット以内の点を明示的に狙う軌道だったため、
+        // 常にプレイヤー付近を通る「狙い撃ち」になっていた。進行方向をプレイヤー位置と
+        // 完全に無関係なランダム方向にし、最接近距離（プレイヤーとの垂直オフセット）も
+        // 広い範囲からランダムに選ぶことで「視界をランダムな方向・オフセットで横切る」
+        // 軌道にする。近傍を通ることはあっても、直撃コースになるのはごく稀（12%の
+        // 抽選に当たった上でオフセットも小さく出た場合のみ）にとどめる。
+        const dirAng = rng() * Math.PI * 2;
+        const dirX = Math.cos(dirAng), dirY = Math.sin(dirAng);
+        const perpX = -dirY, perpY = dirX;
+        const closeCall = rng() < 0.12;
+        const closestApproach = spawnR * (closeCall ? rng() * 0.25 : 0.25 + rng() * 0.85);
+        const side = rng() < 0.5 ? 1 : -1;
         const cometSpeed = 240 + rng() * 140;
-        body.vx = (ddx / dd) * cometSpeed;
-        body.vy = (ddy / dd) * cometSpeed;
+        body.vx = dirX * cometSpeed;
+        body.vy = dirY * cometSpeed;
+        // 上で決めた進行方向・最接近距離を通る直線上、スポーン半径だけ手前に配置し直す
+        // （x,yは元々プレイヤー中心のランダムな点だったため、狙い撃ちにならないよう再配置する）。
+        const closestX = player.x + perpX * closestApproach * side;
+        const closestY = player.y + perpY * closestApproach * side;
+        body.x = closestX - dirX * r;
+        body.y = closestY - dirY * r;
       }
       state.enemies.push(body);
     }
@@ -594,15 +621,26 @@
     return BALANCE.fragmentAbsorbSpeed * (1 + bonus);
   }
 
+  // 実機フィードバック対応（「破片が自機の近くで消えてしまう」）: 破片には寿命
+  // (life=22秒)があり、プレイヤーへ吸い寄せられている最中・目の前まで来ている最中でも
+  // 容赦なく寿命切れで消えていた（吸収判定 d<pr*0.9 に届く直前で life<=0 になり、
+  // 何の見返りもなく消滅する）のが直接の原因。画面内+αの「安全半径」にいる破片は
+  // 寿命を消費しないようにし、寿命が尽きて消えるのは安全半径の外（見えない・触れられない
+  // 遠方）にいる破片だけに限定する。個体数上限による間引き（pruneBodyCounts）は元々
+  // プレイヤーから遠いものから優先して削るため、近傍の破片はそちらでも保護される。
+  function fragmentSafeRadiusFor() {
+    return Math.max(renderer.w, renderer.h) / Math.max(0.05, state.camera.zoom) * 0.65;
+  }
   function updateFragments(player, dt) {
     const range = gravityRangeFor(player);
     const spd = gravitySpeedFor(player);
     const pr = playerRadius(player);
+    const safeR = fragmentSafeRadiusFor();
     for (let i = state.fragments.length - 1; i >= 0; i--) {
       const f = state.fragments[i];
-      f.life -= dt;
-      f.age = (f.age || 0) + dt;
       const d = dist(f, player);
+      if (d >= safeR) f.life -= dt;
+      f.age = (f.age || 0) + dt;
       if (d < range) {
         const nx = (player.x - f.x) / (d || 1), ny = (player.y - f.y) / (d || 1);
         const pull = spd * (1 - d / range + 0.2);
@@ -610,7 +648,7 @@
       }
       f.x += f.vx * dt; f.y += f.vy * dt;
       f.angle = (f.angle || 0) + (f.spin || 0) * dt;
-      if (d < pr * 0.9 || f.life <= 0) {
+      if (d < pr * 0.9 || (d >= safeR && f.life <= 0)) {
         if (d < pr * 1.4) {
           const gained = creditMass(player, f.mass, f.x, f.y);
           if (gained > 0.15) queueFloat('gain-fragment', player.x, player.y - pr - 4, gained, '#bfe3ff');
