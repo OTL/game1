@@ -18,6 +18,7 @@
     enemies: [],
     fragments: [],
     particles: new ParticlePool(500),
+    hitStop: 0,          // 激突時のヒットストップ残り秒数（実時間）
     floats: new FloatTextPool(80),
     camera: { x: 0, y: 0, zoom: 1 },
     lastTs: 0,
@@ -47,6 +48,16 @@
   // 豆粒のような格下（質量比およそ0.2以下）だけをテンポ維持のため一撃にする」
   // 閾値まで引き上げ、それ以外はすべて後述の割合ベースの拮抗ダメージ処理に回す。
   const INSTAKILL_RATIO = 5; // これ以上大きければ即吸収（相手が自分のおよそ1/5以下の質量）
+  // ---- 激突・跳ね返り（実機フィードバック対応: 「ぶつかったときに激突し、跳ね返る感じに」）----
+  // 接触中に毎フレーム弱く押し合うだけだった衝突を、接触の瞬間に撃力（インパルス）を与えて
+  // 運動量保存で弾き合う「激突」に変更した。質量比に応じて、格下は跳ね返され、格上には
+  // 跳ね返される。
+  const IMPACT_RESTITUTION = 0.72;   // 反発係数（接近速度のうち跳ね返りに変わる割合）
+  const IMPACT_MIN_SEP_SPEED = 170;  // 静止状態からそっと触れても最低これだけの相対速度で弾く(px/s)
+  const IMPACT_KNOCK_DECAY = 3.2;    // 跳ね返り速度の減衰率(1/s)。大きいほど早く止まる
+  const IMPACT_KNOCK_MAX = 520;      // 跳ね返り速度の上限(px/s)
+  const IMPACT_BURST_SECONDS = 0.5;  // 激突1回で「接触何秒ぶん」の割合ダメージを与えるか
+  const IMPACT_HITSTOP_MAX = 0.085;  // 強い激突でのヒットストップ最大秒数
   // 拮抗ダメージ（相手の最大HPに対する割合/秒）。質量の絶対値に依存させず「質量比」
   // だけで討伐に必要な接触回数が決まるようにする（大きな敵ほど絶対量として何十秒も
   // 削れない、という不具合の直接の修正）。ratio(=有効質量/相手質量)が1（同格）で
@@ -424,7 +435,7 @@
     if (!enemy.alive) return;
     const pr = playerRadius(player), er = enemy.radius;
     const d = dist(player, enemy);
-    if (d > pr + er) return;
+    if (d > pr + er) { enemy.inContact = false; return; }
     const ramBoost = 1 + (upVal('ramspeed', upLevel(player, 'ramspeed')) / 100) * speedRatio * 0.5;
     const effMass = player.mass * ramBoost;
     const ratio = effMass / enemy.mass;
@@ -440,21 +451,116 @@
     // 格上でも(ENEMY_DMG_EXP_LOによりゆるやかに)常に多少は削れるため、根気よく
     // 当たり続ければいずれ倒せる（＝以前の「押し返すだけで一切減らない」を解消）。
     const off = offenseMultiplier(player, speedRatio);
-    const dmgToEnemy = enemy.maxHp * ratioDamageFactor(ratio, ENEMY_DMG_FRAC, ENEMY_DMG_EXP_HI, ENEMY_DMG_EXP_LO) * off.mult * dt;
-    const dmgToPlayer = playerMaxHp(player) * ratioDamageFactor(1 / ratio, PLAYER_DMG_FRAC, PLAYER_DMG_EXP_HI, PLAYER_DMG_EXP_LO) * dt;
+    const enemyRate = enemy.maxHp * ratioDamageFactor(ratio, ENEMY_DMG_FRAC, ENEMY_DMG_EXP_HI, ENEMY_DMG_EXP_LO) * off.mult;
+    const playerRate = playerMaxHp(player) * ratioDamageFactor(1 / ratio, PLAYER_DMG_FRAC, PLAYER_DMG_EXP_HI, PLAYER_DMG_EXP_LO);
+
+    // 法線: 相手→自機
+    const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
+    const m1 = effMass, m2 = enemy.mass;
+    const w1 = m2 / (m1 + m2), w2 = m1 / (m1 + m2); // 軽い方ほど大きく動く
+
+    const fresh = !enemy.inContact;
+    enemy.inContact = true;
+    let dmgToEnemy = enemyRate * dt, dmgToPlayer = playerRate * dt;
+    if (fresh) {
+      // ---- 激突（接触の瞬間だけ） ----
+      // 法線方向の接近速度（跳ね返り分の速度も含める）から撃力を求め、運動量保存で弾く。
+      const rvx = (player.vx + (player.kvx || 0)) - (enemy.vx + (enemy.kvx || 0));
+      const rvy = (player.vy + (player.kvy || 0)) - (enemy.vy + (enemy.kvy || 0));
+      const approach = Math.max(0, -(rvx * nx + rvy * ny));
+      const sep = Math.max(approach * IMPACT_RESTITUTION, IMPACT_MIN_SEP_SPEED);
+      const dv = approach + sep; // 相対速度の変化量（接近→分離）
+      applyKnock(player, nx * dv * w1, ny * dv * w1);
+      applyKnock(enemy, -nx * dv * w2, -ny * dv * w2);
+      // 激突の瞬間は移動慣性もいったん打ち消す（相手に向かって進んでいた勢いを殺す）。
+      const vn = player.vx * nx + player.vy * ny;
+      if (vn < 0) { player.vx -= nx * vn; player.vy -= ny * vn; }
+
+      // 激突の強さ（0〜約1.6）: 接近速度が自機最高速に対してどれくらいか
+      const impact = clamp(approach / BALANCE.moveMaxSpeed, 0, 1.6);
+      // 一瞬で離れてしまうため、激突1回ぶんの瞬間ダメージを加算する（強くぶつかるほど多め）。
+      const burst = IMPACT_BURST_SECONDS * (0.5 + impact * 0.7);
+      dmgToEnemy += enemyRate * burst;
+      dmgToPlayer += playerRate * burst;
+      spawnImpactEffects(player, enemy, nx, ny, impact, ratio, w1, w2);
+    }
     damageEnemy(enemy, dmgToEnemy, player);
     if (off.isCrit) showFloat(enemy.x, enemy.y - enemy.radius - 26, '会心!', '#ffe066');
     applyPlayerDamage(player, dmgToPlayer, enemy);
 
-    const nx = (player.x - enemy.x) / (d || 1), ny = (player.y - enemy.y) / (d || 1);
-    if (ratio < 1) {
-      // 相手が格上なほど強く押し返される（従来の「押し返し」挙動を維持）。
-      const push = Math.min(3, 1 / ratio);
-      player.vx += nx * 40 * dt * 30 * push;
-      player.vy += ny * 40 * dt * 30 * push;
-    } else {
-      enemy.x -= nx * 30 * dt; enemy.y -= ny * 30 * dt;
+    // めり込み解消: 重なりぶんを質量比で分担して即座に離す（軽い方が大きく退く）。
+    const overlap = pr + er - d;
+    if (overlap > 0) {
+      player.x += nx * overlap * w1; player.y += ny * overlap * w1;
+      enemy.x -= nx * overlap * w2; enemy.y -= ny * overlap * w2;
     }
+  }
+
+  /* 跳ね返り速度（kvx/kvy）を加算する。通常の移動速度とは別枠で持ち、最高速度の
+   * クランプや摩擦の影響を受けずに IMPACT_KNOCK_DECAY で独自に減衰する。 */
+  function applyKnock(body, ix, iy) {
+    body.kvx = (body.kvx || 0) + ix;
+    body.kvy = (body.kvy || 0) + iy;
+    const k = Math.hypot(body.kvx, body.kvy);
+    if (k > IMPACT_KNOCK_MAX) { body.kvx *= IMPACT_KNOCK_MAX / k; body.kvy *= IMPACT_KNOCK_MAX / k; }
+  }
+  function decayKnock(body, dt) {
+    if (!body.kvx && !body.kvy) return;
+    const f = Math.exp(-IMPACT_KNOCK_DECAY * dt);
+    body.kvx *= f; body.kvy *= f;
+    if (Math.abs(body.kvx) < 0.5 && Math.abs(body.kvy) < 0.5) { body.kvx = 0; body.kvy = 0; }
+  }
+  /* 激突時の天体変形（法線方向につぶれてから伸びる減衰振動）。描画側 render.js が参照する。 */
+  function setSquash(body, nx, ny, amount, dur) {
+    body.squashT = dur; body.squashDur = dur;
+    body.squashAmt = amount; body.squashAngle = Math.atan2(ny, nx);
+  }
+  function tickSquash(body, dt) { if (body.squashT > 0) body.squashT -= dt; }
+
+  /* 激突エフェクト: 接触点の閃光・衝撃波・接線方向に飛び散る火花・シェイク・ヒットストップ・
+   * 天体のスカッシュ。impact は接近速度/最高速（0〜1.6）、w1/w2 は自機/相手の動く割合。 */
+  function spawnImpactEffects(player, enemy, nx, ny, impact, ratio, w1, w2) {
+    const pr = playerRadius(player), er = enemy.radius;
+    const cx = enemy.x + nx * er, cy = enemy.y + ny * er;
+    const outmatched = ratio < 1;                 // 自機が格下＝「跳ね返される」側
+    const sizeScale = clamp(Math.min(pr, er) / 14, 0.6, 3);
+    const strength = 0.45 + impact;               // 見た目全体のスケール
+    const color = outmatched ? '#ffb08a' : (enemy.palette.light || '#fff6d8');
+
+    renderer.spawnImpactFlash(cx, cy, Math.min(pr, er) * (0.9 + impact * 0.7), color);
+    if (impact > 0.35 || Math.max(pr, er) > 18) {
+      renderer.spawnShockwave(cx, cy, Math.max(pr, er) * (0.5 + impact * 0.35), outmatched ? '#ffc9b0' : '#dff2ff');
+    }
+    // 火花: 接触面に沿って（接線方向へ）両側に飛び散る＋法線方向に少量の破片
+    const tx = -ny, ty = nx;
+    const sparkCount = Math.round(clamp((10 + impact * 16) * (0.7 + sizeScale * 0.3), 8, 40));
+    for (let i = 0; i < sparkCount; i++) {
+      const side = i % 2 === 0 ? 1 : -1;
+      const spread = (rng() - 0.5) * 1.1;
+      const dx = tx * side * Math.cos(spread) + nx * Math.sin(spread);
+      const dy = ty * side * Math.cos(spread) + ny * Math.sin(spread);
+      const spd = (90 + rng() * 260) * (0.55 + strength * 0.45);
+      state.particles.spawn({
+        x: cx, y: cy, vx: dx * spd, vy: dy * spd,
+        size: (1.8 + rng() * 2.8) * (0.8 + sizeScale * 0.25), color: rng() < 0.5 ? color : '#fff6d8',
+        life: 0.28 + rng() * 0.3, gravity: 18,
+      });
+    }
+    for (let i = 0; i < 4; i++) {
+      const side = i < 2 ? 1 : -1, a = (rng() - 0.5) * 0.6;
+      const dx = nx * side * Math.cos(a) + tx * Math.sin(a), dy = ny * side * Math.cos(a) + ty * Math.sin(a);
+      const spd = (60 + rng() * 120) * strength;
+      state.particles.spawn({ x: cx, y: cy, vx: dx * spd, vy: dy * spd, size: 2.5 + rng() * 3, color: enemy.palette.light || '#fff', life: 0.35 + rng() * 0.3, gravity: 30 });
+    }
+    // 画面シェイク: 衝撃の強さと、自機がどれだけ弾かれたか（格上にぶつかるほど大きい）
+    renderer.addShake(clamp(2.5 + impact * 5 + w1 * 4 + (outmatched ? 2 : 0), 2.5, 13));
+    // ヒットストップ: 強めの激突だけ一瞬止めて「激突感」を出す（弱い接触では入れない）
+    if (impact > 0.4) state.hitStop = Math.max(state.hitStop, Math.min(IMPACT_HITSTOP_MAX, 0.035 + impact * 0.04));
+    // スカッシュ: 軽い方ほど大きくつぶれる
+    const amt = clamp(0.12 + impact * 0.22, 0.12, 0.42);
+    setSquash(player, nx, ny, amt * clamp(w1 * 2, 0.45, 1.25), 0.32);
+    setSquash(enemy, nx, ny, amt * clamp(w2 * 2, 0.45, 1.25), 0.32);
+    if (impact >= 0.9) showFloat(cx, cy - Math.min(pr, er) - 6, '激突!', outmatched ? '#ffb08a' : '#fff1c9');
   }
 
   function handlePlayerDeath(player) {
@@ -473,7 +579,7 @@
     player.hp = player.checkpointHp;
     player.nextLevelMass = Math.max(player.mass * levelUpGrowthFor(player.level), player.mass + 1);
     player.invuln = 2.5;
-    player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
+    player.x = 0; player.y = 0; player.vx = 0; player.vy = 0; player.kvx = 0; player.kvy = 0;
     state.enemies = [];
     state.fragments.length = 0;
     // 死亡直後は敵のスポーン基準質量も即座に新しい（低い）質量へ合わせる。
@@ -689,7 +795,9 @@
     const spd = Math.hypot(player.vx, player.vy);
     if (spd > maxSpeed) { player.vx *= maxSpeed / spd; player.vy *= maxSpeed / spd; }
     player.vx *= BALANCE.friction; player.vy *= BALANCE.friction;
-    player.x += player.vx * dt; player.y += player.vy * dt;
+    // 跳ね返り速度は最高速クランプ・摩擦の対象外（別枠で減衰）。
+    decayKnock(player, dt);
+    player.x += (player.vx + (player.kvx || 0)) * dt; player.y += (player.vy + (player.kvy || 0)) * dt;
     if (spd > 8) player.angle = Math.atan2(player.vy, player.vx);
     return clamp(spd / maxSpeed, 0, 1);
   }
@@ -824,8 +932,11 @@
         }
       }
       // 真空中なので速度は減衰させない（ケプラー運動のまま漂流・公転させる）。
-      e.x += e.vx * dt; e.y += e.vy * dt;
+      // ただし激突で受けた跳ね返り（kvx/kvy）だけは別枠で減衰させ、弾かれたあと元の漂流に戻す。
+      decayKnock(e, dt);
+      e.x += (e.vx + (e.kvx || 0)) * dt; e.y += (e.vy + (e.kvy || 0)) * dt;
       if (e.hitFlash > 0) e.hitFlash -= dt * 2.2;
+      tickSquash(e, dt);
     }
   }
 
@@ -895,6 +1006,7 @@
     }
     player.invuln = Math.max(0, player.invuln - dt);
     if (player.hitFlash > 0) player.hitFlash -= dt * 2.2;
+    tickSquash(player, dt);
     // 自転（球体テクスチャの流れ用の位相）。序盤2段階は不規則形状のため、
     // 非等速のタンブリングになるようゆらぎを加える。
     const stageKey = currentStage(player).key;
@@ -1185,6 +1297,8 @@
   /* 1フレーム分のゲームロジック更新（rAFベースのstep()から呼び出す）。 */
   function updateFrame(player, dt) {
     if (!state.paused && !state.cleared) {
+      // ヒットストップ: 強い激突の直後だけゲーム時間をほぼ止める（閃光・衝撃波は実時間で進む）。
+      if (state.hitStop > 0) { state.hitStop = Math.max(0, state.hitStop - dt); dt *= 0.1; }
       player.playTime += dt;
       // 敵のスポーン基準質量を、実際のプレイヤー質量へ緩やかに（遅れて）追従させる（log空間で平滑化）。
       state.enemyScaleLogMass += (Math.log(Math.max(1e-6, player.mass)) - state.enemyScaleLogMass) * Math.min(1, dt / BALANCE.enemyScaleLagSeconds);
@@ -1336,6 +1450,7 @@
         angle: player.angle, spinPhase: player.spinPhase || 0, hitFlash: player.hitFlash,
         hitFlashColor: player.hitFlashColor, hasRing: upLevel(player, 'rings') > 0 && stage.key !== 'rock',
         vx: player.vx, vy: player.vy,
+        squashT: player.squashT, squashDur: player.squashDur, squashAmt: player.squashAmt, squashAngle: player.squashAngle,
         // 序盤2段階（岩石片・小惑星）は不規則形状でタンブリング、準惑星進化時に球になる
         irregularShape: stage.key === 'rock' || stage.key === 'asteroid',
       };
