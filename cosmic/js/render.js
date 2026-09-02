@@ -758,6 +758,17 @@ class Renderer {
   updateBodySlot(slot, body, kind, worldX, worldY, worldR, opts) {
     slot.group.position.set(worldX, worldY, 0);
     slot.group.visible = true;
+    // 激突スカッシュ（game.js の setSquash が付与）: 衝突法線の方向へつぶれてから伸びる
+    // 減衰振動を、グループ全体の非等方スケールで表現する。グループを法線方向へ回転させて
+    // X軸をつぶすため、内側のメッシュの自転角からその回転分を差し引いて見た目の自転を保つ。
+    let sq = 0, sqA = 0;
+    if (kind !== 'blackhole' && body.squashT > 0 && body.squashDur > 0) {
+      const p = 1 - body.squashT / body.squashDur;
+      sq = (body.squashAmt || 0) * Math.sin(p * Math.PI * 2) * (1 - p);
+      sqA = body.squashAngle || 0;
+    }
+    slot.group.rotation.z = sqA;
+    slot.group.scale.set(1 - sq, 1 + sq * 0.6, 1);
     slot.sphereMesh.visible = false; slot.irrMesh.visible = false; slot.atmoMesh.visible = false;
     slot.glowSprite.visible = false; slot.ringMesh.visible = false; slot.hostileRing.visible = false;
     slot.bhHorizon.visible = false; slot.bhDisk.visible = false; slot.bhGlow.visible = false;
@@ -782,7 +793,7 @@ class Renderer {
       if (slot.texKey !== texKey) { this.applyTexture(slot.irrMat, kind, palette, seedBucket); slot.texKey = texKey; }
       slot.irrMesh.visible = true;
       slot.irrMesh.scale.setScalar(worldR);
-      slot.irrMesh.rotation.z = spinPhase;
+      slot.irrMesh.rotation.z = spinPhase - sqA;
       slot.irrMesh.rotation.x = spinPhase * 0.37;
       slot.irrMat.emissive.set(0x000000); slot.irrMat.emissiveMap = null;
       this.applyHitFlash(slot.irrMat, body);
@@ -791,7 +802,7 @@ class Renderer {
       if (slot.texKey !== texKey) { this.applyTexture(slot.sphereMat, kind, palette, seedBucket); slot.texKey = texKey; }
       slot.sphereMesh.visible = true;
       slot.sphereMesh.scale.setScalar(worldR);
-      slot.sphereMesh.rotation.z = spinPhase;
+      slot.sphereMesh.rotation.z = spinPhase - sqA;
 
       const isGlowKind = kind === 'star' || kind === 'giant' || kind === 'browndwarf' || kind === 'neutron';
       if (isGlowKind) {
@@ -825,7 +836,7 @@ class Renderer {
       slot.ringMesh.visible = true;
       slot.ringMesh.scale.setScalar(worldR);
       slot.ringMesh.rotation.x = 1.15;
-      slot.ringMesh.rotation.z = (body.angle || 0) * 0.3 + 0.5;
+      slot.ringMesh.rotation.z = (body.angle || 0) * 0.3 + 0.5 - sqA;
     }
     // 彗星のコマ（核を包む淡いガス状の光暈）。尾本体は game.js 側で反太陽方向へ
     // 連続放出される発光パーティクル（既存の state.particles プールを共有）で表現する
