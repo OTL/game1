@@ -24,16 +24,27 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   #app{ position:fixed; inset:0; display:flex; flex-direction:column; }
-  .band{ position:relative; flex:0 0 25%; min-height:118px; display:flex; flex-direction:column; }
-  .band.p2{ transform:rotate(180deg); }
-  .padrow{ flex:1 1 auto; display:flex; min-height:0; }
+  /* HUDは上下端の薄い帯だけ。操作パッドはマップに重ねるオーバーレイにする */
+  .hud{ flex:0 0 40px; height:40px; min-height:40px; display:flex; align-items:center; gap:6px; padding:2px 10px; position:relative; z-index:6; background:rgba(5,8,18,0.55); }
+  .hud.hudTop{ transform:rotate(180deg); }
+  #mapArea{ position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#05070f; }
+  /* 操作ゾーンのオーバーレイ: 自分側の縁から画面高さの30%、マップに重ねて表示する */
+  .padOverlay{ position:absolute; left:0; right:0; height:30%; display:flex; z-index:15; }
+  .padOverlay.p2{ top:0; transform:rotate(180deg); }
+  .padOverlay.p1{ bottom:0; }
+  .padOverlay::before{ /* 帯の存在を示すうっすらとした境界線 */
+    content:""; position:absolute; top:0; left:6%; right:6%; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.16),transparent); pointer-events:none;
+  }
   .padzone{ flex:1 1 50%; position:relative; touch-action:none; }
-  .padzone.move{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 70%); }
-  .padzone.aim{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03), transparent 70%); }
+  .padzone.move{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05), transparent 70%); }
+  .padzone.aim{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 70%); }
   .padzone::after{
     content:""; position:absolute; left:50%; top:50%; width:64px; height:64px;
-    margin:-32px 0 0 -32px; border:2px dashed rgba(255,255,255,0.12); border-radius:50%; pointer-events:none;
+    margin:-32px 0 0 -32px; border:2px dashed rgba(255,255,255,0.16); border-radius:50%; pointer-events:none;
+    transition:opacity 0.4s;
   }
+  .padzone.touched::after{ opacity:0; }
   .stick{
     position:fixed; width:70px; height:70px; margin:-35px 0 0 -35px; border-radius:50%;
     background:rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.35);
@@ -41,23 +52,34 @@
   }
   .stick.knob{ width:34px; height:34px; margin:-17px 0 0 -17px; background:rgba(255,255,255,0.55); }
   .specialBtn{
-    position:absolute; left:50%; top:8px; transform:translateX(-50%);
-    width:56px; height:56px; border-radius:50%; border:2px solid #ffe08a; background:#3a2e08;
+    position:absolute; right:10px; bottom:10px;
+    width:54px; height:54px; border-radius:50%; border:2px solid #ffe08a; background:#3a2e08;
     color:#ffe08a; font-weight:700; font-size:12px; line-height:1.2; padding:0;
   }
-  .band.p1 .specialBtn{ top:auto; bottom:8px; }
   .specialBtn.ready{ background:#ffcc4d; color:#231600; box-shadow:0 0 14px 4px rgba(255,204,77,0.7); }
-  .hud{ flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:6px 10px; }
   .wIcon{ font-size:20px; width:26px; text-align:center; flex:0 0 auto; }
-  .bar{ position:relative; height:12px; border-radius:6px; background:rgba(255,255,255,0.12); overflow:hidden; flex:1 1 auto; border:1px solid rgba(255,255,255,0.18); }
-  .bar.sp{ flex:0 0 40%; }
-  .bar i{ position:absolute; left:0; top:0; bottom:0; width:0%; display:block; border-radius:6px; }
-  .band[data-player="1"] .bar.ink i{ background:linear-gradient(90deg,var(--p1dark),var(--p1)); }
-  .band[data-player="2"] .bar.ink i{ background:linear-gradient(90deg,var(--p2dark),var(--p2)); }
+  .barCol{ display:flex; flex-direction:column; gap:2px; flex:1 1 auto; min-width:0; }
+  .bar{ position:relative; height:9px; border-radius:5px; background:rgba(255,255,255,0.12); overflow:hidden; flex:1 1 auto; border:1px solid rgba(255,255,255,0.18); }
+  .bar.sp{ flex:0 0 40%; height:12px; }
+  .bar i{ position:absolute; left:0; top:0; bottom:0; width:0%; display:block; border-radius:5px; }
+  .hud[data-player="1"] .bar.hp i{ background:linear-gradient(90deg,#8a1d1d,#ff5252); }
+  .hud[data-player="2"] .bar.hp i{ background:linear-gradient(90deg,#8a1d1d,#ff5252); }
+  .hud[data-player="1"] .bar.ink i{ background:linear-gradient(90deg,var(--p1dark),var(--p1)); }
+  .hud[data-player="2"] .bar.ink i{ background:linear-gradient(90deg,var(--p2dark),var(--p2)); }
   .bar.sp i{ background:linear-gradient(90deg,#ffb238,#ffe08a); }
   .bar.sp.full i{ box-shadow:0 0 10px 2px #ffe08a; }
-  .hpTxt{ font-size:11px; color:var(--sub); flex:0 0 auto; width:34px; text-align:right; }
-  #mapArea{ position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#05070f; }
+  .barRow{ display:flex; align-items:center; gap:8px; flex:1 1 auto; min-width:0; }
+  .hpTxt{ font-size:10px; color:var(--sub); flex:0 0 auto; width:52px; text-align:right; white-space:nowrap; }
+  .killTxt{ font-size:10px; color:#ffcf7a; flex:0 0 auto; white-space:nowrap; }
+  .hudToast{
+    position:absolute; left:50%; top:-2px; transform:translate(-50%,-100%);
+    font-size:13px; font-weight:800; padding:2px 10px; border-radius:8px;
+    background:rgba(10,14,28,0.85); pointer-events:none; opacity:0; white-space:nowrap;
+    transition:opacity 0.25s;
+  }
+  .hudToast.show{ opacity:1; }
+  .hudToast.dead{ color:#ff8a8a; }
+  .hudToast.kill{ color:#ffe08a; }
   #gameCanvas{ display:block; touch-action:none; background:#1c2340; box-shadow:0 0 0 2px #2b3866, 0 10px 30px rgba(0,0,0,0.5); border-radius:6px; }
   .timer{ position:absolute; left:50%; transform:translateX(-50%); font-size:15px; font-weight:700; color:#cfd8f5; background:rgba(6,10,22,0.55); padding:2px 12px; border-radius:10px; letter-spacing:0.05em; pointer-events:none; }
   .timer.top{ top:6px; transform:translateX(-50%) rotate(180deg); }
@@ -96,6 +118,8 @@
   .resultText{ font-size:18px; font-weight:700; line-height:1.6; }
   .resultText .win1{ color:var(--p1); }
   .resultText .win2{ color:var(--p2); }
+  .killSummary{ display:flex; gap:18px; font-size:13px; color:var(--sub); }
+  .killSummary b.p1{ color:var(--p1); } .killSummary b.p2{ color:var(--p2); }
   .seriesDots{ display:flex; gap:8px; }
   .seriesDots span{ width:16px; height:16px; border-radius:50%; background:#222846; border:2px solid #3a4270; }
   .seriesDots span.p1{ background:var(--p1); border-color:var(--p1); }
@@ -107,19 +131,13 @@
 </head>
 <body>
 <div id="app">
-  <div class="band p2" id="bandP2" data-player="2">
-    <div class="padrow">
-      <div class="padzone move" data-player="2" data-kind="move"></div>
-      <div class="padzone aim" data-player="2" data-kind="aim">
-        <button class="specialBtn" data-player="2" id="spBtnP2">SP</button>
-      </div>
+  <div class="hud hudTop" id="hudP2" data-player="2">
+    <div class="wIcon" id="wIconP2">🔫</div>
+    <div class="barCol">
+      <div class="barRow"><div class="bar hp"><i id="hpFillP2"></i></div><div class="bar sp" id="spBarP2"><i id="spFillP2"></i></div></div>
+      <div class="barRow"><div class="bar ink"><i id="inkFillP2"></i></div><div class="hpTxt" id="hpP2">100</div><div class="killTxt" id="killP2">たおした 0</div></div>
     </div>
-    <div class="hud">
-      <div class="wIcon" id="wIconP2">🔫</div>
-      <div class="bar ink"><i id="inkFillP2"></i></div>
-      <div class="bar sp" id="spBarP2"><i id="spFillP2"></i></div>
-      <div class="hpTxt" id="hpP2">100</div>
-    </div>
+    <div class="hudToast" id="hudToastP2"></div>
   </div>
 
   <div id="mapArea">
@@ -134,18 +152,25 @@
     <div id="flashTint"></div>
   </div>
 
-  <div class="band p1" id="bandP1" data-player="1">
-    <div class="hud">
-      <div class="wIcon" id="wIconP1">🔫</div>
-      <div class="bar ink"><i id="inkFillP1"></i></div>
-      <div class="bar sp" id="spBarP1"><i id="spFillP1"></i></div>
-      <div class="hpTxt" id="hpP1">100</div>
+  <div class="hud hudBottom" id="hudP1" data-player="1">
+    <div class="wIcon" id="wIconP1">🔫</div>
+    <div class="barCol">
+      <div class="barRow"><div class="bar hp"><i id="hpFillP1"></i></div><div class="bar sp" id="spBarP1"><i id="spFillP1"></i></div></div>
+      <div class="barRow"><div class="bar ink"><i id="inkFillP1"></i></div><div class="hpTxt" id="hpP1">100</div><div class="killTxt" id="killP1">たおした 0</div></div>
     </div>
-    <div class="padrow">
-      <div class="padzone move" data-player="1" data-kind="move"></div>
-      <div class="padzone aim" data-player="1" data-kind="aim">
-        <button class="specialBtn" data-player="1" id="spBtnP1">SP</button>
-      </div>
+    <div class="hudToast" id="hudToastP1"></div>
+  </div>
+
+  <div class="padOverlay p2">
+    <div class="padzone move" data-player="2" data-kind="move"></div>
+    <div class="padzone aim" data-player="2" data-kind="aim">
+      <button class="specialBtn" data-player="2" id="spBtnP2">SP</button>
+    </div>
+  </div>
+  <div class="padOverlay p1">
+    <div class="padzone move" data-player="1" data-kind="move"></div>
+    <div class="padzone aim" data-player="1" data-kind="aim">
+      <button class="specialBtn" data-player="1" id="spBtnP1">SP</button>
     </div>
   </div>
 
@@ -176,6 +201,7 @@
         <div class="rollerIcon" id="rollerIcon">🎨</div>
       </div>
       <div class="resultText" id="resultText"></div>
+      <div class="killSummary" id="killSummary"></div>
       <div class="seriesDots" id="seriesDots"></div>
       <button class="nextBtn" id="resultNextBtn">つぎへ</button>
     </div>
@@ -239,19 +265,19 @@ var WEAPONS = {
     paintRadius:1.5,      // 着弾の塗り半径(セル)
     spread:6*Math.PI/180, // 弾のばらつき角(片側)
     moveSpeedMul:1.0,
-    specialGaugeMax:170,  // スペシャルゲージ満タン値(塗ったセル数)
+    specialGaugeMax:880,  // スペシャルゲージ満タン値(塗ったセル数)
     special:{ type:'inkbomb', count:3, radius:5, damage:100, fuse:1.0, speed:360, spreadDeg:26 },
   },
   roller:{
     name:'ローラー', emoji:'🖌️', desc:'ころがしてぬる。ちかづくとつよい',
     moveSpeedMul:0.85,
     rollWidth:5,          // 移動時に塗る幅(セル)
-    contactDamage:100,    // 接触ダメージ(ほぼ即死)
+    contactDamage:85,    // 接触ダメージ(ほぼ即死)
     swingArc:70*Math.PI/180, // 振りの扇角度
     swingCount:7,
-    swingBulletSpeed:900, swingRange:105, swingDamage:40, swingPaintRadius:1.1,
+    swingBulletSpeed:900, swingRange:105, swingDamage:55, swingPaintRadius:1.1,
     swingInkCost:34, swingCooldown:0.7,
-    specialGaugeMax:210,
+    specialGaugeMax:1250,
     special:{ type:'giant', duration:5, widthMul:2, speedMul:1.2 },
   },
   charger:{
@@ -260,10 +286,10 @@ var WEAPONS = {
     maxCharge:1.2,          // フルチャージ秒数
     maxRange:0.7*WORLD_H,   // フルチャージ時の射程
     maxDamage:100,
-    minChargeFrac:0.3,      // 最低保証チャージ割合
-    beamPaintRadius:0.7,    // 通過線の塗り半径(セル)
+    minChargeFrac:0.45,      // 最低保証チャージ割合
+    beamPaintRadius:1.12,    // 通過線の塗り半径(セル)
     inkBase:15, inkPerFrac:35,
-    specialGaugeMax:150,
+    specialGaugeMax:385,
     special:{ type:'rapid', duration:4, rate:3, damage:100 },
   },
 };
@@ -287,7 +313,7 @@ function makePlayer(idx){
     hp:100, ink:INK_MAX, alive:true, invuln:0, respawnTimer:0,
     angle: idx===0 ? -Math.PI/2 : Math.PI/2,
     sp:0, charge:0, charging:false, specialActive:false, specialTimer:0, specialFireCooldown:0,
-    fireCooldown:0, swingCooldown:0, contactCooldown:0,
+    fireCooldown:0, swingCooldown:0, contactCooldown:0, rollDist:0, hitFlash:0, hudToast:null,
     wasFiring:false, fireHeldStart:0, wasSpecial:false,
     isBot:false, forced:null,
     input:{move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false},
@@ -321,6 +347,8 @@ function createGame(opts){
   g.counts = [0,0];
   g.bullets = [];
   g.particles = [];
+  g.popups = [];        // やられた!/たおした! のポップアップ演出(描画専用)
+  g.shakeTimer = 0; g.shakeMag = 0; // 画面の軽い揺れ演出
   g.time = 0; g.acc = 0;
   g.duration = ROUND_DURATION_DEFAULT;
   g.remaining = g.duration;
@@ -352,6 +380,7 @@ function startRound(g, handicapLoserIdx){
   buildWallGrid(g.grid);
   g.counts=[0,0];
   g.bullets.length=0; g.particles.length=0;
+  g.popups.length=0; g.shakeTimer=0; g.shakeMag=0;
   if (!g.headless) g.inkCtx.clearRect(0,0,WORLD_W,WORLD_H);
   for (var i=0;i<2;i++){
     var p=g.players[i], w=WEAPONS[p.weapon];
@@ -359,7 +388,7 @@ function startRound(g, handicapLoserIdx){
     p.hp=100; p.ink=INK_MAX; p.alive=true; p.invuln=0; p.respawnTimer=0;
     p.angle = i===0 ? -Math.PI/2 : Math.PI/2;
     p.charge=0; p.charging=false; p.specialActive=false; p.specialTimer=0; p.specialFireCooldown=0;
-    p.fireCooldown=0; p.swingCooldown=0; p.contactCooldown=0;
+    p.fireCooldown=0; p.swingCooldown=0; p.contactCooldown=0; p.rollDist=0; p.hitFlash=0; p.hudToast=null;
     p.wasFiring=false; p.wasSpecial=false;
     p.sp = (handicapLoserIdx===i) ? Math.round(w.specialGaugeMax*0.5) : 0;
     p.stats={paintedCells:0, specials:0, kills:0};
@@ -432,6 +461,64 @@ function paintCircle(g, wx, wy, radiusPx, owner){
   return painted;
 }
 
+function drawInkEllipse(g,wx,wy,rx,ry,angle,owner){
+  var ctx=g.inkCtx;
+  ctx.fillStyle = owner===1 ? COLOR.p1 : COLOR.p2;
+  ctx.save();
+  ctx.translate(wx,wy);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.ellipse(0,0,rx*1.05,ry*1.05,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 楕円ブラシで塗る(着弾の見た目用)。paintCircleと同じくグリッド判定+オフスクリーン描画
+function paintEllipse(g, wx, wy, rx, ry, angle, owner){
+  if (rx<=0 || ry<=0) return 0;
+  var rMax=Math.max(rx,ry);
+  var minCx=Math.max(0,Math.floor((wx-rMax)/CELL));
+  var maxCx=Math.min(GRID_W-1,Math.floor((wx+rMax)/CELL));
+  var minCy=Math.max(0,Math.floor((wy-rMax)/CELL));
+  var maxCy=Math.min(GRID_H-1,Math.floor((wy+rMax)/CELL));
+  var cosA=Math.cos(-angle), sinA=Math.sin(-angle);
+  var painted=0;
+  for (var cy=minCy; cy<=maxCy; cy++){
+    for (var cx=minCx; cx<=maxCx; cx++){
+      var idx=cy*GRID_W+cx;
+      var cell=g.grid[idx];
+      if (cell===9) continue;
+      var ccx=(cx+0.5)*CELL, ccy=(cy+0.5)*CELL;
+      var dx=ccx-wx, dy=ccy-wy;
+      var lx=dx*cosA-dy*sinA, ly=dx*sinA+dy*cosA;
+      if ((lx*lx)/(rx*rx)+(ly*ly)/(ry*ry) <= 1 && cell!==owner){
+        if (cell===1) g.counts[0]--; else if (cell===2) g.counts[1]--;
+        g.grid[idx]=owner;
+        if (owner===1) g.counts[0]++; else g.counts[1]++;
+        painted++;
+      }
+    }
+  }
+  if (painted>0){
+    var pl=g.players[owner-1], w=WEAPONS[pl.weapon];
+    pl.sp=Math.min(w.specialGaugeMax, pl.sp+painted);
+    pl.stats.paintedCells+=painted;
+  }
+  if (!g.headless) drawInkEllipse(g,wx,wy,rx,ry,angle,owner);
+  return painted;
+}
+
+// シューターの着弾: 楕円+周囲2〜3個の小さな飛沫で「しずくが飛び散った」見た目にする
+function paintShooterImpact(g, wx, wy, r, owner, dirAngle){
+  paintEllipse(g, wx, wy, r*1.15, r*0.8, dirAngle, owner);
+  var n=2+((g.rng()*2)|0); // 2〜3個
+  for (var i=0;i<n;i++){
+    var a=g.rng()*Math.PI*2, d=r*(0.7+g.rng()*0.9);
+    var dr=r*(0.25+g.rng()*0.3);
+    paintCircle(g, wx+Math.cos(a)*d, wy+Math.sin(a)*d, dr, owner);
+  }
+}
+
 function resolveWallCollision(p, wallsPx){
   for (var i=0;i<wallsPx.length;i++){
     var w=wallsPx[i];
@@ -463,11 +550,21 @@ function resolveWallCollision(p, wallsPx){
 function applyDamage(g, target, dmg, ownerIdx){
   if (!target.alive || isInvulnerable(target)) return;
   target.hp -= dmg;
+  target.hitFlash = 0.12; // 被弾で一瞬白く点滅
   if (target.hp<=0){
     target.hp=0; target.alive=false; target.respawnTimer=RESPAWN_TIME;
-    g.players[ownerIdx].stats.kills++;
+    var killer=g.players[ownerIdx];
+    killer.stats.kills++;
     paintCircle(g, target.x, target.y, DEATH_SPLAT_RADIUS, ownerIdx+1);
-    spawnParticles(g, target.x, target.y, ownerIdx, 18);
+    spawnParticles(g, target.x, target.y, ownerIdx, 26);
+    if (!g.headless){
+      g.shakeTimer=0.28; g.shakeMag=9;
+      var killColor = ownerIdx===0?COLOR.p1:COLOR.p2, deadColor = target.idx===0?COLOR.p1:COLOR.p2;
+      g.popups.push({x:target.x, y:target.y-34, text:'たおした!', color:killColor, age:0, life:1.1});
+      g.popups.push({x:target.x, y:target.y+6, text:'やられた!', color:deadColor, age:0, life:1.1});
+      killer.hudToast = {text:'たおした!', kind:'kill', age:0, life:1.3};
+      target.hudToast = {text:'やられた…', kind:'dead', age:0, life:1.3};
+    }
   } else {
     spawnParticles(g, target.x, target.y, ownerIdx, 6);
   }
@@ -486,7 +583,7 @@ function fireShooterBullet(g, idx, p, weapon){
   var spread=(g.rng()*2-1)*weapon.spread;
   var ang=p.angle+spread;
   g.bullets.push({
-    kind:'bullet', owner:idx,
+    kind:'bullet', owner:idx, weaponKey:'shooter',
     x:p.x+Math.cos(p.angle)*p.radius, y:p.y+Math.sin(p.angle)*p.radius,
     vx:Math.cos(ang)*weapon.bulletSpeed, vy:Math.sin(ang)*weapon.bulletSpeed,
     damage:weapon.damage, range:weapon.range, traveled:0,
@@ -504,7 +601,7 @@ function tryRollerSwing(g, idx, p, weapon){
     var t = n<=1 ? 0 : (i/(n-1)-0.5);
     var ang = p.angle + t*weapon.swingArc;
     g.bullets.push({
-      kind:'bullet', owner:idx,
+      kind:'bullet', owner:idx, weaponKey:'roller',
       x:p.x+Math.cos(ang)*p.radius, y:p.y+Math.sin(ang)*p.radius,
       vx:Math.cos(ang)*weapon.swingBulletSpeed, vy:Math.sin(ang)*weapon.swingBulletSpeed,
       damage:weapon.swingDamage, range:weapon.swingRange, traveled:0,
@@ -586,6 +683,26 @@ function activateSpecial(g, idx){
 }
 
 /* ==================== 6. 弾・プレイヤー更新 ==================== */
+// 弾道の塗り: シューターの弾は直径0.8〜1.6セルでばらつかせ、進行方向に対して左右にずらして飛沫っぽくする
+function paintBulletTrail(g,b){
+  if (!b.trailRadius) return;
+  if (b.weaponKey==='shooter'){
+    var tR=CELL*(0.4+g.rng()*0.4); // 半径0.4〜0.8セル(直径0.8〜1.6セル)
+    var perpAng=Math.atan2(b.vy,b.vx)+Math.PI/2;
+    var off=(g.rng()*2-1)*tR*0.9;
+    paintCircle(g, b.x+Math.cos(perpAng)*off, b.y+Math.sin(perpAng)*off, tR, b.owner+1);
+  } else {
+    paintCircle(g,b.x,b.y,b.trailRadius,b.owner+1);
+  }
+}
+// 着弾の塗り: シューターは楕円+飛沫、それ以外(ローラーの振り)は従来どおり丸
+function paintBulletImpact(g,b){
+  if (b.weaponKey==='shooter'){
+    paintShooterImpact(g,b.x,b.y,b.paintRadius,b.owner+1,Math.atan2(b.vy,b.vx));
+  } else {
+    paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1);
+  }
+}
 function updateBullets(g, dt){
   var arr=g.bullets;
   for (var i=arr.length-1; i>=0; i--){
@@ -595,20 +712,20 @@ function updateBullets(g, dt){
       b.x += b.vx*dt; b.y += b.vy*dt;
       b.traveled += Math.hypot(b.vx*dt, b.vy*dt);
       if (isWallAt(g,b.x,b.y)){
-        paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1); dead=true;
+        paintBulletImpact(g,b); dead=true;
       } else {
-        if (b.trailRadius) paintCircle(g,b.x,b.y,b.trailRadius,b.owner+1);
+        paintBulletTrail(g,b);
         var target=g.players[1-b.owner];
         if (!dead && target.alive && !isInvulnerable(target)){
           var dx=target.x-b.x, dy=target.y-b.y;
           if (dx*dx+dy*dy <= (target.radius+(b.hitRadius||4))*(target.radius+(b.hitRadius||4))){
             applyDamage(g,target,b.damage,b.owner);
-            paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1);
+            paintBulletImpact(g,b);
             dead=true;
           }
         }
         if (!dead && b.traveled>=b.range){
-          paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1); dead=true;
+          paintBulletImpact(g,b); dead=true;
         }
         if (!dead && (b.x<0||b.x>WORLD_W||b.y<0||b.y>WORLD_H)) dead=true;
       }
@@ -642,6 +759,7 @@ function updatePlayer(g, idx, dt){
   var opp=g.players[1-idx];
 
   // 復活処理
+  if (p.hitFlash>0) p.hitFlash=Math.max(0,p.hitFlash-dt);
   if (!p.alive){
     p.respawnTimer -= dt;
     if (p.respawnTimer<=0){
@@ -706,10 +824,14 @@ function updatePlayer(g, idx, dt){
     if (releasedNow && heldDur < TAP_MAX_DURATION) tryRollerSwing(g, idx, p, weapon);
     var moved = speed*dt;
     if (moved > 0.4){
-      var rad = weapon.rollWidth*CELL/2 * (p.specialActive?weapon.special.widthMul:1);
+      // 塗り幅を移動距離に応じて揺らし、轢き跡の両端をギザギザにする
+      p.rollDist += moved;
+      var wobble = Math.sin(p.rollDist/(CELL*3.1))*CELL*0.55;
+      var rad = Math.max(CELL*0.55, weapon.rollWidth*CELL/2 + wobble) * (p.specialActive?weapon.special.widthMul:1);
       paintCircle(g, p.x, p.y, rad, idx+1);
     }
-    if (opp.alive && !isInvulnerable(opp)){
+    // 接触キルは「ある程度の速さで動いている時だけ」有効(待ち伏せ即死を防ぐ)
+    if (opp.alive && !isInvulnerable(opp) && speed > BASE_SPEED*0.15){
       var ddx=opp.x-p.x, ddy=opp.y-p.y;
       var rr=p.radius+opp.radius+2;
       if (ddx*ddx+ddy*ddy <= rr*rr && p.contactCooldown<=0){
@@ -759,7 +881,7 @@ function checkRoundEnd(g){
   var pct2 = g.counts[1]/totalPlayable*100;
   var winnerIdx = pct1>pct2 ? 0 : (pct2>pct1 ? 1 : null);
   if (winnerIdx!==null) g.seriesScore[winnerIdx]++;
-  g.roundResults.push({pct1:pct1, pct2:pct2, winnerIdx:winnerIdx});
+  g.roundResults.push({pct1:pct1, pct2:pct2, winnerIdx:winnerIdx, kills:[g.players[0].stats.kills, g.players[1].stats.kills]});
   g.lastRoundLoserIdx = winnerIdx===null ? null : (1-winnerIdx);
   g.lastRoundPct=[pct1,pct2];
   g.seriesDone = g.seriesScore[0]>=WINS_NEEDED || g.seriesScore[1]>=WINS_NEEDED;
@@ -781,7 +903,23 @@ function stepGame(g, dt){
   updatePlayer(g,1,dt);
   updateBullets(g,dt);
   updateParticles(g,dt);
+  updateEffects(g,dt);
   checkRoundEnd(g);
+}
+
+// 画面の軽い揺れ・やられた!/たおした!ポップアップ・HUDトーストの経過時間を更新する(描画専用、判定には影響しない)
+function updateEffects(g, dt){
+  if (g.shakeTimer>0) g.shakeTimer=Math.max(0,g.shakeTimer-dt);
+  for (var i=0;i<2;i++){
+    var t=g.players[i].hudToast;
+    if (t){ t.age+=dt; if (t.age>=t.life) g.players[i].hudToast=null; }
+  }
+  if (g.headless) return;
+  var arr=g.popups;
+  for (var j=arr.length-1;j>=0;j--){
+    arr[j].age+=dt;
+    if (arr[j].age>=arr[j].life) arr.splice(j,1);
+  }
 }
 
 /* ==================== 7. ボットAI ==================== */
@@ -850,8 +988,8 @@ function botDecide(g, idx){
     if (weapon.key==='roller' && distToOpp < 5*CELL && opp.alive){
       mem.dir = {x:(opp.x-p.x)/(distToOpp||1), y:(opp.y-p.y)/(distToOpp||1)};
     } else if (weapon.key==='charger'){
-      var ideal=10*CELL;
-      if (distToOpp < ideal-2*CELL && opp.alive){
+      var ideal=11*CELL; // 近づかれたらすぐ離れる(近距離はローラー等に弱いため)
+      if (distToOpp < ideal && opp.alive){
         mem.dir = {x:(p.x-opp.x)/(distToOpp||1), y:(p.y-opp.y)/(distToOpp||1)};
       } else {
         mem.dir = pickCoverageDir(g, idx, p, lowInk);
@@ -898,7 +1036,8 @@ function botDecide(g, idx){
       if (!input.fire) { input.aim = {x:Math.cos(mem.chargeAng), y:Math.sin(mem.chargeAng)}; }
     } else {
       var wantCharge=false, ang3=mem.dir.x||mem.dir.y ? Math.atan2(mem.dir.y,mem.dir.x) : p.angle;
-      if (los && distToOpp < weapon.maxRange && distToOpp > 3*CELL){
+      var danger = distToOpp < 4*CELL; // 接近戦は不利なので近距離でも撃って防衛する
+      if (los && distToOpp < weapon.maxRange){
         wantCharge=true; ang3=Math.atan2(opp.y-p.y,opp.x-p.x);
       } else if (!mem.nextPaintShot || g.time>=mem.nextPaintShot){
         // 敵がいなければマップの長辺(縦)に沿って長いビームで塗る
@@ -912,7 +1051,8 @@ function botDecide(g, idx){
         input.fire=true;
         input.aim={x:Math.cos(ang3), y:Math.sin(ang3)};
         mem.chargeAng = botAimJitter(g, ang3);
-        mem.chargeReleaseAt = g.time + 0.4+CONFIG.BOT_SKILL*0.7*(0.6+g.rng()*0.4);
+        // 近距離で危険なときは即座に撃って迎撃、そうでなければ普段どおりためる
+        mem.chargeReleaseAt = danger ? g.time + 0.05 : g.time + 0.4+CONFIG.BOT_SKILL*0.7*(0.6+g.rng()*0.4);
       }
     }
   }
@@ -938,6 +1078,7 @@ function setupInput(){
       try{ zone.setPointerCapture(e.pointerId); }catch(err){}
       touchState[e.pointerId] = {player:player, kind:kind, anchorX:e.clientX, anchorY:e.clientY, curX:e.clientX, curY:e.clientY};
       updateStickVisual(e.pointerId, true);
+      zone.classList.add('touched'); // 触ったらヒントの点線円をフェードアウト
     }, {passive:false});
     zone.addEventListener('pointermove', function(e){
       var s=touchState[e.pointerId]; if (!s) return;
@@ -1149,11 +1290,41 @@ function drawParticles(ctx, g){
   }
 }
 
+// 頭上の小さなHPバー(自分色の枠+HPで色が変わるバー)
+function drawHpBar(ctx, p, col){
+  var w=p.radius*2.2, h=4, x=-w/2, y=-p.radius-14;
+  var frac=clamp(p.hp/100,0,1);
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.fillRect(x-1,y-1,w+2,h+2);
+  ctx.fillStyle = frac>0.5 ? '#57e08a' : (frac>0.2 ? '#ffcc4d' : '#ff5252');
+  ctx.fillRect(x,y,w*frac,h);
+  ctx.strokeStyle=col; ctx.lineWidth=1;
+  ctx.strokeRect(x-1,y-1,w+2,h+2);
+  ctx.restore();
+}
+
+// リスポーンまでのカウントダウン(3,2,1)をキャラの死亡位置に表示する
+function drawRespawnCountdown(ctx, p, col){
+  if (p.respawnTimer<=0) return;
+  var n=Math.ceil(p.respawnTimer);
+  ctx.save();
+  ctx.globalAlpha=0.85;
+  ctx.beginPath();
+  ctx.fillStyle='rgba(6,10,22,0.55)';
+  ctx.arc(p.x,p.y,20,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=col;
+  ctx.font='bold 26px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(n>0?String(n):'GO', p.x, p.y);
+  ctx.restore();
+}
+
 function drawPlayer(ctx, g, idx){
   var p=g.players[idx];
-  if (!p.alive) return;
   var col = idx===0?COLOR.p1:COLOR.p2;
   var dark = idx===0?COLOR.p1dark:COLOR.p2dark;
+  if (!p.alive){ drawRespawnCountdown(ctx, p, col); return; }
   var flashing = p.invuln>0 && Math.floor(g.time*10)%2===0;
   ctx.save();
   ctx.translate(p.x,p.y);
@@ -1172,6 +1343,13 @@ function drawPlayer(ctx, g, idx){
   ctx.arc(0,0,p.radius,0,Math.PI*2);
   ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.5; ctx.stroke();
+  // 被弾フラッシュ: 一瞬全身を白く光らせる
+  if (p.hitFlash>0){
+    ctx.globalAlpha = flashing?0.45:Math.min(1,p.hitFlash/0.12)*0.85;
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.arc(0,0,p.radius,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = flashing?0.45:1;
+  }
   // 目
   ctx.fillStyle='#fff';
   ctx.beginPath(); ctx.arc(p.radius*0.25,-p.radius*0.35,2.6,0,Math.PI*2); ctx.fill();
@@ -1181,6 +1359,8 @@ function drawPlayer(ctx, g, idx){
   ctx.beginPath(); ctx.arc(p.radius*0.5, p.radius*0.35,1.2,0,Math.PI*2); ctx.fill();
   ctx.restore();
 
+  drawHpBar(ctx, p, col);
+
   if (p.specialActive && p.weapon==='roller'){
     ctx.save();
     ctx.strokeStyle='rgba(255,224,138,0.85)'; ctx.lineWidth=2;
@@ -1189,10 +1369,34 @@ function drawPlayer(ctx, g, idx){
   }
 }
 
+function drawPopups(ctx, g){
+  var arr=g.popups;
+  for (var i=0;i<arr.length;i++){
+    var pu=arr[i];
+    var t=pu.age/pu.life;
+    ctx.save();
+    ctx.globalAlpha = t<0.75 ? 1 : Math.max(0,1-(t-0.75)/0.25);
+    ctx.fillStyle=pu.color;
+    ctx.font='bold 20px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=3;
+    var y=pu.y - t*26;
+    ctx.strokeText(pu.text, pu.x, y);
+    ctx.fillText(pu.text, pu.x, y);
+    ctx.restore();
+  }
+}
+
 function render(g){
   var ctx=g.ctx;
   if (!ctx) return;
-  ctx.clearRect(0,0,WORLD_W,WORLD_H);
+  ctx.save();
+  if (g.shakeTimer>0){
+    // 決定論性を壊さないよう、rngではなくgame.timeベースの揺れにする(描画専用)
+    var m=g.shakeMag*(g.shakeTimer/0.28);
+    ctx.translate(Math.sin(g.time*53.0)*m, Math.cos(g.time*47.0)*m);
+  }
+  ctx.clearRect(-24,-24,WORLD_W+48,WORLD_H+48);
   ctx.fillStyle=COLOR.floor;
   ctx.fillRect(0,0,WORLD_W,WORLD_H);
   ctx.drawImage(g.inkCanvas,0,0,WORLD_W,WORLD_H);
@@ -1202,6 +1406,8 @@ function render(g){
   drawParticles(ctx,g);
   drawPlayer(ctx,g,0);
   drawPlayer(ctx,g,1);
+  drawPopups(ctx,g);
+  ctx.restore();
 }
 
 /* ==================== 10. UI / 画面フロー ==================== */
@@ -1272,10 +1478,15 @@ function onRoundEndUI(g){
       $('rollerIcon').style.left=g.lastRoundPct[0]+'%';
     });
   });
-  var winnerIdx=g.roundResults[g.roundResults.length-1].winnerIdx;
+  var lastResult=g.roundResults[g.roundResults.length-1];
+  var winnerIdx=lastResult.winnerIdx;
   var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">P1のかち!</span>' : '<span class="win2">P2のかち!</span>');
+  var kills = lastResult.kills || [0,0];
   setTimeout(function(){
     $('resultText').innerHTML = 'P1 '+pct1+'% / P2 '+pct2+'%<br>'+label;
+    $('killSummary').innerHTML =
+      '<span><b class="p1">P1</b> たおした:'+kills[0]+' / やられた:'+kills[1]+'</span>'+
+      '<span><b class="p2">P2</b> たおした:'+kills[1]+' / やられた:'+kills[0]+'</span>';
   }, 600);
   // 左からP1の勝ち分、右からP2の勝ち分を塗る (5個の丸)
   var dotsEl=$('seriesDots'); dotsEl.innerHTML='';
@@ -1326,7 +1537,16 @@ function updateHUD(g){
     $('spFillP'+pn).style.width=spPct+'%';
     $('spBarP'+pn).classList.toggle('full', spPct>=100);
     $('spBtnP'+pn).classList.toggle('ready', spPct>=100);
-    $('hpP'+pn).textContent=Math.ceil(p.hp);
+    $('hpFillP'+pn).style.width=Math.max(0,p.hp)+'%';
+    $('hpP'+pn).textContent = p.alive ? ('HP '+Math.ceil(p.hp)) : ('ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
+    $('killP'+pn).textContent = 'たおした '+p.stats.kills;
+    var toastEl=$('hudToastP'+pn), toast=p.hudToast;
+    if (toast){
+      toastEl.textContent = toast.text;
+      toastEl.className = 'hudToast show '+(toast.kind==='kill'?'kill':'dead');
+    } else {
+      toastEl.classList.remove('show');
+    }
   }
   if (g.phase==='playing'){
     var t=Math.max(0,Math.ceil(g.remaining));
@@ -1378,6 +1598,7 @@ function simulate(opts){
     winner: rr.winnerIdx===0?'p1':(rr.winnerIdx===1?'p2':'draw'),
     splats: [g.players[0].stats.paintedCells, g.players[1].stats.paintedCells],
     specials: [g.players[0].stats.specials, g.players[1].stats.specials],
+    kills: [g.players[0].stats.kills, g.players[1].stats.kills],
     inkPainted: [g.counts[0], g.counts[1]],
   };
 }
