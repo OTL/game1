@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>スプロティーン</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{
+    --bg:#0b1020;
+    --p1:#ff7a1a;
+    --p1dark:#c9530a;
+    --p2:#3fa0ff;
+    --p2dark:#1f6fd6;
+    --text:#e9eefb;
+    --sub:#9aa6cf;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg); color:var(--text);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;
+    overflow:hidden; overscroll-behavior:none; touch-action:none;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  #app{ position:fixed; inset:0; display:flex; flex-direction:column; }
+  .band{ position:relative; flex:0 0 25%; min-height:118px; display:flex; flex-direction:column; }
+  .band.p2{ transform:rotate(180deg); }
+  .padrow{ flex:1 1 auto; display:flex; min-height:0; }
+  .padzone{ flex:1 1 50%; position:relative; touch-action:none; }
+  .padzone.move{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 70%); }
+  .padzone.aim{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03), transparent 70%); }
+  .padzone::after{
+    content:""; position:absolute; left:50%; top:50%; width:64px; height:64px;
+    margin:-32px 0 0 -32px; border:2px dashed rgba(255,255,255,0.12); border-radius:50%; pointer-events:none;
+  }
+  .stick{
+    position:fixed; width:70px; height:70px; margin:-35px 0 0 -35px; border-radius:50%;
+    background:rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.35);
+    pointer-events:none; display:none; z-index:20;
+  }
+  .stick.knob{ width:34px; height:34px; margin:-17px 0 0 -17px; background:rgba(255,255,255,0.55); }
+  .specialBtn{
+    position:absolute; left:50%; top:8px; transform:translateX(-50%);
+    width:56px; height:56px; border-radius:50%; border:2px solid #ffe08a; background:#3a2e08;
+    color:#ffe08a; font-weight:700; font-size:12px; line-height:1.2; padding:0;
+  }
+  .band.p1 .specialBtn{ top:auto; bottom:8px; }
+  .specialBtn.ready{ background:#ffcc4d; color:#231600; box-shadow:0 0 14px 4px rgba(255,204,77,0.7); }
+  .hud{ flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:6px 10px; }
+  .wIcon{ font-size:20px; width:26px; text-align:center; flex:0 0 auto; }
+  .bar{ position:relative; height:12px; border-radius:6px; background:rgba(255,255,255,0.12); overflow:hidden; flex:1 1 auto; border:1px solid rgba(255,255,255,0.18); }
+  .bar.sp{ flex:0 0 40%; }
+  .bar i{ position:absolute; left:0; top:0; bottom:0; width:0%; display:block; border-radius:6px; }
+  .band[data-player="1"] .bar.ink i{ background:linear-gradient(90deg,var(--p1dark),var(--p1)); }
+  .band[data-player="2"] .bar.ink i{ background:linear-gradient(90deg,var(--p2dark),var(--p2)); }
+  .bar.sp i{ background:linear-gradient(90deg,#ffb238,#ffe08a); }
+  .bar.sp.full i{ box-shadow:0 0 10px 2px #ffe08a; }
+  .hpTxt{ font-size:11px; color:var(--sub); flex:0 0 auto; width:34px; text-align:right; }
+  #mapArea{ position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#05070f; }
+  #gameCanvas{ display:block; touch-action:none; background:#1c2340; box-shadow:0 0 0 2px #2b3866, 0 10px 30px rgba(0,0,0,0.5); border-radius:6px; }
+  .timer{ position:absolute; left:50%; transform:translateX(-50%); font-size:15px; font-weight:700; color:#cfd8f5; background:rgba(6,10,22,0.55); padding:2px 12px; border-radius:10px; letter-spacing:0.05em; pointer-events:none; }
+  .timer.top{ top:6px; transform:translateX(-50%) rotate(180deg); }
+  .timer.bottom{ bottom:6px; }
+  #bigCount{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:min(22vw,140px); font-weight:800; color:#ff5252; text-shadow:0 0 24px rgba(255,82,82,0.9); pointer-events:none; opacity:0; }
+  #flashTint{ position:absolute; inset:0; background:#ff2b2b; opacity:0; pointer-events:none; mix-blend-mode:screen; }
+  #countdownWrap{ position:absolute; inset:0; pointer-events:none; }
+  .cdNum{ position:absolute; left:50%; width:100%; text-align:center; transform:translate(-50%,-50%); font-size:min(20vw,110px); font-weight:800; color:#ffe08a; text-shadow:0 0 20px rgba(255,224,138,0.8); }
+  .cdNum.cdTop{ top:32%; transform:translate(-50%,-50%) rotate(180deg); }
+  .cdNum.cdBottom{ top:68%; }
+  #overlay{ position:absolute; inset:0; pointer-events:none; z-index:30; }
+  .panel{ position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(6,10,22,0.92); pointer-events:none; }
+  .panel.show{ display:flex; pointer-events:auto; }
+  .titleLogo{ font-size:min(13vw,54px); font-weight:800; letter-spacing:0.08em; background:linear-gradient(90deg,var(--p1),var(--p2)); -webkit-background-clip:text; background-clip:text; color:transparent; text-shadow:0 6px 24px rgba(0,0,0,0.4); }
+  .titleSub{ margin-top:14px; font-size:15px; color:var(--sub); animation:blink 1.4s infinite; }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  #panelSelect{ flex-direction:column; padding:0; }
+  .selectHalf{ flex:1 1 50%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:10px; min-height:0; }
+  .selectHalf.rot{ transform:rotate(180deg); }
+  .selectHalf.ready{ background:rgba(255,255,255,0.04); }
+  .selLabel{ font-size:13px; color:var(--sub); }
+  .weaponRow{ display:flex; gap:8px; width:100%; max-width:520px; justify-content:center; }
+  .wCard{ flex:1 1 0; max-width:150px; background:#161c34; border:2px solid #2b3866; border-radius:12px; padding:8px 4px; color:var(--text); font:inherit; cursor:pointer; }
+  .wCard .wEmoji{ font-size:26px; }
+  .wCard .wName{ font-size:13px; font-weight:700; margin-top:2px; }
+  .wCard.selected{ border-color:#ffcc4d; background:#2a2410; }
+  .wDesc{ font-size:12px; color:var(--sub); min-height:16px; max-width:90vw; }
+  .readyBtn{ font:inherit; font-weight:700; color:#1a1206; background:#8fa2ff; border:none; border-radius:999px; padding:9px 22px; cursor:pointer; }
+  .readyBtn.on{ background:#57e08a; }
+  #panelResult{ gap:14px; }
+  .wipeStage{ position:relative; width:min(88vw,420px); }
+  .wipeBarBg{ display:flex; width:100%; height:26px; border-radius:13px; overflow:hidden; background:#141a30; border:2px solid #2b3866; }
+  .wipeFillP1{ height:100%; width:50%; background:var(--p1); transition:width 1.1s cubic-bezier(.2,.8,.2,1); }
+  .wipeFillP2{ height:100%; width:50%; background:var(--p2); transition:width 1.1s cubic-bezier(.2,.8,.2,1); }
+  .rollerIcon{ position:absolute; top:50%; left:0; transform:translate(-50%,-50%); font-size:26px; transition:left 1.1s cubic-bezier(.2,.8,.2,1); }
+  .resultText{ font-size:18px; font-weight:700; line-height:1.6; }
+  .resultText .win1{ color:var(--p1); }
+  .resultText .win2{ color:var(--p2); }
+  .seriesDots{ display:flex; gap:8px; }
+  .seriesDots span{ width:16px; height:16px; border-radius:50%; background:#222846; border:2px solid #3a4270; }
+  .seriesDots span.p1{ background:var(--p1); border-color:var(--p1); }
+  .seriesDots span.p2{ background:var(--p2); border-color:var(--p2); }
+  .nextBtn{ font:inherit; font-weight:700; color:#1a1206; background:#ffcc4d; border:none; border-radius:999px; padding:11px 28px; cursor:pointer; }
+  .champTitle{ font-size:min(9vw,34px); font-weight:800; color:#ffe08a; margin-bottom:18px; }
+  .hidden{ display:none!important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="band p2" id="bandP2" data-player="2">
+    <div class="padrow">
+      <div class="padzone move" data-player="2" data-kind="move"></div>
+      <div class="padzone aim" data-player="2" data-kind="aim">
+        <button class="specialBtn" data-player="2" id="spBtnP2">SP</button>
+      </div>
+    </div>
+    <div class="hud">
+      <div class="wIcon" id="wIconP2">🔫</div>
+      <div class="bar ink"><i id="inkFillP2"></i></div>
+      <div class="bar sp" id="spBarP2"><i id="spFillP2"></i></div>
+      <div class="hpTxt" id="hpP2">100</div>
+    </div>
+  </div>
+
+  <div id="mapArea">
+    <canvas id="gameCanvas"></canvas>
+    <div class="timer top" id="timerTop">90</div>
+    <div class="timer bottom" id="timerBottom">90</div>
+    <div id="countdownWrap" class="hidden">
+      <div class="cdNum cdTop" id="cdNumTop"></div>
+      <div class="cdNum cdBottom" id="cdNumBottom"></div>
+    </div>
+    <div id="bigCount"></div>
+    <div id="flashTint"></div>
+  </div>
+
+  <div class="band p1" id="bandP1" data-player="1">
+    <div class="hud">
+      <div class="wIcon" id="wIconP1">🔫</div>
+      <div class="bar ink"><i id="inkFillP1"></i></div>
+      <div class="bar sp" id="spBarP1"><i id="spFillP1"></i></div>
+      <div class="hpTxt" id="hpP1">100</div>
+    </div>
+    <div class="padrow">
+      <div class="padzone move" data-player="1" data-kind="move"></div>
+      <div class="padzone aim" data-player="1" data-kind="aim">
+        <button class="specialBtn" data-player="1" id="spBtnP1">SP</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div class="panel show" id="panelTitle">
+      <div class="titleLogo">スプロティーン</div>
+      <div class="titleSub">タップしてはじめる</div>
+    </div>
+
+    <div class="panel" id="panelSelect">
+      <div class="selectHalf rot" data-half="2">
+        <div class="selLabel">P2 (うえ) ぶきをえらぼう</div>
+        <div class="weaponRow" data-select-player="2"></div>
+        <div class="wDesc" id="descP2"></div>
+        <button class="readyBtn" id="readyP2">じゅんび OK</button>
+      </div>
+      <div class="selectHalf" data-half="1">
+        <div class="selLabel">P1 (した) ぶきをえらぼう</div>
+        <div class="weaponRow" data-select-player="1"></div>
+        <div class="wDesc" id="descP1"></div>
+        <button class="readyBtn" id="readyP1">じゅんび OK</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panelResult">
+      <div class="wipeStage">
+        <div class="wipeBarBg"><div class="wipeFillP1" id="wipeFillP1"></div><div class="wipeFillP2" id="wipeFillP2"></div></div>
+        <div class="rollerIcon" id="rollerIcon">🎨</div>
+      </div>
+      <div class="resultText" id="resultText"></div>
+      <div class="seriesDots" id="seriesDots"></div>
+      <button class="nextBtn" id="resultNextBtn">つぎへ</button>
+    </div>
+
+    <div class="panel" id="panelSeries">
+      <div class="champTitle" id="champTitle">ゆうしょう!</div>
+      <button class="nextBtn" id="seriesNextBtn">ぶきせんたくへ</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+/* ==================== 1. 定数・調整パラメータ ==================== */
+var GRID_W=48, GRID_H=72;      // 塗りグリッド 列x行 (縦長)
+var CELL=14;                   // 1セルの内部px
+var WORLD_W=GRID_W*CELL, WORLD_H=GRID_H*CELL;
+var FIXED_DT=1/60;
+var ROUND_DURATION_DEFAULT=90; // 1ラウンドの秒数
+var WINS_NEEDED=3;             // シリーズ先取本数
+var INK_MAX=100;
+var INK_REGEN_FAST=35, INK_REGEN_SLOW=8; // 自陣インク上 / それ以外
+var OWN_INK_MUL=1.3, ENEMY_INK_MUL=0.55; // 地形による移動速度倍率
+var RESPAWN_TIME=3, INVULN_TIME=1.5;
+var DEATH_SPLAT_RADIUS=4*CELL;
+var BASE_SPEED=205;             // 基準移動速度 px/s
+var CHARGER_CHARGE_MOVE_MUL=0.5;
+var PLAYER_RADIUS=11;
+var INK_SCALE=2;                // 塗りキャンバスの解像度倍率
+var STICK_RADIUS=46;            // スティック最大半径(px, 実画面px基準)
+var AIM_DEADZONE=8;
+var TAP_MAX_DURATION=0.25;      // タップ判定の最大長押し時間(秒)
+
+var CONFIG = { BOT_SKILL: 0.6 }; // 0〜1。大きいほどボットが強い。実行時に書き換え可
+
+var COLOR = {
+  bg:'#0b1020', floor:'#232a45', floorLine:'rgba(255,255,255,0.03)',
+  wall:'#4a5680', wallEdge:'#8b97c9',
+  p1:'#ff7a1a', p1dark:'#c9530a',
+  p2:'#3fa0ff', p2dark:'#1f6fd6',
+};
+
+// 点対称マップ。壁は [列,行,幅,高さ] (セル単位)
+var WALLS_CELL = [
+  [6,30,6,4],  [36,38,6,4],
+  [34,14,6,4], [8,54,6,4],
+  [14,33,4,6], [30,33,4,6],
+  [20,8,8,3],  [20,61,8,3],
+];
+var SPAWN = [ {x:336,y:936}, {x:336,y:72} ]; // P1下端中央 / P2上端中央
+
+/* 武器パラメータ。ここを書き換えればバランス調整できる (実行中も反映される) */
+var WEAPONS = {
+  shooter:{
+    name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ',
+    fireRate:8,          // 毎秒発射数
+    bulletSpeed:640,      // 弾速 px/s
+    range:470,            // 射程 px
+    damage:27,            // 1発ダメージ (4発でだいたい撃破)
+    inkPerShot:6,         // 1発の消費インク
+    paintRadius:1.5,      // 着弾の塗り半径(セル)
+    spread:6*Math.PI/180, // 弾のばらつき角(片側)
+    moveSpeedMul:1.0,
+    specialGaugeMax:170,  // スペシャルゲージ満タン値(塗ったセル数)
+    special:{ type:'inkbomb', count:3, radius:5, damage:100, fuse:1.0, speed:360, spreadDeg:26 },
+  },
+  roller:{
+    name:'ローラー', emoji:'🖌️', desc:'ころがしてぬる。ちかづくとつよい',
+    moveSpeedMul:0.85,
+    rollWidth:5,          // 移動時に塗る幅(セル)
+    contactDamage:100,    // 接触ダメージ(ほぼ即死)
+    swingArc:70*Math.PI/180, // 振りの扇角度
+    swingCount:7,
+    swingBulletSpeed:900, swingRange:105, swingDamage:40, swingPaintRadius:1.1,
+    swingInkCost:34, swingCooldown:0.7,
+    specialGaugeMax:210,
+    special:{ type:'giant', duration:5, widthMul:2, speedMul:1.2 },
+  },
+  charger:{
+    name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ',
+    moveSpeedMul:1.0,       // 通常時の移動速度倍率(ため中はCHARGER_CHARGE_MOVE_MULが追加でかかる)
+    maxCharge:1.2,          // フルチャージ秒数
+    maxRange:0.7*WORLD_H,   // フルチャージ時の射程
+    maxDamage:100,
+    minChargeFrac:0.3,      // 最低保証チャージ割合
+    beamPaintRadius:0.7,    // 通過線の塗り半径(セル)
+    inkBase:15, inkPerFrac:35,
+    specialGaugeMax:150,
+    special:{ type:'rapid', duration:4, rate:3, damage:100 },
+  },
+};
+for (var wk in WEAPONS) WEAPONS[wk].key = wk;
+
+/* ==================== 2. 決定論的PRNG (mulberry32) ==================== */
+function mulberry32(seed){
+  var a = seed>>>0;
+  return function(){
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a>>>15), 1 | a);
+    t = (t + Math.imul(t ^ (t>>>7), 61 | t)) ^ t;
+    return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ==================== 3. ゲーム状態生成 ==================== */
+function makePlayer(idx){
+  return {
+    idx:idx, weapon:'shooter', x:0, y:0, radius:PLAYER_RADIUS,
+    hp:100, ink:INK_MAX, alive:true, invuln:0, respawnTimer:0,
+    angle: idx===0 ? -Math.PI/2 : Math.PI/2,
+    sp:0, charge:0, charging:false, specialActive:false, specialTimer:0, specialFireCooldown:0,
+    fireCooldown:0, swingCooldown:0, contactCooldown:0,
+    wasFiring:false, fireHeldStart:0, wasSpecial:false,
+    isBot:false, forced:null,
+    input:{move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false},
+    stats:{paintedCells:0, specials:0, kills:0},
+    botMem:{ nextDecision:0, dir:{x:0,y:1} },
+  };
+}
+
+function buildWallGrid(grid){
+  var wallCount=0;
+  for (var i=0;i<WALLS_CELL.length;i++){
+    var w=WALLS_CELL[i];
+    for (var cy=w[1]; cy<w[1]+w[3]; cy++){
+      for (var cx=w[0]; cx<w[0]+w[2]; cx++){
+        grid[cy*GRID_W+cx]=9; wallCount++;
+      }
+    }
+  }
+  return wallCount;
+}
+
+function createGame(opts){
+  opts = opts||{};
+  var g = {};
+  g.headless = !!opts.headless;
+  g.live = !!opts.live;
+  g.rng = mulberry32((opts.seed>>>0) || 1);
+  g.grid = new Uint8Array(GRID_W*GRID_H);
+  g.wallCount = buildWallGrid(g.grid);
+  g.wallsPx = WALLS_CELL.map(function(w){ return {x:w[0]*CELL, y:w[1]*CELL, w:w[2]*CELL, h:w[3]*CELL}; });
+  g.counts = [0,0];
+  g.bullets = [];
+  g.particles = [];
+  g.time = 0; g.acc = 0;
+  g.duration = ROUND_DURATION_DEFAULT;
+  g.remaining = g.duration;
+  g.phase = 'idle'; // idle/title/select/countdown/playing/roundResult/seriesResult
+  g.countdown = 0;
+  g.seriesScore = [0,0];
+  g.roundResults = [];
+  g.lastRoundLoserIdx = null;
+  g.players = [ makePlayer(0), makePlayer(1) ];
+  if (!g.headless){
+    g.inkCanvas = document.createElement('canvas');
+    g.inkCanvas.width = WORLD_W*INK_SCALE;
+    g.inkCanvas.height = WORLD_H*INK_SCALE;
+    g.inkCtx = g.inkCanvas.getContext('2d');
+    g.inkCtx.setTransform(INK_SCALE,0,0,INK_SCALE,0,0);
+  }
+  return g;
+}
+
+function configurePlayers(g,p1w,p2w,bot1,bot2){
+  if (!WEAPONS[p1w]) p1w='shooter';
+  if (!WEAPONS[p2w]) p2w='shooter';
+  g.players[0].weapon=p1w; g.players[1].weapon=p2w;
+  g.players[0].isBot=!!bot1; g.players[1].isBot=!!bot2;
+}
+
+function startRound(g, handicapLoserIdx){
+  g.grid.fill(0);
+  buildWallGrid(g.grid);
+  g.counts=[0,0];
+  g.bullets.length=0; g.particles.length=0;
+  if (!g.headless) g.inkCtx.clearRect(0,0,WORLD_W,WORLD_H);
+  for (var i=0;i<2;i++){
+    var p=g.players[i], w=WEAPONS[p.weapon];
+    p.x=SPAWN[i].x; p.y=SPAWN[i].y;
+    p.hp=100; p.ink=INK_MAX; p.alive=true; p.invuln=0; p.respawnTimer=0;
+    p.angle = i===0 ? -Math.PI/2 : Math.PI/2;
+    p.charge=0; p.charging=false; p.specialActive=false; p.specialTimer=0; p.specialFireCooldown=0;
+    p.fireCooldown=0; p.swingCooldown=0; p.contactCooldown=0;
+    p.wasFiring=false; p.wasSpecial=false;
+    p.sp = (handicapLoserIdx===i) ? Math.round(w.specialGaugeMax*0.5) : 0;
+    p.stats={paintedCells:0, specials:0, kills:0};
+    p.botMem={ nextDecision:0, dir:{x:0, y:(i===0?-1:1)} };
+  }
+  g.time=0; g.remaining=g.duration;
+  g.phase='countdown'; g.countdown=3.999;
+}
+
+function startSeries(g,p1w,p2w,seed,bot1,bot2,duration){
+  g.rng = mulberry32((seed>>>0) || 1);
+  g.duration = duration || ROUND_DURATION_DEFAULT;
+  configurePlayers(g,p1w,p2w,bot1,bot2);
+  g.seriesScore=[0,0]; g.roundResults=[]; g.lastRoundLoserIdx=null;
+  startRound(g, null);
+}
+
+/* ==================== 4. 物理・塗り ==================== */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+function cellAt(g,wx,wy){
+  var cx = Math.floor(wx/CELL), cy = Math.floor(wy/CELL);
+  if (cx<0||cx>=GRID_W||cy<0||cy>=GRID_H) return 9;
+  return g.grid[cy*GRID_W+cx];
+}
+function isWallAt(g,wx,wy){ return cellAt(g,wx,wy)===9; }
+
+function isInvulnerable(p){
+  return p.invuln>0 || (p.weapon==='roller' && p.specialActive);
+}
+
+function drawInkBrush(g,wx,wy,r,owner){
+  var ctx=g.inkCtx;
+  ctx.fillStyle = owner===1 ? COLOR.p1 : COLOR.p2;
+  ctx.beginPath();
+  ctx.arc(wx,wy,r*1.05,0,Math.PI*2);
+  ctx.fill();
+}
+
+// 円ブラシで塗る。グリッドは判定専用、見た目はオフスクリーンcanvasに丸で蓄積する
+function paintCircle(g, wx, wy, radiusPx, owner){
+  if (radiusPx<=0) return 0;
+  var r2=radiusPx*radiusPx;
+  var minCx=Math.max(0,Math.floor((wx-radiusPx)/CELL));
+  var maxCx=Math.min(GRID_W-1,Math.floor((wx+radiusPx)/CELL));
+  var minCy=Math.max(0,Math.floor((wy-radiusPx)/CELL));
+  var maxCy=Math.min(GRID_H-1,Math.floor((wy+radiusPx)/CELL));
+  var painted=0;
+  for (var cy=minCy; cy<=maxCy; cy++){
+    for (var cx=minCx; cx<=maxCx; cx++){
+      var idx=cy*GRID_W+cx;
+      var cell=g.grid[idx];
+      if (cell===9) continue;
+      var ccx=(cx+0.5)*CELL, ccy=(cy+0.5)*CELL;
+      var dx=ccx-wx, dy=ccy-wy;
+      if (dx*dx+dy*dy<=r2 && cell!==owner){
+        if (cell===1) g.counts[0]--; else if (cell===2) g.counts[1]--;
+        g.grid[idx]=owner;
+        if (owner===1) g.counts[0]++; else g.counts[1]++;
+        painted++;
+      }
+    }
+  }
+  if (painted>0){
+    var pl=g.players[owner-1], w=WEAPONS[pl.weapon];
+    pl.sp=Math.min(w.specialGaugeMax, pl.sp+painted);
+    pl.stats.paintedCells+=painted;
+  }
+  if (!g.headless) drawInkBrush(g,wx,wy,radiusPx,owner);
+  return painted;
+}
+
+function resolveWallCollision(p, wallsPx){
+  for (var i=0;i<wallsPx.length;i++){
+    var w=wallsPx[i];
+    var cx=clamp(p.x, w.x, w.x+w.w);
+    var cy=clamp(p.y, w.y, w.y+w.h);
+    var dx=p.x-cx, dy=p.y-cy;
+    var distSq=dx*dx+dy*dy;
+    if (distSq < p.radius*p.radius){
+      var dist=Math.sqrt(distSq);
+      if (dist>1e-4){
+        var push=(p.radius-dist);
+        p.x += dx/dist*push;
+        p.y += dy/dist*push;
+      } else {
+        // 中心がめり込んだ場合は最も浅い方向へ押し出す
+        var oL=p.x-w.x, oR=(w.x+w.w)-p.x, oT=p.y-w.y, oB=(w.y+w.h)-p.y;
+        var m=Math.min(oL,oR,oT,oB);
+        if (m===oL) p.x=w.x-p.radius;
+        else if (m===oR) p.x=w.x+w.w+p.radius;
+        else if (m===oT) p.y=w.y-p.radius;
+        else p.y=w.y+w.h+p.radius;
+      }
+    }
+  }
+  p.x=clamp(p.x, p.radius, WORLD_W-p.radius);
+  p.y=clamp(p.y, p.radius, WORLD_H-p.radius);
+}
+
+function applyDamage(g, target, dmg, ownerIdx){
+  if (!target.alive || isInvulnerable(target)) return;
+  target.hp -= dmg;
+  if (target.hp<=0){
+    target.hp=0; target.alive=false; target.respawnTimer=RESPAWN_TIME;
+    g.players[ownerIdx].stats.kills++;
+    paintCircle(g, target.x, target.y, DEATH_SPLAT_RADIUS, ownerIdx+1);
+    spawnParticles(g, target.x, target.y, ownerIdx, 18);
+  } else {
+    spawnParticles(g, target.x, target.y, ownerIdx, 6);
+  }
+}
+
+function spawnParticles(g, x, y, ownerIdx, n){
+  if (g.headless) return;
+  for (var i=0;i<n;i++){
+    var a=g.rng()*Math.PI*2, sp=40+g.rng()*160;
+    g.particles.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.35+g.rng()*0.3,age:0,owner:ownerIdx,r:2+g.rng()*3});
+  }
+}
+
+/* ==================== 5. 武器アクション ==================== */
+function fireShooterBullet(g, idx, p, weapon){
+  var spread=(g.rng()*2-1)*weapon.spread;
+  var ang=p.angle+spread;
+  g.bullets.push({
+    kind:'bullet', owner:idx,
+    x:p.x+Math.cos(p.angle)*p.radius, y:p.y+Math.sin(p.angle)*p.radius,
+    vx:Math.cos(ang)*weapon.bulletSpeed, vy:Math.sin(ang)*weapon.bulletSpeed,
+    damage:weapon.damage, range:weapon.range, traveled:0,
+    paintRadius:weapon.paintRadius*CELL, trailRadius:CELL*0.35, hitRadius:5,
+  });
+}
+
+function tryRollerSwing(g, idx, p, weapon){
+  if (p.swingCooldown>0) return;
+  if (p.ink < weapon.swingInkCost) return;
+  p.ink -= weapon.swingInkCost;
+  p.swingCooldown = weapon.swingCooldown;
+  var n=weapon.swingCount;
+  for (var i=0;i<n;i++){
+    var t = n<=1 ? 0 : (i/(n-1)-0.5);
+    var ang = p.angle + t*weapon.swingArc;
+    g.bullets.push({
+      kind:'bullet', owner:idx,
+      x:p.x+Math.cos(ang)*p.radius, y:p.y+Math.sin(ang)*p.radius,
+      vx:Math.cos(ang)*weapon.swingBulletSpeed, vy:Math.sin(ang)*weapon.swingBulletSpeed,
+      damage:weapon.swingDamage, range:weapon.swingRange, traveled:0,
+      paintRadius:weapon.swingPaintRadius*CELL, trailRadius:CELL*0.3, hitRadius:7,
+    });
+  }
+}
+
+function castChargerBeam(g, idx, p, weapon, frac, thin, dmgOverride){
+  var range = weapon.maxRange*frac;
+  var damage = (dmgOverride!=null?dmgOverride:weapon.maxDamage)*frac;
+  var stepLen = 8;
+  var steps = Math.ceil(range/stepLen);
+  var hit=false;
+  var target=g.players[1-idx];
+  var paintR = (thin? weapon.beamPaintRadius*0.6 : weapon.beamPaintRadius)*CELL;
+  var endX=p.x, endY=p.y;
+  for (var s=1; s<=steps; s++){
+    var d=s*stepLen; if (d>range) d=range;
+    var x=p.x+Math.cos(p.angle)*d, y=p.y+Math.sin(p.angle)*d;
+    endX=x; endY=y;
+    if (isWallAt(g,x,y)) break;
+    if (!hit && target.alive && !isInvulnerable(target)){
+      var dx=target.x-x, dy=target.y-y;
+      if (dx*dx+dy*dy <= (target.radius+5)*(target.radius+5)){
+        applyDamage(g, target, damage, idx);
+        hit=true;
+      }
+    }
+    if (s % 2 === 0) paintCircle(g, x, y, paintR, idx+1);
+    if (d>=range) break;
+  }
+  if (!g.headless) g.particles.push({beam:true, x1:p.x,y1:p.y,x2:endX,y2:endY,owner:idx,age:0,life:0.16});
+}
+
+function releaseChargerBeam(g, idx, p, weapon){
+  var frac = weapon.minChargeFrac + (1-weapon.minChargeFrac)*clamp(p.charge/weapon.maxCharge,0,1);
+  var cost = Math.min(p.ink, weapon.inkBase + weapon.inkPerFrac*frac);
+  if (p.ink < 8){ p.charge=0; return; }
+  p.ink -= cost;
+  castChargerBeam(g, idx, p, weapon, frac, false, null);
+  p.charge=0;
+}
+
+function explodeInkBomb(g, b){
+  var weapon=b.weapon;
+  paintCircle(g, b.x, b.y, weapon.special.radius*CELL, b.owner+1);
+  var target=g.players[1-b.owner];
+  if (target.alive && !isInvulnerable(target)){
+    var dx=target.x-b.x, dy=target.y-b.y;
+    var rr=weapon.special.radius*CELL;
+    if (dx*dx+dy*dy <= rr*rr) applyDamage(g, target, weapon.special.damage, b.owner);
+  }
+  spawnParticles(g, b.x, b.y, b.owner, 14);
+}
+
+function activateSpecial(g, idx){
+  var p=g.players[idx], weapon=WEAPONS[p.weapon];
+  if (!p.alive || p.specialActive || p.sp < weapon.specialGaugeMax) return;
+  p.sp = 0;
+  p.stats.specials++;
+  if (p.weapon==='shooter'){
+    var n=weapon.special.count;
+    for (var i=0;i<n;i++){
+      var t = n<=1?0:(i/(n-1)-0.5);
+      var ang = p.angle + t*(weapon.special.spreadDeg*Math.PI/180);
+      g.bullets.push({
+        kind:'inkbomb', owner:idx, x:p.x, y:p.y,
+        vx:Math.cos(ang)*weapon.special.speed, vy:Math.sin(ang)*weapon.special.speed,
+        age:0, fuse:weapon.special.fuse, weapon:weapon, stopped:false,
+      });
+    }
+  } else if (p.weapon==='roller'){
+    p.specialActive=true; p.specialTimer=weapon.special.duration;
+  } else if (p.weapon==='charger'){
+    p.specialActive=true; p.specialTimer=weapon.special.duration; p.specialFireCooldown=0;
+    p.charging=false; p.charge=0;
+  }
+}
+
+/* ==================== 6. 弾・プレイヤー更新 ==================== */
+function updateBullets(g, dt){
+  var arr=g.bullets;
+  for (var i=arr.length-1; i>=0; i--){
+    var b=arr[i];
+    var dead=false;
+    if (b.kind==='bullet'){
+      b.x += b.vx*dt; b.y += b.vy*dt;
+      b.traveled += Math.hypot(b.vx*dt, b.vy*dt);
+      if (isWallAt(g,b.x,b.y)){
+        paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1); dead=true;
+      } else {
+        if (b.trailRadius) paintCircle(g,b.x,b.y,b.trailRadius,b.owner+1);
+        var target=g.players[1-b.owner];
+        if (!dead && target.alive && !isInvulnerable(target)){
+          var dx=target.x-b.x, dy=target.y-b.y;
+          if (dx*dx+dy*dy <= (target.radius+(b.hitRadius||4))*(target.radius+(b.hitRadius||4))){
+            applyDamage(g,target,b.damage,b.owner);
+            paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1);
+            dead=true;
+          }
+        }
+        if (!dead && b.traveled>=b.range){
+          paintCircle(g,b.x,b.y,b.paintRadius,b.owner+1); dead=true;
+        }
+        if (!dead && (b.x<0||b.x>WORLD_W||b.y<0||b.y>WORLD_H)) dead=true;
+      }
+    } else if (b.kind==='inkbomb'){
+      b.age += dt;
+      if (!b.stopped){
+        b.x += b.vx*dt; b.y += b.vy*dt;
+        if (isWallAt(g,b.x,b.y) || b.x<0||b.x>WORLD_W||b.y<0||b.y>WORLD_H) b.stopped=true;
+      }
+      if (b.age >= b.fuse){ explodeInkBomb(g,b); dead=true; }
+    }
+    if (dead) arr.splice(i,1);
+  }
+}
+
+function updateParticles(g, dt){
+  if (g.headless) { g.particles.length=0; return; }
+  var arr=g.particles;
+  for (var i=arr.length-1;i>=0;i--){
+    var pt=arr[i];
+    pt.age += dt;
+    if (pt.beam){ if (pt.age>=pt.life) arr.splice(i,1); continue; }
+    pt.x += pt.vx*dt; pt.y += pt.vy*dt;
+    pt.vx *= 0.9; pt.vy *= 0.9;
+    if (pt.age>=pt.life) arr.splice(i,1);
+  }
+}
+
+function updatePlayer(g, idx, dt){
+  var p=g.players[idx], weapon=WEAPONS[p.weapon];
+  var opp=g.players[1-idx];
+
+  // 復活処理
+  if (!p.alive){
+    p.respawnTimer -= dt;
+    if (p.respawnTimer<=0){
+      p.alive=true; p.hp=100; p.x=SPAWN[idx].x; p.y=SPAWN[idx].y; p.invuln=INVULN_TIME;
+    }
+    p.fireCooldown=Math.max(0,p.fireCooldown-dt);
+    p.swingCooldown=Math.max(0,p.swingCooldown-dt);
+    p.contactCooldown=Math.max(0,p.contactCooldown-dt);
+    if (p.invuln>0) p.invuln=Math.max(0,p.invuln-dt);
+    return;
+  }
+  if (p.invuln>0) p.invuln=Math.max(0,p.invuln-dt);
+
+  var inp=p.input||{move:{x:0,y:0},aim:{x:0,y:0},fire:false,special:false};
+
+  // 移動
+  var mv=inp.move||{x:0,y:0};
+  var mvLen=Math.hypot(mv.x,mv.y);
+  var moveDir = mvLen>0.001 ? {x:mv.x/mvLen, y:mv.y/mvLen} : {x:0,y:0};
+  var speedFrac = Math.min(1,mvLen);
+  var terrainBefore = cellAt(g,p.x,p.y);
+  var terrainMul=1.0;
+  if (terrainBefore===(idx+1)) terrainMul=OWN_INK_MUL;
+  else if (terrainBefore===(2-idx)) terrainMul=ENEMY_INK_MUL;
+  var weaponMul=weapon.moveSpeedMul;
+  if (weapon.key==='charger' && p.charging) weaponMul *= CHARGER_CHARGE_MOVE_MUL;
+  if (p.specialActive && weapon.key==='roller') weaponMul *= weapon.special.speedMul;
+  var speed = BASE_SPEED*weaponMul*terrainMul*speedFrac;
+  p.x += moveDir.x*speed*dt;
+  p.y += moveDir.y*speed*dt;
+  resolveWallCollision(p, g.wallsPx);
+
+  // 地形によるインク回復
+  var terrainAfter = cellAt(g,p.x,p.y);
+  var onOwn = terrainAfter===(idx+1);
+  p.ink = Math.min(INK_MAX, p.ink + (onOwn?INK_REGEN_FAST:INK_REGEN_SLOW)*dt);
+
+  // 向き(エイム)
+  var av=inp.aim;
+  if (av && (Math.abs(av.x)>1e-3 || Math.abs(av.y)>1e-3)){
+    p.angle = Math.atan2(av.y, av.x);
+  }
+
+  // クールダウン
+  p.fireCooldown=Math.max(0,p.fireCooldown-dt);
+  p.swingCooldown=Math.max(0,p.swingCooldown-dt);
+  p.contactCooldown=Math.max(0,p.contactCooldown-dt);
+
+  // fire の押した/離した遷移(タップ判定に使う)
+  var firing=!!inp.fire;
+  if (firing && !p.wasFiring) p.fireHeldStart=g.time;
+  var releasedNow = (!firing && p.wasFiring);
+  var heldDur = releasedNow ? (g.time-p.fireHeldStart) : 0;
+
+  if (weapon.key==='shooter'){
+    if (firing && p.ink>0 && p.fireCooldown<=0){
+      p.fireCooldown = 1/weapon.fireRate;
+      p.ink = Math.max(0, p.ink-weapon.inkPerShot);
+      fireShooterBullet(g, idx, p, weapon);
+    }
+  } else if (weapon.key==='roller'){
+    if (releasedNow && heldDur < TAP_MAX_DURATION) tryRollerSwing(g, idx, p, weapon);
+    var moved = speed*dt;
+    if (moved > 0.4){
+      var rad = weapon.rollWidth*CELL/2 * (p.specialActive?weapon.special.widthMul:1);
+      paintCircle(g, p.x, p.y, rad, idx+1);
+    }
+    if (opp.alive && !isInvulnerable(opp)){
+      var ddx=opp.x-p.x, ddy=opp.y-p.y;
+      var rr=p.radius+opp.radius+2;
+      if (ddx*ddx+ddy*ddy <= rr*rr && p.contactCooldown<=0){
+        applyDamage(g, opp, weapon.contactDamage, idx);
+        p.contactCooldown=0.5;
+      }
+    }
+  } else if (weapon.key==='charger'){
+    if (p.specialActive){
+      p.charging=false; p.charge=0;
+      p.specialFireCooldown=Math.max(0,p.specialFireCooldown-dt);
+      if (firing && p.specialFireCooldown<=0){
+        p.specialFireCooldown = 1/weapon.special.rate;
+        castChargerBeam(g, idx, p, weapon, 1.0, true, weapon.special.damage);
+      }
+    } else {
+      if (firing && p.ink>=8){
+        p.charging=true;
+        p.charge=Math.min(weapon.maxCharge, p.charge+dt);
+      } else if (!firing){
+        p.charging=false;
+      }
+      if (releasedNow && p.charge>0){
+        releaseChargerBeam(g, idx, p, weapon);
+      }
+    }
+  }
+  p.wasFiring=firing;
+
+  // スペシャル
+  var specialPressed=!!inp.special;
+  if (specialPressed && !p.wasSpecial) activateSpecial(g, idx);
+  p.wasSpecial=specialPressed;
+
+  if (p.specialActive){
+    p.specialTimer -= dt;
+    if (p.specialTimer<=0){ p.specialActive=false; }
+  }
+}
+
+function checkRoundEnd(g){
+  if (g.remaining>1e-6) return; // 浮動小数点誤差でちょうど0にならないことがあるため許容誤差を設ける
+  g.remaining=0;
+  g.phase='roundResult';
+  var totalPlayable = GRID_W*GRID_H - g.wallCount;
+  var pct1 = g.counts[0]/totalPlayable*100;
+  var pct2 = g.counts[1]/totalPlayable*100;
+  var winnerIdx = pct1>pct2 ? 0 : (pct2>pct1 ? 1 : null);
+  if (winnerIdx!==null) g.seriesScore[winnerIdx]++;
+  g.roundResults.push({pct1:pct1, pct2:pct2, winnerIdx:winnerIdx});
+  g.lastRoundLoserIdx = winnerIdx===null ? null : (1-winnerIdx);
+  g.lastRoundPct=[pct1,pct2];
+  g.seriesDone = g.seriesScore[0]>=WINS_NEEDED || g.seriesScore[1]>=WINS_NEEDED;
+  if (!g.headless) onRoundEndUI(g);
+}
+
+function stepGame(g, dt){
+  g.time += dt;
+  if (g.phase==='countdown'){
+    g.countdown -= dt;
+    if (!g.headless) updateCountdownUI(g);
+    if (g.countdown<=0){ g.phase='playing'; g.remaining=g.duration; if (!g.headless) onPlayStartUI(g); }
+    return;
+  }
+  if (g.phase!=='playing') return;
+  g.remaining -= dt;
+  updateInputsForTick(g);
+  updatePlayer(g,0,dt);
+  updatePlayer(g,1,dt);
+  updateBullets(g,dt);
+  updateParticles(g,dt);
+  checkRoundEnd(g);
+}
+
+/* ==================== 7. ボットAI ==================== */
+var BOT_DIRS = (function(){
+  var arr=[];
+  for (var i=0;i<8;i++){ var a=i/8*Math.PI*2; arr.push({x:Math.cos(a), y:Math.sin(a)}); }
+  return arr;
+})();
+
+function hasLineOfSight(g, x1,y1,x2,y2){
+  var d=Math.hypot(x2-x1,y2-y1);
+  var steps=Math.max(1,Math.floor(d/(CELL*1.2)));
+  for (var i=1;i<steps;i++){
+    var t=i/steps;
+    if (isWallAt(g, x1+(x2-x1)*t, y1+(y2-y1)*t)) return false;
+  }
+  return true;
+}
+
+// 周囲を8方向サンプリングして「未塗り・敵色」が多い方向を選ぶ
+function pickCoverageDir(g, idx, p, preferOwn){
+  var best=null, bestScore=-Infinity;
+  var look=4*CELL;
+  for (var i=0;i<BOT_DIRS.length;i++){
+    var d=BOT_DIRS[i];
+    var sx=p.x+d.x*look, sy=p.y+d.y*look;
+    if (sx<CELL||sx>WORLD_W-CELL||sy<CELL||sy>WORLD_H-CELL || isWallAt(g,sx,sy)){
+      continue;
+    }
+    var score=0;
+    for (var oy=-1; oy<=1; oy++){
+      for (var ox=-1; ox<=1; ox++){
+        var cell=cellAt(g, sx+ox*CELL, sy+oy*CELL);
+        if (cell===9) continue;
+        if (preferOwn){
+          score += cell===(idx+1) ? 1 : 0;
+        } else {
+          if (cell===0) score += 1;
+          else if (cell===(2-idx)) score += 1.4;
+        }
+      }
+    }
+    score += (g.rng()-0.5)*3*(1-CONFIG.BOT_SKILL);
+    if (score>bestScore){ bestScore=score; best=d; }
+  }
+  return best || {x:0,y: idx===0?-1:1};
+}
+
+function botAimJitter(g, ang){
+  var spread=(1-CONFIG.BOT_SKILL)*0.35;
+  return ang + (g.rng()*2-1)*spread;
+}
+
+function botDecide(g, idx){
+  var p=g.players[idx], opp=g.players[1-idx], weapon=WEAPONS[p.weapon];
+  var mem=p.botMem;
+  var input={move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false};
+  if (!p.alive) return input;
+
+  var distToOpp=Math.hypot(opp.x-p.x, opp.y-p.y);
+  var los = opp.alive && hasLineOfSight(g,p.x,p.y,opp.x,opp.y);
+
+  if (g.time >= mem.nextDecision){
+    mem.nextDecision = g.time + 0.1 + (1-CONFIG.BOT_SKILL)*0.25 + g.rng()*0.12;
+    var lowInk = p.ink < 18;
+    if (weapon.key==='roller' && distToOpp < 5*CELL && opp.alive){
+      mem.dir = {x:(opp.x-p.x)/(distToOpp||1), y:(opp.y-p.y)/(distToOpp||1)};
+    } else if (weapon.key==='charger'){
+      var ideal=10*CELL;
+      if (distToOpp < ideal-2*CELL && opp.alive){
+        mem.dir = {x:(p.x-opp.x)/(distToOpp||1), y:(p.y-opp.y)/(distToOpp||1)};
+      } else {
+        mem.dir = pickCoverageDir(g, idx, p, lowInk);
+      }
+    } else {
+      mem.dir = pickCoverageDir(g, idx, p, lowInk);
+    }
+  }
+  input.move = { x: mem.dir.x*(0.7+0.3*g.rng()), y: mem.dir.y*(0.7+0.3*g.rng()) };
+
+  if (weapon.key==='shooter'){
+    if (los && distToOpp < weapon.range*0.95){
+      var ang=Math.atan2(opp.y-p.y, opp.x-p.x);
+      ang = botAimJitter(g, ang);
+      input.aim={x:Math.cos(ang), y:Math.sin(ang)};
+      input.fire = p.ink>0;
+    } else {
+      input.aim = {x:mem.dir.x, y:mem.dir.y};
+      input.fire = p.ink>10;
+    }
+  } else if (weapon.key==='roller'){
+    input.aim = {x:mem.dir.x, y:mem.dir.y};
+    var meleeR = p.radius+opp.radius+40;
+    if (opp.alive && distToOpp < meleeR && p.swingCooldown<=0){
+      var swAng=Math.atan2(opp.y-p.y, opp.x-p.x);
+      input.aim={x:Math.cos(swAng),y:Math.sin(swAng)};
+      mem.swingUntil = g.time+FIXED_DT*1.5;
+    }
+    input.fire = !!(mem.swingUntil && g.time < mem.swingUntil);
+  } else if (weapon.key==='charger'){
+    if (p.specialActive){
+      if (los){
+        var a2=Math.atan2(opp.y-p.y,opp.x-p.x);
+        input.aim={x:Math.cos(a2),y:Math.sin(a2)};
+        input.fire=true;
+      } else {
+        input.aim={x:mem.dir.x,y:mem.dir.y};
+        input.fire=g.rng()<0.5;
+      }
+    } else if (p.charging){
+      input.fire = g.time < (mem.chargeReleaseAt||0);
+      var tgtAng = los ? Math.atan2(opp.y-p.y,opp.x-p.x) : mem.chargeAng;
+      input.aim = {x:Math.cos(tgtAng), y:Math.sin(tgtAng)};
+      if (!input.fire) { input.aim = {x:Math.cos(mem.chargeAng), y:Math.sin(mem.chargeAng)}; }
+    } else {
+      var wantCharge=false, ang3=mem.dir.x||mem.dir.y ? Math.atan2(mem.dir.y,mem.dir.x) : p.angle;
+      if (los && distToOpp < weapon.maxRange && distToOpp > 3*CELL){
+        wantCharge=true; ang3=Math.atan2(opp.y-p.y,opp.x-p.x);
+      } else if (!mem.nextPaintShot || g.time>=mem.nextPaintShot){
+        // 敵がいなければマップの長辺(縦)に沿って長いビームで塗る
+        wantCharge=true;
+        var targetY = p.y < WORLD_H/2 ? WORLD_H-CELL : CELL;
+        var targetX = clamp(p.x + (g.rng()*2-1)*CELL*8, CELL, WORLD_W-CELL);
+        ang3 = Math.atan2(targetY-p.y, targetX-p.x);
+        mem.nextPaintShot = g.time + 1.2 + g.rng()*1.0;
+      }
+      if (wantCharge && p.ink>=8){
+        input.fire=true;
+        input.aim={x:Math.cos(ang3), y:Math.sin(ang3)};
+        mem.chargeAng = botAimJitter(g, ang3);
+        mem.chargeReleaseAt = g.time + 0.4+CONFIG.BOT_SKILL*0.7*(0.6+g.rng()*0.4);
+      }
+    }
+  }
+
+  if (p.sp>=weapon.specialGaugeMax && !p.specialActive){
+    var chance = (opp.alive && distToOpp<12*CELL) ? 0.4 : 0.03;
+    if (g.rng() < chance) input.special=true;
+  }
+  return input;
+}
+
+/* ==================== 8. 入力(タッチ / キーボード・マウス フォールバック) ==================== */
+var touchState = {};       // pointerId -> {player,kind,anchorX,anchorY,curX,curY}
+var specialPulse = {1:false, 2:false};
+var keysDown = {};
+var mouseState = {x:0,y:0,down:false};
+
+function setupInput(){
+  document.querySelectorAll('.padzone').forEach(function(zone){
+    var player=+zone.dataset.player, kind=zone.dataset.kind;
+    zone.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      try{ zone.setPointerCapture(e.pointerId); }catch(err){}
+      touchState[e.pointerId] = {player:player, kind:kind, anchorX:e.clientX, anchorY:e.clientY, curX:e.clientX, curY:e.clientY};
+      updateStickVisual(e.pointerId, true);
+    }, {passive:false});
+    zone.addEventListener('pointermove', function(e){
+      var s=touchState[e.pointerId]; if (!s) return;
+      e.preventDefault();
+      s.curX=e.clientX; s.curY=e.clientY;
+      updateStickVisual(e.pointerId, true);
+    }, {passive:false});
+    function release(e){
+      if (!touchState[e.pointerId]) return;
+      delete touchState[e.pointerId];
+      updateStickVisual(e.pointerId, false);
+    }
+    zone.addEventListener('pointerup', release);
+    zone.addEventListener('pointercancel', release);
+  });
+  document.querySelectorAll('.specialBtn').forEach(function(btn){
+    var player=+btn.dataset.player;
+    btn.addEventListener('pointerdown', function(e){
+      e.preventDefault(); e.stopPropagation();
+      specialPulse[player]=true;
+    }, {passive:false});
+  });
+  window.addEventListener('keydown', function(e){
+    keysDown[e.key.toLowerCase()]=true;
+    if (['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(e.key.toLowerCase())>=0) e.preventDefault();
+  });
+  window.addEventListener('keyup', function(e){ keysDown[e.key.toLowerCase()]=false; });
+  // マウスの位置・ボタン状態はpointerイベントで追う。
+  // padzone側でpointerdownをpreventDefault()すると後続のmousedown/upが抑止されてしまうため。
+  window.addEventListener('pointermove', function(e){ if (e.pointerType==='mouse'){ mouseState.x=e.clientX; mouseState.y=e.clientY; } });
+  window.addEventListener('pointerdown', function(e){ if (e.pointerType==='mouse' && e.button===0) mouseState.down=true; });
+  window.addEventListener('pointerup', function(e){ if (e.pointerType==='mouse' && e.button===0) mouseState.down=false; });
+  window.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+}
+
+// フローティングスティックの見た目(簡易)
+var stickEls = {};
+function updateStickVisual(pid, show){
+  var s=touchState[pid];
+  var wrap=stickEls[pid];
+  if (!show || !s){
+    if (wrap){ wrap.base.style.display='none'; wrap.knob.style.display='none'; }
+    return;
+  }
+  if (!wrap){
+    var base=document.createElement('div'); base.className='stick';
+    var knob=document.createElement('div'); knob.className='stick knob';
+    document.body.appendChild(base); document.body.appendChild(knob);
+    wrap=stickEls[pid]={base:base,knob:knob};
+  }
+  wrap.base.style.display='block'; wrap.knob.style.display='block';
+  wrap.base.style.left=s.anchorX+'px'; wrap.base.style.top=s.anchorY+'px';
+  var dx=s.curX-s.anchorX, dy=s.curY-s.anchorY;
+  var dist=Math.min(STICK_RADIUS, Math.hypot(dx,dy));
+  var ang=Math.atan2(dy,dx);
+  wrap.knob.style.left=(s.anchorX+Math.cos(ang)*dist)+'px';
+  wrap.knob.style.top=(s.anchorY+Math.sin(ang)*dist)+'px';
+}
+
+function screenToWorld(canvas, clientX, clientY){
+  var rect=canvas.getBoundingClientRect();
+  return {
+    x: (clientX-rect.left)/rect.width*WORLD_W,
+    y: (clientY-rect.top)/rect.height*WORLD_H,
+  };
+}
+
+function readTouchChannel(playerNum, kind){
+  for (var id in touchState){
+    var s=touchState[id];
+    if (s.player!==playerNum || s.kind!==kind) continue;
+    var dx=s.curX-s.anchorX, dy=s.curY-s.anchorY;
+    if (playerNum===2){ dx=-dx; dy=-dy; } // P2は180度回転して解釈する
+    return {dx:dx, dy:dy};
+  }
+  return null;
+}
+
+function readLiveInput(i, game){
+  var playerNum=i+1;
+  var move={x:0,y:0}, aim=null, fire=false;
+
+  var mCh=readTouchChannel(playerNum,'move');
+  if (mCh){
+    var dist=Math.hypot(mCh.dx,mCh.dy);
+    if (dist>3){ var frac=Math.min(1,dist/STICK_RADIUS); move={x:mCh.dx/dist*frac, y:mCh.dy/dist*frac}; }
+  }
+  var aCh=readTouchChannel(playerNum,'aim');
+  if (aCh){
+    fire=true;
+    var adist=Math.hypot(aCh.dx,aCh.dy);
+    if (adist>AIM_DEADZONE) aim={x:aCh.dx/adist, y:aCh.dy/adist};
+  }
+
+  if (move.x===0 && move.y===0){
+    var km = i===0 ? readKeysMove(['w','a','s','d']) : readKeysMove(['arrowup','arrowleft','arrowdown','arrowright']);
+    if (km) move=km;
+  }
+  if (!aCh){
+    if (i===0){
+      var canvas=document.getElementById('gameCanvas');
+      if (mouseState.down){
+        fire=true;
+        var wp=screenToWorld(canvas, mouseState.x, mouseState.y);
+        var dx=wp.x-game.players[0].x, dy=wp.y-game.players[0].y;
+        var d=Math.hypot(dx,dy);
+        if (d>2) aim={x:dx/d, y:dy/d};
+      }
+    } else {
+      var ix=0, iy=0;
+      if (keysDown['i']) iy-=1;
+      if (keysDown['k']) iy+=1;
+      if (keysDown['j']) ix-=1;
+      if (keysDown['l']) ix+=1;
+      if (ix||iy){
+        fire=true;
+        var l=Math.hypot(ix,iy);
+        aim={x:ix/l, y:iy/l};
+      }
+    }
+  }
+
+  var special=false;
+  var key = (i===0)?'e':'o';
+  if (specialPulse[playerNum]){ special=true; specialPulse[playerNum]=false; }
+  if (!special && keysDown[key] && !keysDown['_prev_'+key]){ special=true; }
+  keysDown['_prev_'+key]=!!keysDown[key];
+
+  return {move:move, aim: aim||{x:0,y:0}, fire:fire, special:special};
+}
+
+function readKeysMove(keys){ // [up,left,down,right]
+  var x=0,y=0;
+  if (keysDown[keys[0]]) y-=1;
+  if (keysDown[keys[1]]) x-=1;
+  if (keysDown[keys[2]]) y+=1;
+  if (keysDown[keys[3]]) x+=1;
+  if (!x&&!y) return null;
+  var l=Math.hypot(x,y);
+  return {x:x/l, y:y/l};
+}
+
+function updateInputsForTick(g){
+  for (var i=0;i<2;i++){
+    var p=g.players[i];
+    if (p.forced) p.input = p.forced;
+    else if (p.isBot) p.input = botDecide(g,i);
+    else if (g.live) p.input = readLiveInput(i,g);
+    else p.input = {move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false};
+  }
+}
+
+/* ==================== 9. 描画 ==================== */
+function drawWalls(ctx, g){
+  ctx.fillStyle=COLOR.wall;
+  ctx.strokeStyle=COLOR.wallEdge;
+  ctx.lineWidth=2;
+  for (var i=0;i<g.wallsPx.length;i++){
+    var w=g.wallsPx[i];
+    ctx.fillRect(w.x,w.y,w.w,w.h);
+    ctx.strokeRect(w.x+1,w.y+1,w.w-2,w.h-2);
+  }
+}
+
+function drawChargeRings(ctx, g){
+  for (var i=0;i<2;i++){
+    var p=g.players[i];
+    if (p.weapon==='charger' && p.charging && p.alive){
+      var weapon=WEAPONS.charger;
+      var frac=clamp(p.charge/weapon.maxCharge,0,1);
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.radius+6+10*frac,0,Math.PI*2);
+      ctx.strokeStyle = frac>=1 ? '#ffe08a' : 'rgba(255,255,255,0.6)';
+      ctx.lineWidth=3;
+      ctx.stroke();
+    }
+  }
+}
+
+function drawBullets(ctx, g){
+  for (var i=0;i<g.bullets.length;i++){
+    var b=g.bullets[i];
+    ctx.fillStyle = b.owner===0 ? COLOR.p1 : COLOR.p2;
+    if (b.kind==='inkbomb'){
+      ctx.beginPath(); ctx.arc(b.x,b.y,7,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.5; ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(b.x,b.y,3.2,0,Math.PI*2); ctx.fill();
+    }
+  }
+}
+
+function drawParticles(ctx, g){
+  for (var i=0;i<g.particles.length;i++){
+    var pt=g.particles[i];
+    if (pt.beam){
+      var a=1-pt.age/pt.life;
+      ctx.strokeStyle = (pt.owner===0?'rgba(255,122,26,':'rgba(63,160,255,')+ (a*0.9) +')';
+      ctx.lineWidth=4*a+1;
+      ctx.beginPath(); ctx.moveTo(pt.x1,pt.y1); ctx.lineTo(pt.x2,pt.y2); ctx.stroke();
+      continue;
+    }
+    var alpha=1-pt.age/pt.life;
+    if (alpha<=0) continue;
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle = pt.owner===0?COLOR.p1:COLOR.p2;
+    ctx.beginPath(); ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+}
+
+function drawPlayer(ctx, g, idx){
+  var p=g.players[idx];
+  if (!p.alive) return;
+  var col = idx===0?COLOR.p1:COLOR.p2;
+  var dark = idx===0?COLOR.p1dark:COLOR.p2dark;
+  var flashing = p.invuln>0 && Math.floor(g.time*10)%2===0;
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.globalAlpha = flashing?0.45:1;
+  // ヒレ(むき)
+  ctx.rotate(p.angle);
+  ctx.fillStyle=dark;
+  ctx.beginPath();
+  ctx.moveTo(p.radius*0.2, -p.radius*1.5);
+  ctx.lineTo(p.radius*1.7, 0);
+  ctx.lineTo(p.radius*0.2, p.radius*1.5);
+  ctx.closePath(); ctx.fill();
+  // 本体(丸いイカ)
+  ctx.beginPath();
+  ctx.fillStyle=col;
+  ctx.arc(0,0,p.radius,0,Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.5; ctx.stroke();
+  // 目
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(p.radius*0.25,-p.radius*0.35,2.6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.radius*0.25, p.radius*0.35,2.6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#101018';
+  ctx.beginPath(); ctx.arc(p.radius*0.5,-p.radius*0.35,1.2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.radius*0.5, p.radius*0.35,1.2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  if (p.specialActive && p.weapon==='roller'){
+    ctx.save();
+    ctx.strokeStyle='rgba(255,224,138,0.85)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+5,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function render(g){
+  var ctx=g.ctx;
+  if (!ctx) return;
+  ctx.clearRect(0,0,WORLD_W,WORLD_H);
+  ctx.fillStyle=COLOR.floor;
+  ctx.fillRect(0,0,WORLD_W,WORLD_H);
+  ctx.drawImage(g.inkCanvas,0,0,WORLD_W,WORLD_H);
+  drawWalls(ctx,g);
+  drawChargeRings(ctx,g);
+  drawBullets(ctx,g);
+  drawParticles(ctx,g);
+  drawPlayer(ctx,g,0);
+  drawPlayer(ctx,g,1);
+}
+
+/* ==================== 10. UI / 画面フロー ==================== */
+var activeLiveGame=null;
+var selState = { 1:'shooter', 2:'shooter', readyP1:false, readyP2:false };
+var urlOpts = {};
+
+function $(id){ return document.getElementById(id); }
+
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(function(el){ el.classList.remove('show'); });
+  if (id) $(id).classList.add('show');
+}
+
+function buildWeaponCards(){
+  [1,2].forEach(function(pn){
+    var row=document.querySelector('.weaponRow[data-select-player="'+pn+'"]');
+    row.innerHTML='';
+    Object.keys(WEAPONS).forEach(function(key){
+      var w=WEAPONS[key];
+      var btn=document.createElement('button');
+      btn.className='wCard'+(selState[pn]===key?' selected':'');
+      btn.dataset.weapon=key;
+      btn.innerHTML='<div class="wEmoji">'+w.emoji+'</div><div class="wName">'+w.name+'</div>';
+      btn.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        selState[pn]=key;
+        $('desc'+(pn===1?'P1':'P2')).textContent=w.name+':「'+w.desc+'」';
+        row.querySelectorAll('.wCard').forEach(function(c){ c.classList.toggle('selected', c.dataset.weapon===key); });
+      });
+      row.appendChild(btn);
+    });
+    $('desc'+(pn===1?'P1':'P2')).textContent=WEAPONS[selState[pn]].name+':「'+WEAPONS[selState[pn]].desc+'」';
+  });
+}
+
+function updateWeaponIcons(){
+  $('wIconP1').textContent=WEAPONS[activeLiveGame.players[0].weapon].emoji;
+  $('wIconP2').textContent=WEAPONS[activeLiveGame.players[1].weapon].emoji;
+}
+
+function onPlayStartUI(g){
+  $('countdownWrap').classList.add('hidden');
+  showPanel(null);
+}
+
+function updateCountdownUI(g){
+  $('countdownWrap').classList.remove('hidden');
+  var n = Math.ceil(g.countdown);
+  var txt = n<=0 ? 'GO!' : String(n);
+  if (g.countdown>3) txt='';
+  $('cdNumTop').textContent=txt;
+  $('cdNumBottom').textContent=txt;
+}
+
+function onRoundEndUI(g){
+  $('countdownWrap').classList.add('hidden');
+  $('bigCount').style.opacity=0;
+  var pct1=g.lastRoundPct[0].toFixed(1), pct2=g.lastRoundPct[1].toFixed(1);
+  $('wipeFillP1').style.width='50%';
+  $('wipeFillP2').style.width='50%';
+  $('rollerIcon').style.left='0%';
+  showPanel('panelResult');
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      $('wipeFillP1').style.width=g.lastRoundPct[0]+'%';
+      $('wipeFillP2').style.width=g.lastRoundPct[1]+'%';
+      $('rollerIcon').style.left=g.lastRoundPct[0]+'%';
+    });
+  });
+  var winnerIdx=g.roundResults[g.roundResults.length-1].winnerIdx;
+  var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">P1のかち!</span>' : '<span class="win2">P2のかち!</span>');
+  setTimeout(function(){
+    $('resultText').innerHTML = 'P1 '+pct1+'% / P2 '+pct2+'%<br>'+label;
+  }, 600);
+  // 左からP1の勝ち分、右からP2の勝ち分を塗る (5個の丸)
+  var dotsEl=$('seriesDots'); dotsEl.innerHTML='';
+  var left=g.seriesScore[0], right=g.seriesScore[1];
+  for (var j=0;j<5;j++){
+    var sp=document.createElement('span');
+    if (j<left) sp.className='p1';
+    else if (j>=5-right) sp.className='p2';
+    dotsEl.appendChild(sp);
+  }
+  $('resultNextBtn').textContent = g.seriesDone ? 'けっか へ' : 'つぎのラウンドへ';
+}
+
+function proceedFromResult(){
+  var g=activeLiveGame;
+  if (g.seriesDone){
+    var champ = g.seriesScore[0]>g.seriesScore[1] ? 1 : 2;
+    $('champTitle').innerHTML = 'P'+champ+' の ゆうしょう!<br><span style="font-size:0.55em;color:#9aa6cf;">('+g.seriesScore[0]+' - '+g.seriesScore[1]+')</span>';
+    showPanel('panelSeries');
+  } else {
+    startRound(g, g.lastRoundLoserIdx);
+    updateWeaponIcons();
+    showPanel(null);
+  }
+}
+
+function backToSelect(){
+  showPanel('panelSelect');
+  selState.readyP1=false; selState.readyP2=false;
+  $('readyP1').classList.remove('on'); $('readyP1').textContent='じゅんび OK';
+  $('readyP2').classList.remove('on'); $('readyP2').textContent='じゅんび OK';
+}
+
+function maybeStartCountdown(){
+  if (selState.readyP1 && selState.readyP2){
+    startSeries(activeLiveGame, selState[1], selState[2], Date.now()&0xffffffff, false, false, urlOpts.duration);
+    updateWeaponIcons();
+    showPanel(null);
+  }
+}
+
+function updateHUD(g){
+  var totalPlayable=GRID_W*GRID_H-g.wallCount;
+  for (var i=0;i<2;i++){
+    var p=g.players[i], pn=i+1, w=WEAPONS[p.weapon];
+    $('inkFillP'+pn).style.width=Math.max(0,p.ink)+'%';
+    var spPct=Math.min(100, p.sp/w.specialGaugeMax*100);
+    $('spFillP'+pn).style.width=spPct+'%';
+    $('spBarP'+pn).classList.toggle('full', spPct>=100);
+    $('spBtnP'+pn).classList.toggle('ready', spPct>=100);
+    $('hpP'+pn).textContent=Math.ceil(p.hp);
+  }
+  if (g.phase==='playing'){
+    var t=Math.max(0,Math.ceil(g.remaining));
+    $('timerTop').textContent=t;
+    $('timerBottom').textContent=t;
+    var bc=$('bigCount'), ft=$('flashTint');
+    if (g.remaining<=10 && g.remaining>0){
+      bc.style.opacity=1;
+      bc.textContent=String(Math.ceil(g.remaining));
+      ft.style.opacity = 0.12*Math.abs(Math.sin(g.time*6));
+    } else {
+      bc.style.opacity=0; ft.style.opacity=0;
+    }
+  } else {
+    $('flashTint').style.opacity=0;
+  }
+}
+
+function resizeCanvas(){
+  var area=$('mapArea');
+  var availW=area.clientWidth, availH=area.clientHeight;
+  var targetAspect=GRID_W/GRID_H;
+  var cw,ch;
+  if (availW/availH > targetAspect){ ch=availH; cw=ch*targetAspect; } else { cw=availW; ch=cw/targetAspect; }
+  var canvas=$('gameCanvas');
+  canvas.style.width=cw+'px'; canvas.style.height=ch+'px';
+  var scale=Math.min(window.devicePixelRatio||1, 2);
+  canvas.width=Math.round(cw*scale); canvas.height=Math.round(ch*scale);
+  var ctx=canvas.getContext('2d');
+  ctx.setTransform(canvas.width/WORLD_W,0,0,canvas.height/WORLD_H,0,0);
+  if (activeLiveGame) activeLiveGame.ctx=ctx;
+}
+
+/* ==================== 11. ヘッドレスシミュレーション & 公開API ==================== */
+function simulate(opts){
+  opts=opts||{};
+  var p1=opts.p1||'shooter', p2=opts.p2||'roller';
+  var duration=opts.duration||ROUND_DURATION_DEFAULT;
+  var g=createGame({headless:true, live:false, seed:opts.seed||1});
+  g.duration=duration;
+  configurePlayers(g, p1, p2, opts.bot1!==false, opts.bot2!==false);
+  startRound(g, null);
+  g.phase='playing'; g.remaining=duration; g.countdown=0;
+  var steps=Math.round(duration/FIXED_DT);
+  for (var i=0;i<steps;i++) stepGame(g, FIXED_DT);
+  var rr = g.roundResults[g.roundResults.length-1] || {pct1:0,pct2:0,winnerIdx:null};
+  return {
+    p1Pct: rr.pct1, p2Pct: rr.pct2,
+    winner: rr.winnerIdx===0?'p1':(rr.winnerIdx===1?'p2':'draw'),
+    splats: [g.players[0].stats.paintedCells, g.players[1].stats.paintedCells],
+    specials: [g.players[0].stats.specials, g.players[1].stats.specials],
+    inkPainted: [g.counts[0], g.counts[1]],
+  };
+}
+
+function startMatch(opts){
+  opts=opts||{};
+  showPanel(null);
+  $('countdownWrap').classList.add('hidden');
+  selState[1]=opts.p1||selState[1]||'shooter';
+  selState[2]=opts.p2||selState[2]||'shooter';
+  startSeries(activeLiveGame, selState[1], selState[2], opts.seed!=null?opts.seed:1,
+    opts.bot1!==undefined?opts.bot1:false, opts.bot2!==undefined?opts.bot2:false, opts.duration);
+  updateWeaponIcons();
+}
+
+function getState(){
+  var g=activeLiveGame;
+  if (!g) return null;
+  function pub(p){
+    return { x:p.x, y:p.y, hp:p.hp, ink:p.ink, sp:p.sp, alive:p.alive, weapon:p.weapon, specialActive:p.specialActive };
+  }
+  var totalPlayable=GRID_W*GRID_H-g.wallCount;
+  return {
+    phase:g.phase, remaining:g.remaining, seriesScore:g.seriesScore.slice(),
+    p1:pub(g.players[0]), p2:pub(g.players[1]),
+    pctP1:g.counts[0]/totalPlayable*100, pctP2:g.counts[1]/totalPlayable*100,
+  };
+}
+
+function setInput(player, inputObj){
+  var g=activeLiveGame; if (!g) return;
+  var idx=player-1; if (idx!==0 && idx!==1) return;
+  if (inputObj==null){ g.players[idx].forced=null; return; }
+  g.players[idx].forced = {
+    move: inputObj.move||{x:0,y:0},
+    aim: inputObj.aim||{x:0,y:0},
+    fire: !!inputObj.fire,
+    special: !!inputObj.special,
+  };
+}
+
+window.SPLOTEEN = {
+  WEAPONS: WEAPONS,
+  CONFIG: CONFIG,
+  simulate: simulate,
+  startMatch: startMatch,
+  setInput: setInput,
+  getState: getState,
+};
+
+/* ==================== 12. 起動処理・メインループ ==================== */
+function parseURLOpts(){
+  var sp=new URLSearchParams(location.search);
+  var o={};
+  if (sp.has('p1')) o.p1=sp.get('p1');
+  if (sp.has('p2')) o.p2=sp.get('p2');
+  o.auto = sp.get('auto')==='1';
+  o.bots = sp.get('bots')==='1';
+  o.bot1 = sp.get('bot1')==='1' || o.bots;
+  o.bot2 = sp.get('bot2')==='1' || o.bots;
+  o.seed = sp.has('seed') ? parseInt(sp.get('seed'),10) : 1;
+  o.duration = sp.has('duration') ? parseFloat(sp.get('duration')) : ROUND_DURATION_DEFAULT;
+  return o;
+}
+
+function boot(){
+  activeLiveGame = createGame({headless:false, live:true, seed:1});
+  activeLiveGame.duration = ROUND_DURATION_DEFAULT;
+  buildWeaponCards();
+  setupInput();
+
+  $('panelTitle').addEventListener('pointerdown', function(){ showPanel('panelSelect'); });
+  $('readyP1').addEventListener('pointerdown', function(e){ e.preventDefault(); selState.readyP1=!selState.readyP1; this.classList.toggle('on', selState.readyP1); this.textContent = selState.readyP1?'じゅんび かんりょう':'じゅんび OK'; maybeStartCountdown(); });
+  $('readyP2').addEventListener('pointerdown', function(e){ e.preventDefault(); selState.readyP2=!selState.readyP2; this.classList.toggle('on', selState.readyP2); this.textContent = selState.readyP2?'じゅんび かんりょう':'じゅんび OK'; maybeStartCountdown(); });
+  $('resultNextBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); proceedFromResult(); });
+  $('seriesNextBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); backToSelect(); });
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  urlOpts = parseURLOpts();
+  if (urlOpts.auto){
+    activeLiveGame.duration = urlOpts.duration;
+    startSeries(activeLiveGame, urlOpts.p1||'shooter', urlOpts.p2||'roller', urlOpts.seed, urlOpts.bot1, urlOpts.bot2, urlOpts.duration);
+    updateWeaponIcons();
+    showPanel(null);
+  }
+
+  var lastT=null;
+  function rafLoop(t){
+    requestAnimationFrame(rafLoop);
+    if (lastT===null) lastT=t;
+    var dt=(t-lastT)/1000; lastT=t;
+    dt=Math.min(dt,0.25);
+    var g=activeLiveGame;
+    g.acc=(g.acc||0)+dt;
+    var steps=0;
+    while (g.acc>=FIXED_DT && steps<8){ stepGame(g,FIXED_DT); g.acc-=FIXED_DT; steps++; }
+    updateHUD(g);
+    render(g);
+  }
+  requestAnimationFrame(rafLoop);
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
