@@ -25,9 +25,8 @@
   }
   #app{ position:fixed; inset:0; display:flex; flex-direction:column; }
   /* HUDは上下端の薄い帯だけ。操作パッドはマップに重ねるオーバーレイにする */
-  /* 右側の余白はSPボタン(自分側の縁・エイム側の角、幅54px+右10pxの位置に絶対配置)と文字が重ならないよう広めに確保する。
-     hudTopは要素ごと180度回転するため、この「右」の余白は画面上では左側(SPボタン側)に来る */
-  .hud{ flex:0 0 48px; height:48px; min-height:48px; display:flex; align-items:center; gap:6px; padding:3px 72px 3px 10px; position:relative; z-index:6; background:rgba(5,8,18,0.55); }
+  /* サブ/SPボタンはHUD帯より内側(マップ側)に置いてあるので、HUDの余白は左右そろえた最小限でよい */
+  .hud{ flex:0 0 48px; height:48px; min-height:48px; display:flex; align-items:center; gap:6px; padding:3px 10px; position:relative; z-index:6; background:rgba(5,8,18,0.55); }
   .hud.hudTop{ transform:rotate(180deg); }
   #mapArea{ position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#05070f; }
   /* 操作ゾーンのオーバーレイ: 自分側の縁から画面高さの30%、マップに重ねて表示する */
@@ -56,14 +55,14 @@
   /* サブ/スペシャルのボタンは「下からインクがたまっていく」ゲージそのものにする(第10ラウンド)。
      ためが満タンになるまでの進み具合を .btnFill の高さ(0〜100%)で見せ、満タンになったら光って脈打つ */
   .specialBtn{
-    position:absolute; right:10px; bottom:10px;
+    position:absolute; right:10px; bottom:58px; /* HUD帯(48px)の上に出す */
     width:54px; height:54px; border-radius:50%; border:2px solid #ffe08a; background:#3a2e08;
     color:#ffe08a; font-weight:700; font-size:12px; line-height:1.2; padding:0;
     overflow:hidden; box-shadow:0 0 0 0 rgba(255,204,77,0);
   }
   .specialBtn.ready{ color:#231600; animation:spReady 0.7s ease-in-out infinite; }
   .subBtn{
-    position:absolute; right:74px; bottom:10px;
+    position:absolute; right:74px; bottom:58px; /* HUD帯(48px)の上に出す */
     width:54px; height:54px; border-radius:50%; border:2px solid #7ad6ff; background:#0e2a3a;
     color:#eafcff; font-weight:700; font-size:20px; line-height:1; padding:0; opacity:0.9;
     overflow:hidden; box-shadow:0 0 0 0 rgba(122,214,255,0);
@@ -91,14 +90,11 @@
   .wIcon{ font-size:22px; width:28px; text-align:center; flex:0 0 auto; }
   .barCol{ display:flex; flex-direction:column; gap:3px; flex:1 1 auto; min-width:0; }
   .bar{ position:relative; height:9px; border-radius:5px; background:rgba(255,255,255,0.12); overflow:hidden; flex:1 1 auto; border:1px solid rgba(255,255,255,0.18); }
-  .bar.sp{ flex:0 0 40%; height:12px; }
   .bar i{ position:absolute; left:0; top:0; bottom:0; width:0%; display:block; border-radius:5px; }
   .hud[data-player="1"] .bar.hp i{ background:linear-gradient(90deg,#8a1d1d,#ff5252); }
   .hud[data-player="2"] .bar.hp i{ background:linear-gradient(90deg,#8a1d1d,#ff5252); }
   .hud[data-player="1"] .bar.ink i{ background:linear-gradient(90deg,var(--p1dark),var(--p1)); }
   .hud[data-player="2"] .bar.ink i{ background:linear-gradient(90deg,var(--p2dark),var(--p2)); }
-  .bar.sp i{ background:linear-gradient(90deg,#ffb238,#ffe08a); }
-  .bar.sp.full i{ box-shadow:0 0 10px 2px #ffe08a; }
   .barRow{ display:flex; align-items:center; gap:8px; flex:1 1 auto; min-width:0; }
   .hpTxt{ font-size:13px; font-weight:700; color:var(--sub); flex:0 0 auto; width:128px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .killTxt{ font-size:15px; font-weight:700; color:#ffcf7a; flex:0 0 auto; white-space:nowrap; }
@@ -250,7 +246,7 @@
     <canvas class="hudFace" id="hudFaceP2" width="64" height="64"></canvas>
     <div class="wIcon" id="wIconP2">🔫</div>
     <div class="barCol">
-      <div class="barRow"><div class="bar hp"><i id="hpFillP2"></i></div><div class="bar sp" id="spBarP2"><i id="spFillP2"></i></div></div>
+      <div class="barRow"><div class="bar hp"><i id="hpFillP2"></i></div></div>
       <div class="barRow"><div class="bar ink"><i id="inkFillP2"></i></div><div class="hpTxt" id="hpP2">100</div><div class="killTxt" id="killP2">たおした 0</div></div>
     </div>
     <div class="hudToast" id="hudToastP2"></div>
@@ -284,7 +280,7 @@
   <div class="hud hudBottom" id="hudP1" data-player="1">
     <div class="wIcon" id="wIconP1">🔫</div>
     <div class="barCol">
-      <div class="barRow"><div class="bar hp"><i id="hpFillP1"></i></div><div class="bar sp" id="spBarP1"><i id="spFillP1"></i></div></div>
+      <div class="barRow"><div class="bar hp"><i id="hpFillP1"></i></div></div>
       <div class="barRow"><div class="bar ink"><i id="inkFillP1"></i></div><div class="hpTxt" id="hpP1">100</div><div class="killTxt" id="killP1">たおした 0</div></div>
     </div>
     <div class="hudToast" id="hudToastP1"></div>
@@ -3363,8 +3359,6 @@ function updateHUD(g){
     var p=g.players[i], pn=i+1;
     $('inkFillP'+pn).style.width=Math.max(0,p.ink)+'%';
     var spPct=Math.min(100, p.sp/SPECIAL_GAUGE_MAX*100);
-    $('spFillP'+pn).style.width=spPct+'%';
-    $('spBarP'+pn).classList.toggle('full', spPct>=100);
     $('spBtnP'+pn).classList.toggle('ready', spPct>=100 || p.specialActive);
     // スペシャルのため具合はボタンの下から色がのぼる(発動中は満タン表示のまま)
     $('spBtnFillP'+pn).style.height = (p.specialActive ? 100 : spPct) + '%';
