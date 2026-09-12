@@ -421,8 +421,8 @@ var WEAPONS = {
     maxRange:0.7*WORLD_H,   // フルチャージ時の射程
     maxDamage:100,
     minChargeFrac:0.45,      // 最低保証チャージ割合
-    beamPaintRadius:1.4,     // 通過線の塗り半径(セル)
-    inkBase:15, inkPerFrac:35, // ボット用。人間用は human.inkBase / human.inkPerFrac
+    beamPaintRadius:2.0,     // 通過線の塗り半径(セル)(第6ラウンド: 実験計画法の結果 1.4→2.0)
+    inkBase:8, inkPerFrac:16, // ボット用 (第6ラウンド: 実験計画法の結果 15/35→8/16)。人間用は human.inkBase / human.inkPerFrac
     human:{ inkBase:6, inkPerFrac:12 }, // 第6ラウンド: 人間専用のインクコスト
   },
   bucket:{
@@ -441,7 +441,7 @@ var WEAPONS = {
     moveSpeedMul:1.45,       // 実機フィードバックでローラーとの差別化のため1.35→1.45(最速をさらに強調)
     enemyInkMul:0.75,        // フデだけ相手インク上の減速を緩める(他武器のENEMY_INK_MUL 0.55の代わりに0.75)
     trailWidth:2.0,          // 移動時に塗る幅(セル。実機フィードバックで2.3→2.0、ローラーとの塗り幅差別化)
-    swingCount:4, swingBulletSpeed:820, swingRange:150, swingDamage:18, swingPaintRadius:0.8,
+    swingCount:4, swingBulletSpeed:820, swingRange:150, swingDamage:10, swingPaintRadius:0.8,
     swingInkCost:6, swingCooldown:0.22, // ふりはらい: エイムパッドを押している間0.22秒ごとに自動連続(タップ単発から変更)。飛沫4発・1発18ダメージ・射程150px、1振りインク6
     human:{ brushCostPerCell:0.06 }, // 第6ラウンド: 人間専用(走り塗りは新規セル1つにつきこのインクを消費。自陣の上は新規扱いされないので無料)
   },
