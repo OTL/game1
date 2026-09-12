@@ -261,7 +261,7 @@ var STICK_RADIUS=46;            // スティック最大半径(px, 実画面px�
 var AIM_DEADZONE=8;
 var TAP_MAX_DURATION=0.25;      // タップ判定の最大長押し時間(秒)
 
-var CONFIG = { BOT_SKILL: 0.6, ADVANCE_BIAS: 0.6 }; // BOT_SKILL:0〜1(大きいほど強い) / ADVANCE_BIAS:塗り方向選択が相手の方向へ寄る強さ(会敵率を上げて戦わせるため)。実行時に書き換え可
+var CONFIG = { BOT_SKILL: 0.6, ADVANCE_BIAS: 0.6, SHOOTER_OUTRANGE_CHASE: 0.7 }; // BOT_SKILL:0〜1(大きいほど強い) / ADVANCE_BIAS:塗り方向選択が相手の方向へ寄る強さ(会敵率を上げて戦わせるため)。SHOOTER_OUTRANGE_CHASE:シューターが自分より射程の長い相手(チャージャー等)と対面した時、相手の射程のこの割合まで積極的に詰める(第4ラウンド:射程短縮後もチャージャー相手に一方的に撃たれ続けないようにするための追跡係数)。実行時に書き換え可
 
 var COLOR = {
   bg:'#0b1020', floor:'#232a45', floorLine:'rgba(255,255,255,0.03)',
@@ -288,12 +288,12 @@ var WEAPONS = {
     name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ',
     fireRate:8,          // 毎秒発射数
     bulletSpeed:640,      // 弾速 px/s
-    range:470,            // 射程 px
-    damage:27,            // 1発ダメージ (4発でだいたい撃破)
+    range:280,            // 射程 px(第4ラウンドで470→280、マップ幅の4割程度に短縮。近づいて撃ち合う武器に)
+    damage:35,            // 1発ダメージ (3発で撃破。第4ラウンドで27→35、射程短縮でチャージャー等に近づく間に被弾する分を、詰めきった後の火力で相殺)
     inkPerShot:6,         // 1発の消費インク
-    paintRadius:1.5,      // 着弾の塗り半径(セル)
+    paintRadius:2.05,     // 着弾の塗り半径(セル)(第4ラウンドで1.5→1.9→2.05。射程短縮による塗り効率低下を補い、対ローラー・対チャージャー勝率も引き上げる)
     spread:6*Math.PI/180, // 弾のばらつき角(片側)
-    moveSpeedMul:1.0,
+    moveSpeedMul:1.14,    // 移動速度倍率(第4ラウンド追加調整で1.0→1.14。機動力のある近距離万能武器として、詰める/離脱するまでの被弾時間を短縮)
     specialGaugeMax:880,  // スペシャルゲージ満タン値(塗ったセル数)
     special:{ type:'inkbomb', count:3, radius:5, damage:100, fuse:1.0, speed:360, spreadDeg:26 },
   },
@@ -1022,7 +1022,11 @@ function botDecide(g, idx){
   var oppLowHP = oppTargetable && opp.hp<=40;                        // 弱った敵は追う
   var selfLowHP = p.hp<=30;                                          // 自分が瀕死のときだけ下がる(逃げすぎない)
   // 交戦を検討する間合いの目安(武器の主射程相当。ローラーは近接戦向けの間合い)
-  var engageDist = weapon.key==='shooter' ? weapon.range : (weapon.key==='charger' ? weapon.maxRange : 10*CELL);
+  var oppWeapon = WEAPONS[opp.weapon];
+  var oppThreatRange = oppWeapon.key==='charger' ? oppWeapon.maxRange : (oppWeapon.key==='shooter' ? oppWeapon.range : 10*CELL);
+  // シューターは自分の射程より遠くから狙ってくる相手(チャージャー等)には、相手の射程の一定割合まで積極的に詰める
+  // (射程差があるほど「待っていても撃たれるだけ」なので、詰める意欲を相手の脅威間合いに応じて引き上げる)
+  var engageDist = weapon.key==='shooter' ? Math.max(weapon.range, oppThreatRange*CONFIG.SHOOTER_OUTRANGE_CHASE) : (weapon.key==='charger' ? weapon.maxRange : 10*CELL);
   // 射程の1.3倍以内・インク30以上なら塗りより交戦を優先する(弱った敵/自陣インクで減速中の敵はインクが少なくても追う)
   var wantEngage = oppTargetable && los && distToOpp <= engageDist*1.3 &&
                    (weapon.key==='roller' || p.ink>=30 || oppLowHP || oppOnMyInk);
