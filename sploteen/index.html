@@ -59,6 +59,13 @@
     color:#ffe08a; font-weight:700; font-size:12px; line-height:1.2; padding:0;
   }
   .specialBtn.ready{ background:#ffcc4d; color:#231600; box-shadow:0 0 14px 4px rgba(255,204,77,0.7); }
+  .subBtn{
+    position:absolute; right:74px; bottom:10px;
+    width:54px; height:54px; border-radius:50%; border:2px solid #7ad6ff; background:#0e2a3a;
+    color:#eafcff; font-weight:700; font-size:20px; line-height:1; padding:0; opacity:0.55;
+  }
+  .subBtn.avail{ opacity:1; box-shadow:0 0 10px 3px rgba(122,214,255,0.5); }
+  .subBtn .subCd{ position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,0.55); }
   .wIcon{ font-size:22px; width:28px; text-align:center; flex:0 0 auto; }
   .barCol{ display:flex; flex-direction:column; gap:3px; flex:1 1 auto; min-width:0; }
   .bar{ position:relative; height:9px; border-radius:5px; background:rgba(255,255,255,0.12); overflow:hidden; flex:1 1 auto; border:1px solid rgba(255,255,255,0.18); }
@@ -108,18 +115,22 @@
   .diffBtn{ font:inherit; font-size:12px; padding:6px 14px; border-radius:999px; border:2px solid #2b3866; background:#161c34; color:var(--text); cursor:pointer; }
   .diffBtn.selected{ border-color:#57e08a; background:#123a22; color:#bdf5d3; }
   .weaponRow.readOnly{ pointer-events:none; opacity:0.75; }
+  .selGroup{ display:flex; flex-direction:column; align-items:center; gap:4px; }
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
   #panelSelect{ flex-direction:column; padding:0; }
-  .selectHalf{ flex:1 1 50%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:10px; min-height:0; }
+  .selectHalf{ flex:1 1 50%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:8px; min-height:0; overflow:hidden; }
   .selectHalf.rot{ transform:rotate(180deg); }
   .selectHalf.ready{ background:rgba(255,255,255,0.04); }
   .selLabel{ font-size:13px; color:var(--sub); }
   .weaponRow{ display:flex; gap:8px; width:100%; max-width:520px; justify-content:center; }
-  .wCard{ flex:1 1 0; max-width:150px; background:#161c34; border:2px solid #2b3866; border-radius:12px; padding:8px 4px; color:var(--text); font:inherit; cursor:pointer; }
+  .wCard{ flex:1 1 0; max-width:150px; min-width:56px; min-height:56px; background:#161c34; border:2px solid #2b3866; border-radius:12px; padding:8px 4px; color:var(--text); font:inherit; cursor:pointer; }
   .wCard .wEmoji{ font-size:26px; }
   .wCard .wName{ font-size:13px; font-weight:700; margin-top:2px; }
   .wCard.selected{ border-color:#ffcc4d; background:#2a2410; }
-  .wDesc{ font-size:12px; color:var(--sub); min-height:16px; max-width:90vw; }
+  .weaponRow.subRow{ max-width:400px; }
+  .weaponRow.subRow .wCard{ min-height:56px; padding:4px 2px; }
+  .wDesc{ font-size:11px; color:var(--sub); min-height:14px; max-width:90vw; line-height:1.3; }
+  .wDesc.subDesc{ color:#8fd8ff; }
   .readyBtn{ font:inherit; font-weight:700; color:#1a1206; background:#8fa2ff; border:none; border-radius:999px; padding:9px 22px; cursor:pointer; }
   .readyBtn.on{ background:#57e08a; }
   #panelResult{ gap:14px; }
@@ -140,6 +151,15 @@
   .nextBtn{ font:inherit; font-weight:700; color:#1a1206; background:#ffcc4d; border:none; border-radius:999px; padding:11px 28px; cursor:pointer; }
   .champTitle{ font-size:min(9vw,34px); font-weight:800; color:#ffe08a; margin-bottom:18px; }
   .hidden{ display:none!important; }
+  /* 横持ち(幅>高さ)では縦に積まず、メイン/サブ/CPUパネルを横に並べて縦スペースを節約する。
+     (このブロックは他の.selectHalf/.cpuPanelルールより後ろに置き、flex-directionの上書きを確実にする) */
+  @media (orientation:landscape){
+    .selectHalf{ flex-direction:row; flex-wrap:wrap; align-content:center; gap:4px 16px; }
+    .selectHalf > .selLabel{ flex:0 0 100%; }
+    .selectHalf > .readyBtn{ flex:0 0 auto; margin-top:2px; }
+    .cpuPanel{ flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:center; gap:4px 10px; margin:0; }
+    .cpuPanel > .selLabel{ flex:0 0 100%; font-size:11px; }
+  }
 </style>
 </head>
 <body>
@@ -178,12 +198,14 @@
     <div class="padzone move" data-player="2" data-kind="move"></div>
     <div class="padzone aim" data-player="2" data-kind="aim">
       <button class="specialBtn" data-player="2" id="spBtnP2">SP</button>
+      <button class="subBtn" data-player="2" id="subBtnP2">💣</button>
     </div>
   </div>
   <div class="padOverlay p1">
     <div class="padzone move" data-player="1" data-kind="move"></div>
     <div class="padzone aim" data-player="1" data-kind="aim">
       <button class="specialBtn" data-player="1" id="spBtnP1">SP</button>
+      <button class="subBtn" data-player="1" id="subBtnP1">💣</button>
     </div>
   </div>
 
@@ -199,17 +221,30 @@
     <div class="panel" id="panelSelect">
       <div class="selectHalf rot" data-half="2">
         <div class="selLabel" id="labelP2">P2 (うえ) ぶきをえらぼう</div>
-        <div class="weaponRow" data-select-player="2"></div>
-        <div class="wDesc" id="descP2"></div>
+        <div class="selGroup">
+          <div class="weaponRow" data-select-player="2"></div>
+          <div class="wDesc" id="descP2"></div>
+        </div>
+        <div class="selGroup">
+          <div class="weaponRow small subRow" data-select-sub="2"></div>
+          <div class="wDesc subDesc" id="descSubP2"></div>
+        </div>
         <button class="readyBtn" id="readyP2">じゅんび OK</button>
       </div>
       <div class="selectHalf" data-half="1">
         <div class="selLabel">P1 (した) ぶきをえらぼう</div>
-        <div class="weaponRow" data-select-player="1"></div>
-        <div class="wDesc" id="descP1"></div>
+        <div class="selGroup">
+          <div class="weaponRow" data-select-player="1"></div>
+          <div class="wDesc" id="descP1"></div>
+        </div>
+        <div class="selGroup">
+          <div class="weaponRow small subRow" data-select-sub="1"></div>
+          <div class="wDesc subDesc" id="descSubP1"></div>
+        </div>
         <div class="cpuPanel hidden" id="cpuPanel">
           <div class="selLabel">CPU(うえ)の ぶきを えらぶ</div>
           <div class="weaponRow small" data-select-player="cpu"></div>
+          <div class="weaponRow small subRow" data-select-sub="cpu"></div>
           <div class="selLabel">CPU の つよさ</div>
           <div class="diffRow">
             <button class="diffBtn" data-diff="0.35">よわい</button>
@@ -261,7 +296,7 @@ var STICK_RADIUS=46;            // スティック最大半径(px, 実画面px�
 var AIM_DEADZONE=8;
 var TAP_MAX_DURATION=0.25;      // タップ判定の最大長押し時間(秒)
 
-var CONFIG = { BOT_SKILL: 0.6, ADVANCE_BIAS: 0.6, SHOOTER_OUTRANGE_CHASE: 0.7 }; // BOT_SKILL:0〜1(大きいほど強い) / ADVANCE_BIAS:塗り方向選択が相手の方向へ寄る強さ(会敵率を上げて戦わせるため)。SHOOTER_OUTRANGE_CHASE:シューターが自分より射程の長い相手(チャージャー等)と対面した時、相手の射程のこの割合まで積極的に詰める(第4ラウンド:射程短縮後もチャージャー相手に一方的に撃たれ続けないようにするための追跡係数)。実行時に書き換え可
+var CONFIG = { BOT_SKILL: 0.6, ADVANCE_BIAS: 0.6, SHOOTER_OUTRANGE_CHASE: 0.8 };// BOT_SKILL:0〜1(大きいほど強い) / ADVANCE_BIAS:塗り方向選択が相手の方向へ寄る強さ(会敵率を上げて戦わせるため)。SHOOTER_OUTRANGE_CHASE:シューター・バケツが自分より射程の長い相手(チャージャー等)と対面した時、相手の射程のこの割合まで積極的に詰める追跡係数(第4ラウンドでシューター用に導入、既定値0.7。第5ラウンドでバケツにも適用し0.8に再調整)。実行時に書き換え可
 
 var COLOR = {
   bg:'#0b1020', floor:'#232a45', floorLine:'rgba(255,255,255,0.03)',
@@ -283,9 +318,10 @@ var WALLS_CELL = [
 var SPAWN = [ {x:336,y:936}, {x:336,y:72} ]; // P1下端中央 / P2上端中央
 
 /* 武器パラメータ。ここを書き換えればバランス調整できる (実行中も反映される) */
+var SUB_COOLDOWN=1.0;           // サブウェポン使用後の共通クールダウン(秒)
 var WEAPONS = {
   shooter:{
-    name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ',
+    name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ', defaultSub:'splashbomb',
     fireRate:8,          // 毎秒発射数
     bulletSpeed:640,      // 弾速 px/s
     range:280,            // 射程 px(第4ラウンドで470→280、マップ幅の4割程度に短縮。近づいて撃ち合う武器に)
@@ -298,7 +334,7 @@ var WEAPONS = {
     special:{ type:'inkbomb', count:3, radius:5, damage:100, fuse:1.0, speed:360, spreadDeg:26 },
   },
   roller:{
-    name:'ローラー', emoji:'🖌️', desc:'ころがしてぬる。ちかづくとつよい',
+    name:'ローラー', emoji:'🖌️', desc:'ころがしてぬる。ちかづくとつよい', defaultSub:'quickbomb',
     moveSpeedMul:0.85,
     rollWidth:5,          // 移動時に塗る幅(セル)
     contactDamage:85,    // 接触ダメージ(ほぼ即死)
@@ -310,7 +346,7 @@ var WEAPONS = {
     special:{ type:'giant', duration:5, widthMul:2, speedMul:1.2 },
   },
   charger:{
-    name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ',
+    name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ', defaultSub:'sprinkler',
     moveSpeedMul:1.0,       // 通常時の移動速度倍率(ため中はCHARGER_CHARGE_MOVE_MULが追加でかかる)
     maxCharge:1.2,          // フルチャージ秒数
     maxRange:0.7*WORLD_H,   // フルチャージ時の射程
@@ -321,8 +357,51 @@ var WEAPONS = {
     specialGaugeMax:385,
     special:{ type:'rapid', duration:4, rate:3, damage:100 },
   },
+  bucket:{
+    name:'バケツ', emoji:'🪣', desc:'ひろく ぬる。かべを こえて とどく', defaultSub:'shield',
+    fireInterval:0.48,      // 発射間隔(秒。触れている間この間隔で1発。バランス調整で0.55→0.48)
+    range:230,              // 射程px(壁を無視して届く)
+    nearRange:8*CELL,       // このセル数以内なら高ダメージが乗る近距離(バランス調整で6→8セル)
+    fanHalfAngle:20*Math.PI/180, // 扇の半角(幅4セル×長さ8セル相当。調整で14→20度、当てやすさ確保)
+    damage:70,              // 近距離ヒット時のダメージ(調整で60→70)
+    inkPerShot:19,          // 1発の消費インク(調整で22→19)
+    moveSpeedMul:1.06,      // バランス調整で0.92→1.06(遠距離武器から一方的に撃たれ続けず、フデ等の高機動武器にも置いていかれないよう機動力を確保)
+    specialGaugeMax:760,
+    special:{ type:'inkrain', duration:4, radius:9, dps:25 }, // インクのあめ: 半径9セルに雨を降らせ塗る/毎秒25ダメージ
+  },
+  brush:{
+    name:'フデ', emoji:'🖌', desc:'はしるだけで ぬれる。とにかく はやい', defaultSub:'quickbomb',
+    moveSpeedMul:1.35,       // 最速。移動しているだけで塗れる(接触ダメージなし)
+    trailWidth:2.3,          // 移動時に塗る幅(セル。バランス調整で2→2.3。ローラー(5セル)より細いが塗り効率を確保)
+    swingCount:5, swingBulletSpeed:820, swingRange:150, swingDamage:11, swingPaintRadius:0.8,
+    swingInkCost:15, swingCooldown:0.25, // ふりはらい: 前方短距離に小さな飛沫5発、クールダウン速い(バランス調整でswingDamage25→8。5発命中でも40程度に抑制)
+    specialGaugeMax:760,
+    special:{ type:'clone', duration:5, widthMul:2, speedMul:1.6 }, // ぶんしん
+  },
 };
 for (var wk in WEAPONS) WEAPONS[wk].key = wk;
+
+/* サブウェポン。メインとは別に1つ選ぶ。使用後は共通クールダウン(SUB_COOLDOWN)がかかる */
+var SUBS = {
+  splashbomb:{
+    name:'スプラッシュボム', emoji:'💣', desc:'なげて じばくはつ。ひろく ぬれる',
+    throwDist:200, fuse:1.0, radius:4.5, dmgCenter:100, dmgEdge:40, inkCost:45, // バランス調整で55→45(コスト±10の範囲内。撃ち続ける武器での使用回数確保のため)
+  },
+  quickbomb:{
+    name:'クイックボム', emoji:'⚡', desc:'あたると すぐ ばくはつ。れんとうできる',
+    throwDist:160, fuse:0, radius:2.5, dmgCenter:35, dmgEdge:15, inkCost:28, // バランス調整でdmgCenter50→35, dmgEdge25→15(対スプリンクラー等の勝率調整)
+  },
+  sprinkler:{
+    name:'スプリンクラー', emoji:'🌀', desc:'おいとくと じどうで ぬってくれる',
+    throwDist:150, duration:8, radius:5, hp:30, inkCost:40, rate:3.0, splashR:0.9, // rate/splashRはバランス調整値。コストは50→40(±10の範囲内)
+    // (対ボム系サブの勝率調整は主にボム側のダメージで行う。スプリンクラー自身は無傷での塗り面積確保が役割)
+  },
+  shield:{
+    name:'スプラッシュシールド', emoji:'🛡', desc:'かべを つくって まもる',
+    standoff:3, width:6, thickness:0.9, duration:5, inkCost:50, // バランス調整で60→50(コスト±10の範囲内)
+  },
+};
+for (var sk in SUBS) SUBS[sk].key = sk;
 
 /* ==================== 2. 決定論的PRNG (mulberry32) ==================== */
 function mulberry32(seed){
@@ -338,15 +417,15 @@ function mulberry32(seed){
 /* ==================== 3. ゲーム状態生成 ==================== */
 function makePlayer(idx){
   return {
-    idx:idx, weapon:'shooter', x:0, y:0, radius:PLAYER_RADIUS,
+    idx:idx, weapon:'shooter', sub:'splashbomb', x:0, y:0, radius:PLAYER_RADIUS,
     hp:100, ink:INK_MAX, alive:true, invuln:0, respawnTimer:0,
     angle: idx===0 ? -Math.PI/2 : Math.PI/2,
     sp:0, charge:0, charging:false, specialActive:false, specialTimer:0, specialFireCooldown:0,
-    fireCooldown:0, swingCooldown:0, contactCooldown:0, rollDist:0, hitFlash:0, hudToast:null,
-    wasFiring:false, fireHeldStart:0, wasSpecial:false,
+    fireCooldown:0, swingCooldown:0, contactCooldown:0, subCooldown:0, rollDist:0, hitFlash:0, hudToast:null,
+    wasFiring:false, fireHeldStart:0, wasSpecial:false, wasSub:false,
     isBot:false, forced:null,
-    input:{move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false},
-    stats:{paintedCells:0, specials:0, kills:0},
+    input:{move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false, sub:false},
+    stats:{paintedCells:0, specials:0, kills:0, subsUsed:0},
     botMem:{ nextDecision:0, dir:{x:0,y:1} },
   };
 }
@@ -376,6 +455,9 @@ function createGame(opts){
   g.counts = [0,0];
   g.bullets = [];
   g.particles = [];
+  g.subThrows = [];     // スプラッシュボム/クイックボムの投擲物(放物線移動)
+  g.sprinklers = [];    // 設置中のスプリンクラー { ownerIdx, x, y, timer, hp }
+  g.shields = [];       // 設置中のスプラッシュシールド { ownerIdx, cx, cy, dx, dy, halfLen, thickness, timer }
   g.popups = [];        // やられた!/たおした! のポップアップ演出(描画専用)
   g.shakeTimer = 0; g.shakeMag = 0; // 画面の軽い揺れ演出
   g.time = 0; g.acc = 0;
@@ -397,10 +479,13 @@ function createGame(opts){
   return g;
 }
 
-function configurePlayers(g,p1w,p2w,bot1,bot2){
+function configurePlayers(g,p1w,p2w,bot1,bot2,p1sub,p2sub){
   if (!WEAPONS[p1w]) p1w='shooter';
   if (!WEAPONS[p2w]) p2w='shooter';
+  if (!SUBS[p1sub]) p1sub=WEAPONS[p1w].defaultSub;
+  if (!SUBS[p2sub]) p2sub=WEAPONS[p2w].defaultSub;
   g.players[0].weapon=p1w; g.players[1].weapon=p2w;
+  g.players[0].sub=p1sub; g.players[1].sub=p2sub;
   g.players[0].isBot=!!bot1; g.players[1].isBot=!!bot2;
 }
 
@@ -409,6 +494,7 @@ function startRound(g, handicapLoserIdx){
   buildWallGrid(g.grid);
   g.counts=[0,0];
   g.bullets.length=0; g.particles.length=0;
+  g.subThrows.length=0; g.sprinklers.length=0; g.shields.length=0;
   g.popups.length=0; g.shakeTimer=0; g.shakeMag=0;
   if (!g.headless) g.inkCtx.clearRect(0,0,WORLD_W,WORLD_H);
   for (var i=0;i<2;i++){
@@ -417,20 +503,20 @@ function startRound(g, handicapLoserIdx){
     p.hp=100; p.ink=INK_MAX; p.alive=true; p.invuln=0; p.respawnTimer=0;
     p.angle = i===0 ? -Math.PI/2 : Math.PI/2;
     p.charge=0; p.charging=false; p.specialActive=false; p.specialTimer=0; p.specialFireCooldown=0;
-    p.fireCooldown=0; p.swingCooldown=0; p.contactCooldown=0; p.rollDist=0; p.hitFlash=0; p.hudToast=null;
-    p.wasFiring=false; p.wasSpecial=false;
+    p.fireCooldown=0; p.swingCooldown=0; p.contactCooldown=0; p.subCooldown=0; p.rollDist=0; p.hitFlash=0; p.hudToast=null;
+    p.wasFiring=false; p.wasSpecial=false; p.wasSub=false;
     p.sp = (handicapLoserIdx===i) ? Math.round(w.specialGaugeMax*0.5) : 0;
-    p.stats={paintedCells:0, specials:0, kills:0};
+    p.stats={paintedCells:0, specials:0, kills:0, subsUsed:0};
     p.botMem={ nextDecision:0, dir:{x:0, y:(i===0?-1:1)} };
   }
   g.time=0; g.remaining=g.duration;
   g.phase='countdown'; g.countdown=3.999;
 }
 
-function startSeries(g,p1w,p2w,seed,bot1,bot2,duration){
+function startSeries(g,p1w,p2w,seed,bot1,bot2,duration,p1sub,p2sub){
   g.rng = mulberry32((seed>>>0) || 1);
   g.duration = duration || ROUND_DURATION_DEFAULT;
-  configurePlayers(g,p1w,p2w,bot1,bot2);
+  configurePlayers(g,p1w,p2w,bot1,bot2,p1sub,p2sub);
   g.seriesScore=[0,0]; g.roundResults=[]; g.lastRoundLoserIdx=null;
   startRound(g, null);
 }
@@ -580,6 +666,7 @@ function applyDamage(g, target, dmg, ownerIdx){
   if (!target.alive || isInvulnerable(target)) return;
   target.hp -= dmg;
   target.hitFlash = 0.12; // 被弾で一瞬白く点滅
+  target.lastHitAt = g.time; // シールドのボットAI判断用(直近の被弾時刻)
   if (target.hp<=0){
     target.hp=0; target.alive=false; target.respawnTimer=RESPAWN_TIME;
     var killer=g.players[ownerIdx];
@@ -652,7 +739,7 @@ function castChargerBeam(g, idx, p, weapon, frac, thin, dmgOverride){
     var d=s*stepLen; if (d>range) d=range;
     var x=p.x+Math.cos(p.angle)*d, y=p.y+Math.sin(p.angle)*d;
     endX=x; endY=y;
-    if (isWallAt(g,x,y)) break;
+    if (isWallAt(g,x,y) || isShieldBlockingAt(g,x,y,idx)) break;
     if (!hit && target.alive && !isInvulnerable(target)){
       var dx=target.x-x, dy=target.y-y;
       if (dx*dx+dy*dy <= (target.radius+5)*(target.radius+5)){
@@ -673,6 +760,212 @@ function releaseChargerBeam(g, idx, p, weapon){
   p.ink -= cost;
   castChargerBeam(g, idx, p, weapon, frac, false, null);
   p.charge=0;
+}
+
+// バケツ: 扇状(半角fanHalfAngle・射程range)の範囲を1発でまとめて塗る。壁は無視して届く(貫通)
+function paintSector(g, cx, cy, angle, halfAngle, radius, owner){
+  var minCx=Math.max(0,Math.floor((cx-radius)/CELL));
+  var maxCx=Math.min(GRID_W-1,Math.floor((cx+radius)/CELL));
+  var minCy=Math.max(0,Math.floor((cy-radius)/CELL));
+  var maxCy=Math.min(GRID_H-1,Math.floor((cy+radius)/CELL));
+  var r2=radius*radius, painted=0;
+  for (var cyi=minCy; cyi<=maxCy; cyi++){
+    for (var cxi=minCx; cxi<=maxCx; cxi++){
+      var idx2=cyi*GRID_W+cxi;
+      var cell=g.grid[idx2];
+      if (cell===9 || cell===owner) continue;
+      var ccx=(cxi+0.5)*CELL, ccy=(cyi+0.5)*CELL;
+      var dx=ccx-cx, dy=ccy-cy;
+      var d2=dx*dx+dy*dy;
+      if (d2>r2) continue;
+      var da=Math.atan2(dy,dx)-angle;
+      da=Math.atan2(Math.sin(da),Math.cos(da));
+      if (Math.abs(da)>halfAngle) continue;
+      if (cell===1) g.counts[0]--; else if (cell===2) g.counts[1]--;
+      g.grid[idx2]=owner;
+      if (owner===1) g.counts[0]++; else g.counts[1]++;
+      painted++;
+    }
+  }
+  if (painted>0){
+    var pl=g.players[owner-1], w=WEAPONS[pl.weapon];
+    pl.sp=Math.min(w.specialGaugeMax, pl.sp+painted);
+    pl.stats.paintedCells+=painted;
+  }
+  if (!g.headless){
+    var ctx=g.inkCtx;
+    ctx.fillStyle = owner===1 ? COLOR.p1 : COLOR.p2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,radius,angle-halfAngle,angle+halfAngle);
+    ctx.closePath();
+    ctx.fill();
+  }
+  return painted;
+}
+
+function fireBucketShot(g, idx, p, weapon){
+  paintSector(g, p.x, p.y, p.angle, weapon.fanHalfAngle, weapon.range, idx+1);
+  var target=g.players[1-idx];
+  if (target.alive && !isInvulnerable(target)){
+    var dx=target.x-p.x, dy=target.y-p.y;
+    var d=Math.hypot(dx,dy);
+    if (d<=weapon.nearRange){
+      var da=Math.atan2(dy,dx)-p.angle; da=Math.atan2(Math.sin(da),Math.cos(da));
+      if (Math.abs(da)<=weapon.fanHalfAngle+0.15) applyDamage(g, target, weapon.damage, idx);
+    }
+  }
+  if (!g.headless) spawnParticles(g, p.x+Math.cos(p.angle)*CELL*3, p.y+Math.sin(p.angle)*CELL*3, idx, 4);
+}
+
+// フデ: タップで前方に小さな飛沫5発(ふりはらい)
+function tryBrushSwing(g, idx, p, weapon){
+  if (p.swingCooldown>0) return;
+  if (p.ink < weapon.swingInkCost) return;
+  p.ink -= weapon.swingInkCost;
+  p.swingCooldown = weapon.swingCooldown;
+  var n=weapon.swingCount;
+  for (var i=0;i<n;i++){
+    var t = n<=1 ? 0 : (i/(n-1)-0.5);
+    var ang = p.angle + t*(30*Math.PI/180);
+    g.bullets.push({
+      kind:'bullet', owner:idx, weaponKey:'brush',
+      x:p.x+Math.cos(ang)*p.radius, y:p.y+Math.sin(ang)*p.radius,
+      vx:Math.cos(ang)*weapon.swingBulletSpeed, vy:Math.sin(ang)*weapon.swingBulletSpeed,
+      damage:weapon.swingDamage, range:weapon.swingRange, traveled:0,
+      paintRadius:weapon.swingPaintRadius*CELL, trailRadius:CELL*0.22, hitRadius:6,
+    });
+  }
+}
+
+/* ---- サブウェポン ---- */
+function subFacingAngle(p){
+  // 「キャラの向き(最後のエイム方向、無ければ移動方向)」。p.angleは常にエイム/移動で更新されているのでそのまま使う
+  return p.angle;
+}
+
+function throwSubBomb(g, idx, p, sub, instant){
+  var ang=subFacingAngle(p);
+  var tx=p.x+Math.cos(ang)*sub.throwDist, ty=p.y+Math.sin(ang)*sub.throwDist;
+  tx=clamp(tx, CELL, WORLD_W-CELL); ty=clamp(ty, CELL, WORLD_H-CELL);
+  var dist=Math.hypot(tx-p.x, ty-p.y);
+  var travelTime=Math.max(0.12, dist/620);
+  g.subThrows.push({
+    kind: instant?'quickbomb':'splashbomb', owner:idx, sub:sub,
+    x0:p.x, y0:p.y, x:tx, y:ty, age:0, travelTime:travelTime, landed:false, fuse:sub.fuse||0,
+  });
+}
+
+function explodeSubBomb(g, b){
+  var sub=b.sub;
+  var target=g.players[1-b.owner];
+  var rr=sub.radius*CELL;
+  paintCircle(g, b.x, b.y, rr, b.owner+1);
+  if (target.alive && !isInvulnerable(target)){
+    var dx=target.x-b.x, dy=target.y-b.y;
+    var d=Math.hypot(dx,dy);
+    if (d<=rr){
+      var frac=1-clamp(d/rr,0,1);
+      var dmg=sub.dmgEdge + (sub.dmgCenter-sub.dmgEdge)*frac;
+      applyDamage(g, target, dmg, b.owner);
+    }
+  }
+  spawnParticles(g, b.x, b.y, b.owner, 16);
+}
+
+function placeSprinkler(g, idx, p, sub){
+  // 同時に1個まで(次を置くと前のが消える)
+  for (var i=g.sprinklers.length-1;i>=0;i--) if (g.sprinklers[i].ownerIdx===idx) g.sprinklers.splice(i,1);
+  var ang=subFacingAngle(p);
+  var x=clamp(p.x+Math.cos(ang)*sub.throwDist, CELL, WORLD_W-CELL);
+  var y=clamp(p.y+Math.sin(ang)*sub.throwDist, CELL, WORLD_H-CELL);
+  g.sprinklers.push({ ownerIdx:idx, x:x, y:y, timer:sub.duration, hp:sub.hp, nextTick:0 });
+}
+
+function placeShield(g, idx, p, sub){
+  for (var i=g.shields.length-1;i>=0;i--) if (g.shields[i].ownerIdx===idx) g.shields.splice(i,1);
+  var ang=subFacingAngle(p);
+  var cx=p.x+Math.cos(ang)*sub.standoff*CELL, cy=p.y+Math.sin(ang)*sub.standoff*CELL;
+  var perp=ang+Math.PI/2;
+  var dx=Math.cos(perp), dy=Math.sin(perp);
+  var halfLen=sub.width*CELL/2;
+  var sh={ ownerIdx:idx, cx:cx, cy:cy, dx:dx, dy:dy, halfLen:halfLen, thickness:sub.thickness*CELL, timer:sub.duration };
+  g.shields.push(sh);
+  // 壁の下を自分色に塗る
+  var steps=Math.ceil(halfLen*2/(CELL*0.8));
+  for (var s=0;s<=steps;s++){
+    var t=-halfLen+ (2*halfLen)*(s/steps);
+    paintCircle(g, cx+dx*t, cy+dy*t, sub.thickness*CELL*0.75+CELL*0.3, idx+1);
+  }
+}
+
+function distToShieldSeg(sh, x, y){
+  var px=x-sh.cx, py=y-sh.cy;
+  var t=clamp(px*sh.dx+py*sh.dy, -sh.halfLen, sh.halfLen);
+  var cx2=sh.cx+sh.dx*t, cy2=sh.cy+sh.dy*t;
+  return Math.hypot(x-cx2, y-cy2);
+}
+
+// projectileOwnerIdxの弾/ビームが(x,y)地点でシールドに止められるか(自分が張ったシールドは自分の弾を止めない)
+function isShieldBlockingAt(g, x, y, projectileOwnerIdx){
+  for (var i=0;i<g.shields.length;i++){
+    var sh=g.shields[i];
+    if (sh.ownerIdx===projectileOwnerIdx) continue;
+    if (distToShieldSeg(sh,x,y) <= sh.thickness) return true;
+  }
+  return false;
+}
+
+// idx側プレイヤーの移動を、相手が設置したシールドでブロックする(自分のシールドはすり抜けられる)
+function resolveShieldCollision(g, idx, p){
+  for (var i=0;i<g.shields.length;i++){
+    var sh=g.shields[i];
+    if (sh.ownerIdx===idx) continue;
+    var d=distToShieldSeg(sh,p.x,p.y);
+    var minD=p.radius+sh.thickness;
+    if (d<minD && d>1e-4){
+      var px=p.x-sh.cx, py=p.y-sh.cy;
+      var t=clamp(px*sh.dx+py*sh.dy, -sh.halfLen, sh.halfLen);
+      var cx2=sh.cx+sh.dx*t, cy2=sh.cy+sh.dy*t;
+      var nx=(p.x-cx2)/d, ny=(p.y-cy2)/d;
+      p.x = cx2+nx*minD; p.y = cy2+ny*minD;
+    }
+  }
+}
+
+function updateSprinklers(g, dt){
+  for (var i=g.sprinklers.length-1;i>=0;i--){
+    var s=g.sprinklers[i];
+    s.timer-=dt;
+    if (s.timer<=0 || s.hp<=0){ g.sprinklers.splice(i,1); continue; }
+    var sub=SUBS.sprinkler;
+    s.nextTick-=dt;
+    if (s.nextTick<=0){
+      s.nextTick = 1/sub.rate;
+      var a=g.rng()*Math.PI*2, d=g.rng()*sub.radius*CELL;
+      paintCircle(g, s.x+Math.cos(a)*d, s.y+Math.sin(a)*d, sub.splashR*CELL, s.ownerIdx+1);
+    }
+  }
+}
+
+function updateShields(g, dt){
+  for (var i=g.shields.length-1;i>=0;i--){
+    g.shields[i].timer-=dt;
+    if (g.shields[i].timer<=0) g.shields.splice(i,1);
+  }
+}
+
+function updateSubThrows(g, dt){
+  var arr=g.subThrows;
+  for (var i=arr.length-1;i>=0;i--){
+    var b=arr[i];
+    b.age+=dt;
+    if (!b.landed){
+      if (b.age>=b.travelTime){ b.landed=true; b.age=0; if (b.kind==='quickbomb'){ explodeSubBomb(g,b); arr.splice(i,1); } }
+    } else {
+      if (b.age>=b.fuse){ explodeSubBomb(g,b); arr.splice(i,1); }
+    }
+  }
 }
 
 function explodeInkBomb(g, b){
@@ -708,6 +1001,20 @@ function activateSpecial(g, idx){
   } else if (p.weapon==='charger'){
     p.specialActive=true; p.specialTimer=weapon.special.duration; p.specialFireCooldown=0;
     p.charging=false; p.charge=0;
+  } else if (p.weapon==='bucket' || p.weapon==='brush'){
+    p.specialActive=true; p.specialTimer=weapon.special.duration;
+  }
+}
+
+// バケツのスペシャル「インクのあめ」: 発動中、自分の周囲半径にランダムにインクが降って塗り、範囲内の敵に毎秒ダメージ
+function updateBucketRain(g, idx, p, weapon, dt){
+  var sp=weapon.special;
+  var a=g.rng()*Math.PI*2, d=g.rng()*sp.radius*CELL;
+  paintCircle(g, p.x+Math.cos(a)*d, p.y+Math.sin(a)*d, CELL*0.9, idx+1);
+  var target=g.players[1-idx];
+  if (target.alive && !isInvulnerable(target)){
+    var dx=target.x-p.x, dy=target.y-p.y;
+    if (dx*dx+dy*dy <= (sp.radius*CELL)*(sp.radius*CELL)) applyDamage(g, target, sp.dps*dt, idx);
   }
 }
 
@@ -740,7 +1047,7 @@ function updateBullets(g, dt){
     if (b.kind==='bullet'){
       b.x += b.vx*dt; b.y += b.vy*dt;
       b.traveled += Math.hypot(b.vx*dt, b.vy*dt);
-      if (isWallAt(g,b.x,b.y)){
+      if (isWallAt(g,b.x,b.y) || isShieldBlockingAt(g,b.x,b.y,b.owner)){
         paintBulletImpact(g,b); dead=true;
       } else {
         paintBulletTrail(g,b);
@@ -751,6 +1058,16 @@ function updateBullets(g, dt){
             applyDamage(g,target,b.damage,b.owner);
             paintBulletImpact(g,b);
             dead=true;
+          }
+        }
+        if (!dead){
+          for (var si=0; si<g.sprinklers.length; si++){
+            var spk=g.sprinklers[si];
+            if (spk.ownerIdx===b.owner) continue;
+            var sdx=spk.x-b.x, sdy=spk.y-b.y;
+            if (sdx*sdx+sdy*sdy <= (CELL*1.1)*(CELL*1.1)){
+              spk.hp -= b.damage; paintBulletImpact(g,b); dead=true; break;
+            }
           }
         }
         if (!dead && b.traveled>=b.range){
@@ -797,6 +1114,7 @@ function updatePlayer(g, idx, dt){
     p.fireCooldown=Math.max(0,p.fireCooldown-dt);
     p.swingCooldown=Math.max(0,p.swingCooldown-dt);
     p.contactCooldown=Math.max(0,p.contactCooldown-dt);
+    p.subCooldown=Math.max(0,p.subCooldown-dt);
     if (p.invuln>0) p.invuln=Math.max(0,p.invuln-dt);
     return;
   }
@@ -815,11 +1133,12 @@ function updatePlayer(g, idx, dt){
   else if (terrainBefore===(2-idx)) terrainMul=ENEMY_INK_MUL;
   var weaponMul=weapon.moveSpeedMul;
   if (weapon.key==='charger' && p.charging) weaponMul *= CHARGER_CHARGE_MOVE_MUL;
-  if (p.specialActive && weapon.key==='roller') weaponMul *= weapon.special.speedMul;
+  if (p.specialActive && (weapon.key==='roller' || weapon.key==='brush')) weaponMul *= weapon.special.speedMul;
   var speed = BASE_SPEED*weaponMul*terrainMul*speedFrac;
   p.x += moveDir.x*speed*dt;
   p.y += moveDir.y*speed*dt;
   resolveWallCollision(p, g.wallsPx);
+  resolveShieldCollision(g, idx, p);
 
   // 地形によるインク回復
   var terrainAfter = cellAt(g,p.x,p.y);
@@ -836,6 +1155,7 @@ function updatePlayer(g, idx, dt){
   p.fireCooldown=Math.max(0,p.fireCooldown-dt);
   p.swingCooldown=Math.max(0,p.swingCooldown-dt);
   p.contactCooldown=Math.max(0,p.contactCooldown-dt);
+  p.subCooldown=Math.max(0,p.subCooldown-dt);
 
   // fire の押した/離した遷移(タップ判定に使う)
   var firing=!!inp.fire;
@@ -887,8 +1207,39 @@ function updatePlayer(g, idx, dt){
         releaseChargerBeam(g, idx, p, weapon);
       }
     }
+  } else if (weapon.key==='bucket'){
+    if (firing && p.ink>=weapon.inkPerShot && p.fireCooldown<=0){
+      p.fireCooldown = weapon.fireInterval;
+      p.ink = Math.max(0, p.ink-weapon.inkPerShot);
+      fireBucketShot(g, idx, p, weapon);
+    }
+  } else if (weapon.key==='brush'){
+    if (releasedNow && heldDur < TAP_MAX_DURATION) tryBrushSwing(g, idx, p, weapon);
+    var movedBrush = speed*dt;
+    if (movedBrush > 0.3){
+      var radBrush = Math.max(CELL*0.35, weapon.trailWidth*CELL/2) * (p.specialActive?weapon.special.widthMul:1);
+      paintCircle(g, p.x, p.y, radBrush, idx+1);
+    }
   }
   p.wasFiring=firing;
+
+  if (weapon.key==='bucket' && p.specialActive) updateBucketRain(g, idx, p, weapon, dt);
+
+  // サブウェポン(タップで使用。使用後は共通クールダウン)
+  var subPressed=!!inp.sub;
+  if (subPressed && !p.wasSub && p.subCooldown<=0){
+    var sub=SUBS[p.sub];
+    if (sub && p.ink>=sub.inkCost){
+      p.ink -= sub.inkCost;
+      p.subCooldown = SUB_COOLDOWN;
+      p.stats.subsUsed++;
+      if (sub.key==='splashbomb') throwSubBomb(g, idx, p, sub, false);
+      else if (sub.key==='quickbomb') throwSubBomb(g, idx, p, sub, true);
+      else if (sub.key==='sprinkler') placeSprinkler(g, idx, p, sub);
+      else if (sub.key==='shield') placeShield(g, idx, p, sub);
+    }
+  }
+  p.wasSub=subPressed;
 
   // スペシャル
   var specialPressed=!!inp.special;
@@ -931,6 +1282,9 @@ function stepGame(g, dt){
   updatePlayer(g,0,dt);
   updatePlayer(g,1,dt);
   updateBullets(g,dt);
+  updateSubThrows(g,dt);
+  updateSprinklers(g,dt);
+  updateShields(g,dt);
   updateParticles(g,dt);
   updateEffects(g,dt);
   checkRoundEnd(g);
@@ -1023,13 +1377,20 @@ function botDecide(g, idx){
   var selfLowHP = p.hp<=30;                                          // 自分が瀕死のときだけ下がる(逃げすぎない)
   // 交戦を検討する間合いの目安(武器の主射程相当。ローラーは近接戦向けの間合い)
   var oppWeapon = WEAPONS[opp.weapon];
-  var oppThreatRange = oppWeapon.key==='charger' ? oppWeapon.maxRange : (oppWeapon.key==='shooter' ? oppWeapon.range : 10*CELL);
+  var oppThreatRange = oppWeapon.key==='charger' ? oppWeapon.maxRange : (oppWeapon.key==='shooter' || oppWeapon.key==='bucket' ? oppWeapon.range : 10*CELL);
   // シューターは自分の射程より遠くから狙ってくる相手(チャージャー等)には、相手の射程の一定割合まで積極的に詰める
   // (射程差があるほど「待っていても撃たれるだけ」なので、詰める意欲を相手の脅威間合いに応じて引き上げる)
-  var engageDist = weapon.key==='shooter' ? Math.max(weapon.range, oppThreatRange*CONFIG.SHOOTER_OUTRANGE_CHASE) : (weapon.key==='charger' ? weapon.maxRange : 10*CELL);
+  // バケツも壁越しに届くが、チャージャーのように射程が非常に長い相手には自分の射程内に収まるまで
+  // 詰めないと一方的に狙撃され続けるため、シューターと同様に相手の脅威間合いに応じて詰める意欲を引き上げる
+  var engageDist = weapon.key==='shooter' ? Math.max(weapon.range, oppThreatRange*CONFIG.SHOOTER_OUTRANGE_CHASE)
+    : weapon.key==='charger' ? weapon.maxRange
+    : weapon.key==='bucket' ? Math.max(weapon.range, oppThreatRange*CONFIG.SHOOTER_OUTRANGE_CHASE)
+    : weapon.key==='brush' ? weapon.swingRange
+    : 10*CELL;
+  var needsLOS = weapon.key !== 'bucket'; // バケツは壁を越えて届くのでLOS不要
   // 射程の1.3倍以内・インク30以上なら塗りより交戦を優先する(弱った敵/自陣インクで減速中の敵はインクが少なくても追う)
-  var wantEngage = oppTargetable && los && distToOpp <= engageDist*1.3 &&
-                   (weapon.key==='roller' || p.ink>=30 || oppLowHP || oppOnMyInk);
+  var wantEngage = oppTargetable && (!needsLOS || los) && distToOpp <= engageDist*1.3 &&
+                   (weapon.key==='roller' || (weapon.key!=='brush' && p.ink>=30) || oppLowHP || oppOnMyInk);
   var wantRetreat = selfLowHP && oppTargetable && !oppLowHP && distToOpp < engageDist*0.8;
   // 一度交戦を始めたら、インクが多少減っただけで戦いをやめて塗りへ逃げてしまわないようにする
   // (ヒステリシス: 開始条件はwantEngageより厳しくないが、続行条件はwantEngageより緩い)
@@ -1065,8 +1426,30 @@ function botDecide(g, idx){
         // 遠距離での塗りは相手方向バイアスをかけない(距離を保つ武器の持ち味を維持する)
         mem.dir = pickCoverageDir(g, idx, p, lowInk, false);
       }
-    } else { // shooter
-      if (engaged) mem.dir = toOpp; // 撃ちながら間合いを詰める・撃ち合いを継続する
+    } else if (weapon.key==='brush'){
+      // フデ: 基本は逃げ回りながら塗る。相手のHPが低いときだけふりはらいで詰める。
+      // 詰められた時は単純に反対方向へ直進するとコーナーに追い込まれやすいので、
+      // 「未塗り優先+相手と反対方向寄りの重み」を使った coverage 選択で賢く逃げる
+      if (oppLowHP && oppTargetable && distToOpp < weapon.swingRange*2.5){
+        mem.dir = toOpp;
+      } else if (oppTargetable && distToOpp < 8*CELL){
+        var fleeBest=null, fleeScore=-Infinity;
+        for (var fi=0; fi<BOT_DIRS.length; fi++){
+          var fd=BOT_DIRS[fi];
+          var fx=p.x+fd.x*4*CELL, fy=p.y+fd.y*4*CELL;
+          if (fx<CELL||fx>WORLD_W-CELL||fy<CELL||fy>WORLD_H-CELL||isWallAt(g,fx,fy)) continue;
+          var fscore = -(fd.x*toOpp.x+fd.y*toOpp.y); // 相手と反対向きほど高評価
+          fscore += (g.rng()-0.5)*0.6;
+          if (fscore>fleeScore){ fleeScore=fscore; fleeBest=fd; }
+        }
+        mem.dir = fleeBest || awayOpp;
+      } else {
+        // 遠くにいる間は他の武器と同じく軽く相手方向へ寄りつつ塗る(会敵率を確保。
+        // 間合いに入れば上のswing判定が拾ってくれるので、通りすがりに一撃入れるチャンスが生まれる)
+        mem.dir = pickCoverageDir(g, idx, p, lowInk);
+      }
+    } else { // shooter, bucket
+      if (engaged) mem.dir = toOpp; // 撃ちながら間合いを詰める・撃ち合いを継続する(バケツは中距離を保ちつつ塗り優先)
       else mem.dir = pickCoverageDir(g, idx, p, lowInk);
     }
   }
@@ -1139,6 +1522,33 @@ function botDecide(g, idx){
           : g.time + 0.15 + CONFIG.BOT_SKILL*0.15*g.rng();
       }
     }
+  } else if (weapon.key==='bucket'){
+    // バケツ: 壁を越えて届くのでLOSを問わず射程内なら中距離で撃つ。塗り優先で進みながらでも適度に撃つ
+    if (oppTargetable && distToOpp < weapon.range*0.98){
+      var angBk=botAimJitter(g, Math.atan2(opp.y-p.y, opp.x-p.x));
+      input.aim={x:Math.cos(angBk), y:Math.sin(angBk)};
+      input.fire = p.ink>=weapon.inkPerShot;
+    } else {
+      input.aim = {x:mem.dir.x, y:mem.dir.y};
+      input.fire = p.ink>=weapon.inkPerShot*1.4; // 塗り優先。インクに余裕がある時だけ道すがら撃つ
+    }
+  } else if (weapon.key==='brush'){
+    input.aim = {x:mem.dir.x, y:mem.dir.y};
+    var meleeRB = weapon.swingRange*0.9;
+    var pulseActiveB = mem.swingUntil && g.time < mem.swingUntil;
+    // 基本は逃げるが、詰められて間合いに入られた時は(相手のHPに関わらず)ふりはらいで応戦する。
+    // 逃げ切れず接触されるくらいなら、細くても攻撃を当てて反撃する機会を活かす。
+    // 間合いに入りっぱなしだと毎ティック条件を満たし続けてパルスが途切れず「離す」瞬間が来ない
+    // (releasedNowが成立せずtryBrushSwingが一生呼ばれない)ため、パルス終了後は必ず1ティック以上の
+    // 空白(mem.swingBlockUntil)を空けてから次のパルスを許可する
+    if (!pulseActiveB && (!mem.swingBlockUntil || g.time>=mem.swingBlockUntil) && oppTargetable && distToOpp < meleeRB && p.swingCooldown<=0){
+      var swAngB=Math.atan2(opp.y-p.y, opp.x-p.x);
+      input.aim={x:Math.cos(swAngB),y:Math.sin(swAngB)};
+      mem.swingUntil = g.time+FIXED_DT*1.5;
+      mem.swingBlockUntil = mem.swingUntil + FIXED_DT*2;
+      pulseActiveB = true;
+    }
+    input.fire = !!pulseActiveB;
   }
 
   if (p.sp>=weapon.specialGaugeMax && !p.specialActive){
@@ -1151,12 +1561,100 @@ function botDecide(g, idx){
     }
     if (g.rng() < chance) input.special=true;
   }
+
+  // サブの判断: 投げ物系(スプラッシュボム/クイックボム)は「サブ→メイン射撃」の優先順で、
+  // 条件を満たしたらこのティックのメイン射撃を取りやめてサブを投げる(第5.1ラウンドで追加)。
+  // インクが足りない時は、敵が遠ければ一旦撃つのをやめて自陣インクの上へ寄り、回復してから使う「温存モード」。
+  // (シールド・スプリンクラー(未設置時)も「発動に必要なインクを普段から少し蓄えておく」形で
+  //  同じ温存モードの対象にしている。ただし遠距離が続く間ずっと温存し続けると本来の塗り・接近行動が
+  //  止まってしまうため、温存モードは1回最大3秒までとし、明けたら`nextReserveAllowed`で
+  //  数秒(既定8〜12秒)は再突入させないようにして、既存3種を含む全体の勝率バランスへの影響を抑えている)
+  var subDef = SUBS[p.sub];
+  var isBombSub = subDef && (subDef.key==='splashbomb' || subDef.key==='quickbomb');
+  var isShieldSub = subDef && subDef.key==='shield';
+  var isSprinklerSub = subDef && subDef.key==='sprinkler';
+  var hasOwnSprinkler = false;
+  if (isSprinklerSub) for (var spi=0; spi<g.sprinklers.length; spi++) if (g.sprinklers[spi].ownerIdx===idx){ hasOwnSprinkler=true; break; }
+  var bombAttemptReady = !mem.nextBombAttempt || g.time>=mem.nextBombAttempt;
+
+  if (isBombSub && p.subCooldown<=0 && bombAttemptReady){
+    var canAffordBomb = p.ink >= subDef.inkCost+5;
+    var inThrowRange = oppTargetable && distToOpp<=subDef.throwDist+40 && distToOpp>=CELL*1.0;
+    if (canAffordBomb && inThrowRange){
+      mem.subReserveActive=false;
+      input.fire=false;
+      input.sub=true;
+      var bombAng=Math.atan2(opp.y-p.y, opp.x-p.x);
+      input.aim={x:Math.cos(bombAng), y:Math.sin(bombAng)};
+      // 投げた後は連投しすぎない(クールダウン1秒いっぱいの連投を防ぎ、1試合3〜12回程度に収める)
+      mem.nextBombAttempt = g.time + 5 + g.rng()*5;
+    }
+  }
+  if ((isBombSub || isShieldSub || (isSprinklerSub && !hasOwnSprinkler)) && p.subCooldown<=0 && !input.sub){
+    var reserveCostNeeded = isBombSub ? subDef.inkCost+5 : subDef.inkCost;
+    var canAffordReserve = p.ink >= reserveCostNeeded;
+    var safeToReserve = !oppTargetable || distToOpp>engageDist;
+    if (!canAffordReserve && safeToReserve &&
+        (!mem.nextReserveAllowed || g.time>=mem.nextReserveAllowed) && !mem.subReserveActive){
+      mem.subReserveActive=true;
+      mem.subReserveUntil=g.time+3.0; // 安全上限(この時間で必要量に届かなくても切り上げる)
+    }
+    if (mem.subReserveActive){
+      // 「1秒ほど」を目安に、必要量まで貯まるか上限時間に達したら終える(自陣インク上なら+35/秒で早く貯まる)
+      if (p.ink<reserveCostNeeded && g.time<mem.subReserveUntil){
+        input.fire=false;
+      } else {
+        mem.subReserveActive=false;
+        mem.nextReserveAllowed=g.time+8+g.rng()*4;
+      }
+    }
+  }
+  if (!input.sub) input.sub = botDecideSub(g, idx, p, opp, weapon, distToOpp, oppTargetable, input);
   return input;
+}
+
+// サブウェポンのボット判断(共通)。投げ物系は上のbotDecide内で優先処理済みのためここには来ない。
+// スプリンクラーは未塗り・相手色が多い方向をねらって置く、シールドは直近で撃たれている(被弾)時に使う
+function botDecideSub(g, idx, p, opp, weapon, distToOpp, oppTargetable, input){
+  var sub = SUBS[p.sub];
+  if (!sub || p.subCooldown>0 || p.ink<sub.inkCost) return false;
+  if (sub.key==='splashbomb' || sub.key==='quickbomb'){
+    return false; // botDecide側の優先ロジックで処理済み
+  } else if (sub.key==='sprinkler'){
+    var already=false;
+    for (var i=0;i<g.sprinklers.length;i++) if (g.sprinklers[i].ownerIdx===idx){ already=true; break; }
+    if (already) return false;
+    var unpaintedNear = countUnpaintedNear(g, p.x, p.y, 6);
+    if (unpaintedNear < 4) return false;
+    // 未塗り・相手色が多い方向へ向いてから置く
+    var sprinklerDir = pickCoverageDir(g, idx, p, false, false);
+    if (input) input.aim = {x:sprinklerDir.x, y:sprinklerDir.y};
+    return true;
+  } else if (sub.key==='shield'){
+    var recentlyHit = (g.time - (p.lastHitAt!=null?p.lastHitAt:-999)) < 2.0;
+    var threatWeapon = oppTargetable && (opp.weapon==='shooter' || opp.weapon==='charger' || opp.weapon==='bucket');
+    return recentlyHit && threatWeapon;
+  }
+  return false;
+}
+
+function countUnpaintedNear(g, x, y, radiusCells){
+  var cx=Math.floor(x/CELL), cy=Math.floor(y/CELL);
+  var cnt=0;
+  for (var oy=-radiusCells; oy<=radiusCells; oy+=2){
+    for (var ox=-radiusCells; ox<=radiusCells; ox+=2){
+      var gx=cx+ox, gy=cy+oy;
+      if (gx<0||gx>=GRID_W||gy<0||gy>=GRID_H) continue;
+      if (g.grid[gy*GRID_W+gx]===0) cnt++;
+    }
+  }
+  return cnt;
 }
 
 /* ==================== 8. 入力(タッチ / キーボード・マウス フォールバック) ==================== */
 var touchState = {};       // pointerId -> {player,kind,anchorX,anchorY,curX,curY}
 var specialPulse = {1:false, 2:false};
+var subPulse = {1:false, 2:false};
 var keysDown = {};
 var mouseState = {x:0,y:0,down:false};
 
@@ -1189,6 +1687,13 @@ function setupInput(){
     btn.addEventListener('pointerdown', function(e){
       e.preventDefault(); e.stopPropagation();
       specialPulse[player]=true;
+    }, {passive:false});
+  });
+  document.querySelectorAll('.subBtn').forEach(function(btn){
+    var player=+btn.dataset.player;
+    btn.addEventListener('pointerdown', function(e){
+      e.preventDefault(); e.stopPropagation();
+      subPulse[player]=true;
     }, {passive:false});
   });
   window.addEventListener('keydown', function(e){
@@ -1298,7 +1803,13 @@ function readLiveInput(i, game){
   if (!special && keysDown[key] && !keysDown['_prev_'+key]){ special=true; }
   keysDown['_prev_'+key]=!!keysDown[key];
 
-  return {move:move, aim: aim||{x:0,y:0}, fire:fire, special:special};
+  var sub=false;
+  var subKey = (i===0)?'r':'u';
+  if (subPulse[playerNum]){ sub=true; subPulse[playerNum]=false; }
+  if (!sub && keysDown[subKey] && !keysDown['_prev_'+subKey]){ sub=true; }
+  keysDown['_prev_'+subKey]=!!keysDown[subKey];
+
+  return {move:move, aim: aim||{x:0,y:0}, fire:fire, special:special, sub:sub};
 }
 
 function readKeysMove(keys){ // [up,left,down,right]
@@ -1378,6 +1889,68 @@ function drawParticles(ctx, g){
     ctx.fillStyle = pt.owner===0?COLOR.p1:COLOR.p2;
     ctx.beginPath(); ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2); ctx.fill();
     ctx.globalAlpha=1;
+  }
+}
+
+// サブウェポンの投擲物: 影+高さの縮尺で放物線っぽく飛んでいるように見せる
+function drawSubThrows(ctx, g){
+  for (var i=0;i<g.subThrows.length;i++){
+    var b=g.subThrows[i];
+    var col = b.owner===0 ? COLOR.p1 : COLOR.p2;
+    if (!b.landed){
+      var t=clamp(b.age/b.travelTime,0,1);
+      var x=b.x0+(b.x-b.x0)*t, y=b.y0+(b.y-b.y0)*t;
+      var arcH=Math.sin(Math.PI*t)*26; // 山なりの高さ
+      // 影(地面の着地予定地点)
+      ctx.fillStyle='rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(x,y,7,3.5,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=col;
+      ctx.beginPath(); ctx.arc(x,y-arcH,b.kind==='quickbomb'?5:6.5,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.2; ctx.stroke();
+    } else {
+      // 着地して起爆待ち: その場で明滅させる
+      var pulse=0.6+0.4*Math.sin(g.time*14);
+      ctx.globalAlpha=pulse;
+      ctx.fillStyle=col;
+      ctx.beginPath(); ctx.arc(b.x,b.y,6.5,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+function drawSprinklers(ctx, g){
+  for (var i=0;i<g.sprinklers.length;i++){
+    var s=g.sprinklers[i];
+    var col = s.ownerIdx===0 ? COLOR.p1 : COLOR.p2;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(g.time*4);
+    ctx.strokeStyle=col; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(-9,0); ctx.lineTo(9,0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,9); ctx.stroke();
+    ctx.fillStyle=col;
+    ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawShields(ctx, g){
+  for (var i=0;i<g.shields.length;i++){
+    var sh=g.shields[i];
+    var col = sh.ownerIdx===0 ? COLOR.p1 : COLOR.p2;
+    var x1=sh.cx-sh.dx*sh.halfLen, y1=sh.cy-sh.dy*sh.halfLen;
+    var x2=sh.cx+sh.dx*sh.halfLen, y2=sh.cy+sh.dy*sh.halfLen;
+    ctx.save();
+    ctx.globalAlpha=0.55;
+    ctx.strokeStyle=col;
+    ctx.lineWidth=sh.thickness*2;
+    ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.globalAlpha=0.85;
+    ctx.lineWidth=3;
+    ctx.strokeStyle='rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -1492,8 +2065,11 @@ function render(g){
   ctx.fillRect(0,0,WORLD_W,WORLD_H);
   ctx.drawImage(g.inkCanvas,0,0,WORLD_W,WORLD_H);
   drawWalls(ctx,g);
+  drawShields(ctx,g);
+  drawSprinklers(ctx,g);
   drawChargeRings(ctx,g);
   drawBullets(ctx,g);
+  drawSubThrows(ctx,g);
   drawParticles(ctx,g);
   drawPlayer(ctx,g,0);
   drawPlayer(ctx,g,1);
@@ -1503,9 +2079,32 @@ function render(g){
 
 /* ==================== 10. UI / 画面フロー ==================== */
 var activeLiveGame=null;
-var selState = { 1:'shooter', 2:'shooter', readyP1:false, readyP2:false };
+var selState = { 1:'shooter', 2:'roller', readyP1:false, readyP2:false };
+var subState = { 1:'splashbomb', 2:'quickbomb' };
 var urlOpts = {};
 var gameMode = 'pvp'; // 'pvp' = ふたりで たいせん / 'cpu' = ひとりで れんしゅう(CPU)
+var LOADOUT_KEY = 'sploteen_loadout_v5';
+
+// 前回選んだ組み合わせをlocalStorageに読み書きする(使えない環境でも動くようtry/catchで囲む)
+function loadSavedLoadout(){
+  try{
+    var raw = window.localStorage && localStorage.getItem(LOADOUT_KEY);
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    if (d && d.p1 && WEAPONS[d.p1.main]) selState[1]=d.p1.main;
+    if (d && d.p1 && SUBS[d.p1.sub]) subState[1]=d.p1.sub;
+    if (d && d.p2 && WEAPONS[d.p2.main]) selState[2]=d.p2.main;
+    if (d && d.p2 && SUBS[d.p2.sub]) subState[2]=d.p2.sub;
+  }catch(e){ /* localStorageが使えなくても無視して既定値のまま進める */ }
+}
+function saveLoadout(){
+  try{
+    if (!window.localStorage) return;
+    localStorage.setItem(LOADOUT_KEY, JSON.stringify({
+      p1:{main:selState[1], sub:subState[1]}, p2:{main:selState[2], sub:subState[2]},
+    }));
+  }catch(e){ /* 保存に失敗しても対戦は続行できる */ }
+}
 
 function $(id){ return document.getElementById(id); }
 
@@ -1532,12 +2131,37 @@ function buildWeaponCards(){
       btn.addEventListener('pointerdown', function(e){
         e.preventDefault();
         selState[stateKeyForRow(pn)]=key;
+        // メインを変えたら、そのプレイヤーのサブが未選択(既定サブのまま)なら合わせて既定サブに揃える必要はないため、そのままにする
         refreshWeaponUI();
+        saveLoadout();
       });
       row.appendChild(btn);
     });
   });
+  buildSubCards();
   refreshWeaponUI();
+}
+
+function buildSubCards(){
+  ['1','2','cpu'].forEach(function(pn){
+    var row=document.querySelector('.weaponRow[data-select-sub="'+pn+'"]');
+    if (!row) return;
+    row.innerHTML='';
+    Object.keys(SUBS).forEach(function(key){
+      var s=SUBS[key];
+      var btn=document.createElement('button');
+      btn.className='wCard';
+      btn.dataset.sub=key;
+      btn.innerHTML='<div class="wEmoji">'+s.emoji+'</div>';
+      btn.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        subState[stateKeyForRow(pn)]=key;
+        refreshSubUI();
+        saveLoadout();
+      });
+      row.appendChild(btn);
+    });
+  });
 }
 
 // 選択状態(selState)に合わせて、各武器カード列のハイライトと説明文を更新する
@@ -1551,11 +2175,27 @@ function refreshWeaponUI(){
   var w1=WEAPONS[selState[1]], w2=WEAPONS[selState[2]];
   if ($('descP1')) $('descP1').textContent=w1.name+':「'+w1.desc+'」';
   if ($('descP2')) $('descP2').textContent=w2.name+':「'+w2.desc+'」';
+  refreshSubUI();
+}
+
+// 選択状態(subState)に合わせて、各サブカード列のハイライトと説明文を更新する
+function refreshSubUI(){
+  ['1','2','cpu'].forEach(function(pn){
+    var row=document.querySelector('.weaponRow[data-select-sub="'+pn+'"]');
+    if (!row) return;
+    var key=subState[stateKeyForRow(pn)];
+    row.querySelectorAll('.wCard').forEach(function(c){ c.classList.toggle('selected', c.dataset.sub===key); });
+  });
+  var s1=SUBS[subState[1]], s2=SUBS[subState[2]];
+  if ($('descSubP1')) $('descSubP1').textContent='サブ '+s1.name+':「'+s1.desc+'」';
+  if ($('descSubP2')) $('descSubP2').textContent='サブ '+s2.name+':「'+s2.desc+'」';
 }
 
 function updateWeaponIcons(){
   $('wIconP1').textContent=WEAPONS[activeLiveGame.players[0].weapon].emoji;
   $('wIconP2').textContent=WEAPONS[activeLiveGame.players[1].weapon].emoji;
+  $('subBtnP1').textContent=SUBS[activeLiveGame.players[0].sub].emoji;
+  $('subBtnP2').textContent=SUBS[activeLiveGame.players[1].sub].emoji;
 }
 
 function onPlayStartUI(g){
@@ -1631,6 +2271,8 @@ function applySelectModeUI(){
   $('cpuPanel').classList.toggle('hidden', !isCpu);
   var p2Row=document.querySelector('.weaponRow[data-select-player="2"]');
   p2Row.classList.toggle('readOnly', isCpu);
+  var p2SubRow=document.querySelector('.weaponRow[data-select-sub="2"]');
+  if (p2SubRow) p2SubRow.classList.toggle('readOnly', isCpu);
   var readyBtn2=$('readyP2');
   if (isCpu){
     selState.readyP2=true;
@@ -1664,7 +2306,7 @@ function maybeStartCountdown(){
     // bot2: CPUモード、またはURLパラメータ(bot2=1 / bots=1)指定時。bot1は既存どおりURLパラメータのみ
     var bot1 = !!urlOpts.bot1;
     var bot2 = (gameMode==='cpu') || !!urlOpts.bot2;
-    startSeries(activeLiveGame, selState[1], selState[2], Date.now()&0xffffffff, bot1, bot2, urlOpts.duration);
+    startSeries(activeLiveGame, selState[1], selState[2], Date.now()&0xffffffff, bot1, bot2, urlOpts.duration, subState[1], subState[2]);
     updateWeaponIcons();
     showPanel(null);
   }
@@ -1682,6 +2324,9 @@ function updateHUD(g){
     $('hpFillP'+pn).style.width=Math.max(0,p.hp)+'%';
     $('hpP'+pn).textContent = p.alive ? ('HP '+Math.ceil(p.hp)) : ('ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
     $('killP'+pn).textContent = 'たおした '+p.stats.kills;
+    var sub=SUBS[p.sub];
+    var subAvail = p.alive && p.subCooldown<=0 && sub && p.ink>=sub.inkCost;
+    $('subBtnP'+pn).classList.toggle('avail', subAvail);
     var toastEl=$('hudToastP'+pn), toast=p.hudToast;
     if (toast){
       toastEl.textContent = toast.text;
@@ -1729,7 +2374,7 @@ function simulate(opts){
   var duration=opts.duration||ROUND_DURATION_DEFAULT;
   var g=createGame({headless:true, live:false, seed:opts.seed||1});
   g.duration=duration;
-  configurePlayers(g, p1, p2, opts.bot1!==false, opts.bot2!==false);
+  configurePlayers(g, p1, p2, opts.bot1!==false, opts.bot2!==false, opts.sub1, opts.sub2);
   startRound(g, null);
   g.phase='playing'; g.remaining=duration; g.countdown=0;
   var steps=Math.round(duration/FIXED_DT);
@@ -1741,6 +2386,7 @@ function simulate(opts){
     splats: [g.players[0].stats.paintedCells, g.players[1].stats.paintedCells],
     specials: [g.players[0].stats.specials, g.players[1].stats.specials],
     kills: [g.players[0].stats.kills, g.players[1].stats.kills],
+    subs: [g.players[0].stats.subsUsed, g.players[1].stats.subsUsed],
     inkPainted: [g.counts[0], g.counts[1]],
   };
 }
@@ -1751,8 +2397,11 @@ function startMatch(opts){
   $('countdownWrap').classList.add('hidden');
   selState[1]=opts.p1||selState[1]||'shooter';
   selState[2]=opts.p2||selState[2]||'shooter';
+  subState[1]=opts.sub1||subState[1]||WEAPONS[selState[1]].defaultSub;
+  subState[2]=opts.sub2||subState[2]||WEAPONS[selState[2]].defaultSub;
   startSeries(activeLiveGame, selState[1], selState[2], opts.seed!=null?opts.seed:1,
-    opts.bot1!==undefined?opts.bot1:false, opts.bot2!==undefined?opts.bot2:false, opts.duration);
+    opts.bot1!==undefined?opts.bot1:false, opts.bot2!==undefined?opts.bot2:false, opts.duration,
+    subState[1], subState[2]);
   updateWeaponIcons();
 }
 
@@ -1760,7 +2409,7 @@ function getState(){
   var g=activeLiveGame;
   if (!g) return null;
   function pub(p){
-    return { x:p.x, y:p.y, hp:p.hp, ink:p.ink, sp:p.sp, alive:p.alive, weapon:p.weapon, specialActive:p.specialActive, kills:p.stats.kills };
+    return { x:p.x, y:p.y, hp:p.hp, ink:p.ink, sp:p.sp, alive:p.alive, weapon:p.weapon, sub:p.sub, specialActive:p.specialActive, kills:p.stats.kills, subsUsed:p.stats.subsUsed };
   }
   var totalPlayable=GRID_W*GRID_H-g.wallCount;
   return {
@@ -1779,11 +2428,13 @@ function setInput(player, inputObj){
     aim: inputObj.aim||{x:0,y:0},
     fire: !!inputObj.fire,
     special: !!inputObj.special,
+    sub: !!inputObj.sub,
   };
 }
 
 window.SPLOTEEN = {
   WEAPONS: WEAPONS,
+  SUBS: SUBS,
   CONFIG: CONFIG,
   simulate: simulate,
   startMatch: startMatch,
@@ -1797,6 +2448,8 @@ function parseURLOpts(){
   var o={};
   if (sp.has('p1')) o.p1=sp.get('p1');
   if (sp.has('p2')) o.p2=sp.get('p2');
+  if (sp.has('sub1')) o.sub1=sp.get('sub1');
+  if (sp.has('sub2')) o.sub2=sp.get('sub2');
   o.auto = sp.get('auto')==='1';
   o.bots = sp.get('bots')==='1';
   o.bot1 = sp.get('bot1')==='1' || o.bots;
@@ -1809,6 +2462,7 @@ function parseURLOpts(){
 function boot(){
   activeLiveGame = createGame({headless:false, live:true, seed:1});
   activeLiveGame.duration = ROUND_DURATION_DEFAULT;
+  loadSavedLoadout();
   buildWeaponCards();
   setupInput();
 
@@ -1836,7 +2490,9 @@ function boot(){
   urlOpts = parseURLOpts();
   if (urlOpts.auto){
     activeLiveGame.duration = urlOpts.duration;
-    startSeries(activeLiveGame, urlOpts.p1||'shooter', urlOpts.p2||'roller', urlOpts.seed, urlOpts.bot1, urlOpts.bot2, urlOpts.duration);
+    var autoP1=urlOpts.p1||'shooter', autoP2=urlOpts.p2||'roller';
+    var autoSub1=urlOpts.sub1||WEAPONS[autoP1].defaultSub, autoSub2=urlOpts.sub2||WEAPONS[autoP2].defaultSub;
+    startSeries(activeLiveGame, autoP1, autoP2, urlOpts.seed, urlOpts.bot1, urlOpts.bot2, urlOpts.duration, autoSub1, autoSub2);
     updateWeaponIcons();
     showPanel(null);
   }
