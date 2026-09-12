@@ -78,7 +78,7 @@
   .bar.sp i{ background:linear-gradient(90deg,#ffb238,#ffe08a); }
   .bar.sp.full i{ box-shadow:0 0 10px 2px #ffe08a; }
   .barRow{ display:flex; align-items:center; gap:8px; flex:1 1 auto; min-width:0; }
-  .hpTxt{ font-size:15px; font-weight:700; color:var(--sub); flex:0 0 auto; width:76px; text-align:right; white-space:nowrap; }
+  .hpTxt{ font-size:13px; font-weight:700; color:var(--sub); flex:0 0 auto; width:128px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .killTxt{ font-size:15px; font-weight:700; color:#ffcf7a; flex:0 0 auto; white-space:nowrap; }
   .hudToast{
     position:absolute; left:50%; top:-2px; transform:translate(-50%,-100%);
@@ -2869,13 +2869,14 @@ function onRoundEndUI(g){
   });
   var lastResult=g.roundResults[g.roundResults.length-1];
   var winnerIdx=lastResult.winnerIdx;
-  var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">P1のかち!</span>' : '<span class="win2">P2のかち!</span>');
+  var n1=avatarDisplayName(1), n2=avatarDisplayName(2);
+  var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">'+n1+' の かち!</span>' : '<span class="win2">'+n2+' の かち!</span>');
   var kills = lastResult.kills || [0,0];
   setTimeout(function(){
-    $('resultText').innerHTML = 'P1 '+pct1+'% / P2 '+pct2+'%<br>'+label;
+    $('resultText').innerHTML = n1+' '+pct1+'% / '+n2+' '+pct2+'%<br>'+label;
     $('killSummary').innerHTML =
-      '<span><b class="p1">P1</b> たおした:'+kills[0]+' / やられた:'+kills[1]+'</span>'+
-      '<span><b class="p2">P2</b> たおした:'+kills[1]+' / やられた:'+kills[0]+'</span>';
+      '<span><b class="p1">'+n1+'</b> たおした:'+kills[0]+' / やられた:'+kills[1]+'</span>'+
+      '<span><b class="p2">'+n2+'</b> たおした:'+kills[1]+' / やられた:'+kills[0]+'</span>';
   }, 600);
   // 左からP1の勝ち分、右からP2の勝ち分を塗る (5個の丸)
   var dotsEl=$('seriesDots'); dotsEl.innerHTML='';
@@ -2893,7 +2894,7 @@ function proceedFromResult(){
   var g=activeLiveGame;
   if (g.seriesDone){
     var champ = g.seriesScore[0]>g.seriesScore[1] ? 1 : 2;
-    $('champTitle').innerHTML = 'P'+champ+' の ゆうしょう!<br><span style="font-size:0.55em;color:#9aa6cf;">('+g.seriesScore[0]+' - '+g.seriesScore[1]+')</span>';
+    $('champTitle').innerHTML = avatarDisplayName(champ)+' の ゆうしょう!<br><span style="font-size:0.55em;color:#9aa6cf;">('+g.seriesScore[0]+' - '+g.seriesScore[1]+')</span>';
     showPanel('panelSeries');
   } else {
     startRound(g, g.lastRoundLoserIdx);
@@ -2964,7 +2965,8 @@ function updateHUD(g){
     $('spBarP'+pn).classList.toggle('full', spPct>=100);
     $('spBtnP'+pn).classList.toggle('ready', spPct>=100 || p.specialActive);
     $('hpFillP'+pn).style.width=Math.max(0,p.hp)+'%';
-    $('hpP'+pn).textContent = p.alive ? ('HP '+Math.ceil(p.hp)) : ('ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
+    var nameLabel=avatarDisplayName(pn);
+    $('hpP'+pn).textContent = p.alive ? (nameLabel+' HP '+Math.ceil(p.hp)) : (nameLabel+' ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
     $('killP'+pn).textContent = 'たおした '+p.stats.kills;
     var sub=SUBS[p.sub];
     var subAvail = p.alive && p.subCooldown<=0 && sub && p.ink>=sub.inkCost;
