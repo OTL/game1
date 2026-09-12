@@ -53,19 +53,41 @@
     pointer-events:none; display:none; z-index:20;
   }
   .stick.knob{ width:34px; height:34px; margin:-17px 0 0 -17px; background:rgba(255,255,255,0.55); }
+  /* サブ/スペシャルのボタンは「下からインクがたまっていく」ゲージそのものにする(第10ラウンド)。
+     ためが満タンになるまでの進み具合を .btnFill の高さ(0〜100%)で見せ、満タンになったら光って脈打つ */
   .specialBtn{
     position:absolute; right:10px; bottom:10px;
     width:54px; height:54px; border-radius:50%; border:2px solid #ffe08a; background:#3a2e08;
     color:#ffe08a; font-weight:700; font-size:12px; line-height:1.2; padding:0;
+    overflow:hidden; box-shadow:0 0 0 0 rgba(255,204,77,0);
   }
-  .specialBtn.ready{ background:#ffcc4d; color:#231600; box-shadow:0 0 14px 4px rgba(255,204,77,0.7); }
+  .specialBtn.ready{ color:#231600; animation:spReady 0.7s ease-in-out infinite; }
   .subBtn{
     position:absolute; right:74px; bottom:10px;
     width:54px; height:54px; border-radius:50%; border:2px solid #7ad6ff; background:#0e2a3a;
-    color:#eafcff; font-weight:700; font-size:20px; line-height:1; padding:0; opacity:0.55;
+    color:#eafcff; font-weight:700; font-size:20px; line-height:1; padding:0; opacity:0.9;
+    overflow:hidden; box-shadow:0 0 0 0 rgba(122,214,255,0);
   }
-  .subBtn.avail{ opacity:1; box-shadow:0 0 10px 3px rgba(122,214,255,0.5); }
-  .subBtn .subCd{ position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,0.55); }
+  .subBtn.avail{ opacity:1; animation:subReady 0.9s ease-in-out infinite; }
+  /* 下からたまるインクゲージ。height はJS(updateHUD)が毎フレーム更新する */
+  .btnFill{
+    position:absolute; left:0; right:0; bottom:0; height:0%; display:block; pointer-events:none;
+    border-radius:0; transition:height 0.08s linear;
+  }
+  .subBtn .btnFill{ background:linear-gradient(180deg,#bdefff,#2f9fd0); }
+  .specialBtn .btnFill{ background:linear-gradient(180deg,#fff0b8,#ff9f1a); }
+  /* インクが足りなくて撃てないときは色を落として「たまっていない理由」を分ける */
+  .subBtn.inkShort .btnFill{ background:linear-gradient(180deg,#c9d2da,#6b7682); }
+  .btnLbl{ position:relative; z-index:1; text-shadow:0 1px 3px rgba(0,0,0,0.75); }
+  .specialBtn.ready .btnLbl, .subBtn.avail .btnLbl{ text-shadow:0 1px 2px rgba(0,0,0,0.35); }
+  @keyframes subReady{
+    0%,100%{ box-shadow:0 0 8px 2px rgba(122,214,255,0.45); }
+    50%    { box-shadow:0 0 20px 7px rgba(122,214,255,0.95); }
+  }
+  @keyframes spReady{
+    0%,100%{ box-shadow:0 0 10px 3px rgba(255,204,77,0.5); }
+    50%    { box-shadow:0 0 26px 9px rgba(255,204,77,1); }
+  }
   .wIcon{ font-size:22px; width:28px; text-align:center; flex:0 0 auto; }
   .barCol{ display:flex; flex-direction:column; gap:3px; flex:1 1 auto; min-width:0; }
   .bar{ position:relative; height:9px; border-radius:5px; background:rgba(255,255,255,0.12); overflow:hidden; flex:1 1 auto; border:1px solid rgba(255,255,255,0.18); }
@@ -271,15 +293,15 @@
   <div class="padOverlay p2">
     <div class="padzone move" data-player="2" data-kind="move"></div>
     <div class="padzone aim" data-player="2" data-kind="aim">
-      <button class="specialBtn" data-player="2" id="spBtnP2">SP</button>
-      <button class="subBtn" data-player="2" id="subBtnP2">💣</button>
+      <button class="specialBtn" data-player="2" id="spBtnP2"><i class="btnFill" id="spBtnFillP2"></i><span class="btnLbl">SP</span></button>
+      <button class="subBtn" data-player="2" id="subBtnP2"><i class="btnFill" id="subBtnFillP2"></i><span class="btnLbl" id="subBtnLblP2">💣</span></button>
     </div>
   </div>
   <div class="padOverlay p1">
     <div class="padzone move" data-player="1" data-kind="move"></div>
     <div class="padzone aim" data-player="1" data-kind="aim">
-      <button class="specialBtn" data-player="1" id="spBtnP1">SP</button>
-      <button class="subBtn" data-player="1" id="subBtnP1">💣</button>
+      <button class="specialBtn" data-player="1" id="spBtnP1"><i class="btnFill" id="spBtnFillP1"></i><span class="btnLbl">SP</span></button>
+      <button class="subBtn" data-player="1" id="subBtnP1"><i class="btnFill" id="subBtnFillP1"></i><span class="btnLbl" id="subBtnLblP1">💣</span></button>
     </div>
   </div>
 
@@ -935,6 +957,33 @@ function spawnParticles(g, x, y, ownerIdx, n){
   }
 }
 
+/* ---- 見た目だけのエフェクト(第10ラウンド: サブ/スペシャルが「起きたこと」を分かりやすくする) ----
+   いずれも g.headless(バランス実験の高速シミュレーション)では何もしないので、勝敗の計算には影響しない */
+
+// 広がる輪。爆発・設置・発動の「ここで何かが起きた」を一目で分かるようにする
+function spawnRing(g, x, y, r0, r1, ownerIdx, life, width, white, alpha){
+  if (g.headless) return;
+  g.particles.push({ring:true, x:x, y:y, r0:r0, r1:r1, owner:ownerIdx, age:0, life:life||0.35,
+                    w:width||4, white:!!white, alpha:(alpha===undefined?0.9:alpha)});
+}
+
+// 太い直線の閃光。せんせいストライクやシールド設置など「線状に起きたこと」の表示に使う
+function spawnStreak(g, x1, y1, x2, y2, ownerIdx, life, width, white){
+  if (g.headless) return;
+  g.particles.push({streak:true, x1:x1, y1:y1, x2:x2, y2:y2, owner:ownerIdx, age:0,
+                    life:life||0.3, w:width||8, white:!!white});
+}
+
+// 飛び散るしぶき(向きと速さを指定できる版)。ウツボの降り注ぎやマンタの水しぶきに使う
+function spawnSplash(g, x, y, ownerIdx, n, speed, life, rad){
+  if (g.headless) return;
+  for (var i=0;i<n;i++){
+    var a=g.rng()*Math.PI*2, sp=speed*(0.4+g.rng()*0.9);
+    g.particles.push({x:x, y:y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, age:0,
+                      life:life*(0.6+g.rng()*0.7), owner:ownerIdx, r:rad*(0.6+g.rng()*0.8)});
+  }
+}
+
 /* ==================== 5. 武器アクション ==================== */
 function fireShooterBullet(g, idx, p, weapon){
   var spread=(g.rng()*2-1)*weapon.spread;
@@ -1101,6 +1150,7 @@ function throwSubBomb(g, idx, p, sub, instant){
     kind: instant?'quickbomb':'splashbomb', owner:idx, sub:sub,
     x0:p.x, y0:p.y, x:tx, y:ty, age:0, travelTime:travelTime, landed:false, fuse:sub.fuse||0,
   });
+  spawnRing(g, p.x, p.y, 4, 22, idx, 0.22, 3, false, 0.7); // 投げた瞬間の合図
 }
 
 function explodeSubBomb(g, b){
@@ -1117,7 +1167,14 @@ function explodeSubBomb(g, b){
       applyDamage(g, target, dmg, b.owner);
     }
   }
-  spawnParticles(g, b.x, b.y, b.owner, 16);
+  // 爆発の演出: 爆発半径ぴったりまで広がる二重の輪+しぶき+軽い画面ゆれ(どこまで届いたか分かるように)
+  spawnParticles(g, b.x, b.y, b.owner, 26);
+  spawnRing(g, b.x, b.y, rr*0.15, rr, b.owner, 0.34, 7, true, 0.95);
+  spawnRing(g, b.x, b.y, rr*0.1, rr*1.15, b.owner, 0.42, 4, false, 0.85);
+  if (!g.headless){
+    var shake = sub.key==='quickbomb' ? 0.12 : 0.2, mag = sub.key==='quickbomb' ? 4 : 7;
+    if (g.shakeTimer < shake){ g.shakeTimer=shake; g.shakeMag=mag; }
+  }
 }
 
 function placeSprinkler(g, idx, p, sub){
@@ -1127,6 +1184,9 @@ function placeSprinkler(g, idx, p, sub){
   var x=clamp(p.x+Math.cos(ang)*sub.throwDist, CELL, WORLD_W-CELL);
   var y=clamp(p.y+Math.sin(ang)*sub.throwDist, CELL, WORLD_H-CELL);
   g.sprinklers.push({ ownerIdx:idx, x:x, y:y, timer:sub.duration, hp:sub.hp, nextTick:0 });
+  spawnRing(g, x, y, 4, sub.radius*CELL, idx, 0.4, 5, false, 0.85); // 設置した位置と塗る範囲を見せる
+  spawnRing(g, x, y, 2, sub.radius*CELL*0.5, idx, 0.26, 3, true, 0.8);
+  spawnParticles(g, x, y, idx, 10);
 }
 
 function placeShield(g, idx, p, sub){
@@ -1144,6 +1204,10 @@ function placeShield(g, idx, p, sub){
     var t=-halfLen+ (2*halfLen)*(s/steps);
     paintCircle(g, cx+dx*t, cy+dy*t, sub.thickness*CELL*0.75+CELL*0.3, idx+1);
   }
+  // 張った瞬間に壁の線が光り、中心から輪が広がる(どこに壁ができたか分かるように)
+  spawnStreak(g, cx-dx*halfLen, cy-dy*halfLen, cx+dx*halfLen, cy+dy*halfLen, idx, 0.35, sub.thickness*CELL*2.2, true);
+  spawnRing(g, cx, cy, 6, halfLen, idx, 0.3, 4, false, 0.7);
+  spawnParticles(g, cx, cy, idx, 8);
 }
 
 function distToShieldSeg(sh, x, y){
@@ -1231,7 +1295,13 @@ function activateSpecial(g, idx){
     p.specialData = { timer: SPECIALS.manta.duration, shotCooldown:0 };
   }
   if (!g.headless){
-    g.specialFlash = { owner:idx, name:SPECIALS[p.special].name, age:0, life:0.3 };
+    g.specialFlash = { owner:idx, name:SPECIALS[p.special].name, age:0, life:0.45, emoji:SPECIALS[p.special].emoji };
+    // 発動の瞬間: 足元から三重の輪が一気に広がり、しぶきが飛び、画面がゆれる
+    spawnRing(g, p.x, p.y, 8, 150, idx, 0.5, 10, false, 1);
+    spawnRing(g, p.x, p.y, 8, 95, idx, 0.36, 6, true, 0.9);
+    spawnRing(g, p.x, p.y, 8, 220, idx, 0.7, 5, false, 0.6);
+    spawnSplash(g, p.x, p.y, idx, 26, 320, 0.6, 4);
+    g.shakeTimer=0.28; g.shakeMag=8;
   }
 }
 
@@ -1263,7 +1333,20 @@ function executeSenseiStrike(g, idx, p, angle){
       }
     }
   }
-  if (!g.headless){ g.shakeTimer=0.3; g.shakeMag=10; }
+  if (!g.headless){
+    g.shakeTimer=0.36; g.shakeMag=12;
+    // 着弾の帯を実際の当たり幅で閃光として描き、こおり範囲の縁も細い線で見せる
+    var exX=ox+dirX*maxRange, exY=oy+dirY*maxRange;
+    spawnStreak(g, ox, oy, exX, exY, idx, 0.45, halfW*2, true);
+    spawnStreak(g, ox+perpX*iceHalfW, oy+perpY*iceHalfW, exX+perpX*iceHalfW, exY+perpY*iceHalfW, idx, 0.45, 3, false);
+    spawnStreak(g, ox-perpX*iceHalfW, oy-perpY*iceHalfW, exX-perpX*iceHalfW, exY-perpY*iceHalfW, idx, 0.45, 3, false);
+    spawnRing(g, ox, oy, 10, halfW*3, idx, 0.4, 8, true, 0.9);
+    for (var fs=1; fs<8; fs++){
+      var fd=maxRange*fs/8, fx2=ox+dirX*fd, fy2=oy+dirY*fd;
+      if (fx2<0||fx2>WORLD_W||fy2<0||fy2>WORLD_H) break;
+      spawnSplash(g, fx2, fy2, idx, 6, 240, 0.5, 3.5);
+    }
+  }
 }
 
 // むらさめウツボ: 前方の広い矩形範囲(キャラに追従)にウツボの群れが降り注ぎ、毎秒40%塗りつつ35ダメージ/秒。
@@ -1278,6 +1361,17 @@ function updateUtsuboField(g, idx, p, dt){
     sd.paintAcc-=1;
     var rf=g.rng()*depth, rp=(g.rng()*2-1)*halfW;
     paintCircle(g, p.x+dirX*rf+perpX*rp, p.y+dirY*rf+perpY*rp, CELL*0.62, idx+1);
+  }
+  // 降り注いでいる様子を見せる: 範囲内にウツボのしぶきと輪を毎フレームいくつか落とす
+  if (!g.headless){
+    sd.fxAcc = (sd.fxAcc||0) + dt*26;
+    while (sd.fxAcc>=1){
+      sd.fxAcc-=1;
+      var fr=g.rng()*depth, fp=(g.rng()*2-1)*halfW;
+      var fx3=p.x+dirX*fr+perpX*fp, fy3=p.y+dirY*fr+perpY*fp;
+      spawnRing(g, fx3, fy3, 1, CELL*1.1, idx, 0.28, 3, false, 0.85);
+      spawnSplash(g, fx3, fy3, idx, 2, 120, 0.3, 3);
+    }
   }
   var target=g.players[1-idx];
   if (target.alive && !isInvulnerable(target)){
@@ -1295,6 +1389,16 @@ function updateUtsuboField(g, idx, p, dt){
 function updateMantaRide(g, idx, p, dt, inp){
   var sp=SPECIALS.manta, sd=p.specialData;
   paintCircle(g, p.x, p.y, sp.trailCells*CELL/2, idx+1);
+  // 乗っている間は水しぶきの跡と、引き寄せ範囲を示す輪を出し続ける
+  if (!g.headless){
+    sd.trailAcc = (sd.trailAcc||0) + dt*22;
+    while (sd.trailAcc>=1){ sd.trailAcc-=1; spawnSplash(g, p.x, p.y, idx, 1, 180, 0.4, 4); }
+    sd.pullAcc = (sd.pullAcc||0) + dt;
+    if (sd.pullAcc>=0.22){
+      sd.pullAcc=0;
+      spawnRing(g, p.x, p.y, sp.pullRadiusCells*CELL, p.radius+6, idx, 0.34, 3, false, 0.55); // 内向きに縮む輪=引き寄せ
+    }
+  }
   var opp=g.players[1-idx];
   if (opp.alive && !isInvulnerable(opp)){
     var dx=opp.x-p.x, dy=opp.y-p.y, d=Math.hypot(dx,dy)||1e-4;
@@ -1302,6 +1406,10 @@ function updateMantaRide(g, idx, p, dt, inp){
     if (d<=contactR){
       applyDamage(g, opp, sp.contactDamage, idx);
       if (opp.alive) applyStatus(g, idx, opp, 'aburi', sp.aburiTime);
+      // 体当たりの瞬間を大きな輪+しぶき+ゆれで見せる
+      spawnRing(g, opp.x, opp.y, 6, 90, idx, 0.32, 9, true, 1);
+      spawnSplash(g, opp.x, opp.y, idx, 18, 300, 0.5, 4);
+      if (!g.headless && g.shakeTimer<0.2){ g.shakeTimer=0.2; g.shakeMag=8; }
     } else if (d<=sp.pullRadiusCells*CELL){
       opp.x -= dx/d*sp.pullForce*dt; opp.y -= dy/d*sp.pullForce*dt;
     }
@@ -1408,7 +1516,7 @@ function updateParticles(g, dt){
   for (var i=arr.length-1;i>=0;i--){
     var pt=arr[i];
     pt.age += dt;
-    if (pt.beam){ if (pt.age>=pt.life) arr.splice(i,1); continue; }
+    if (pt.beam || pt.ring || pt.streak){ if (pt.age>=pt.life) arr.splice(i,1); continue; }
     pt.x += pt.vx*dt; pt.y += pt.vy*dt;
     pt.vx *= 0.9; pt.vy *= 0.9;
     if (pt.age>=pt.life) arr.splice(i,1);
@@ -2320,6 +2428,33 @@ function drawBullets(ctx, g){
 function drawParticles(ctx, g){
   for (var i=0;i<g.particles.length;i++){
     var pt=g.particles[i];
+    if (pt.ring){
+      var rt=clamp(pt.age/pt.life,0,1);
+      var rr2=pt.r0+(pt.r1-pt.r0)*(1-(1-rt)*(1-rt)); // 最初はいきおいよく、終わりはゆっくり広がる
+      ctx.save();
+      ctx.globalAlpha=(1-rt)*pt.alpha;
+      ctx.strokeStyle= pt.white ? '#ffffff' : (pt.owner===0?COLOR.p1:COLOR.p2);
+      ctx.lineWidth=Math.max(0.8, pt.w*(1-rt*0.65));
+      ctx.beginPath(); ctx.arc(pt.x,pt.y,Math.max(0.5,rr2),0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    if (pt.streak){
+      var st=clamp(pt.age/pt.life,0,1);
+      ctx.save();
+      ctx.globalAlpha=1-st;
+      ctx.lineCap='round';
+      ctx.strokeStyle= pt.owner===0?COLOR.p1:COLOR.p2;
+      ctx.lineWidth=pt.w*(1-st*0.5);
+      ctx.beginPath(); ctx.moveTo(pt.x1,pt.y1); ctx.lineTo(pt.x2,pt.y2); ctx.stroke();
+      if (pt.white){
+        ctx.strokeStyle='rgba(255,255,255,0.9)';
+        ctx.lineWidth=Math.max(1, pt.w*0.35*(1-st*0.5));
+        ctx.beginPath(); ctx.moveTo(pt.x1,pt.y1); ctx.lineTo(pt.x2,pt.y2); ctx.stroke();
+      }
+      ctx.restore();
+      continue;
+    }
     if (pt.beam){
       var a=1-pt.age/pt.life;
       ctx.strokeStyle = (pt.owner===0?'rgba(255,122,26,':'rgba(63,160,255,')+ (a*0.9) +')';
@@ -2332,6 +2467,8 @@ function drawParticles(ctx, g){
     ctx.globalAlpha=alpha;
     ctx.fillStyle = pt.owner===0?COLOR.p1:COLOR.p2;
     ctx.beginPath(); ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2); ctx.fill();
+    // 自分の色の上に飛んだしぶきが埋もれないよう、白い縁をつける
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.stroke();
     ctx.globalAlpha=1;
   }
 }
@@ -2352,11 +2489,21 @@ function drawSubThrows(ctx, g){
       ctx.beginPath(); ctx.arc(x,y-arcH,b.kind==='quickbomb'?5:6.5,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.2; ctx.stroke();
     } else {
-      // 着地して起爆待ち: その場で明滅させる
+      // 着地して起爆待ち: 本体を明滅させつつ、爆発範囲を細い輪で予告する(巻き込まれる前に逃げられるように)
       var pulse=0.6+0.4*Math.sin(g.time*14);
+      var rr=(b.sub.radius||0)*CELL;
+      var warn=clamp(1-(b.fuse>0 ? b.age/b.fuse : 1),0,1); // 起爆が近いほど輪が濃く・太くなる
+      if (rr>0){
+        ctx.save();
+        ctx.globalAlpha=0.25+0.5*(1-warn);
+        ctx.strokeStyle=col; ctx.lineWidth=1.5+2.5*(1-warn);
+        ctx.setLineDash([6,5]);
+        ctx.beginPath(); ctx.arc(b.x,b.y,rr,0,Math.PI*2); ctx.stroke();
+        ctx.restore();
+      }
       ctx.globalAlpha=pulse;
       ctx.fillStyle=col;
-      ctx.beginPath(); ctx.arc(b.x,b.y,6.5,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x,b.y,6.5+2*(1-warn),0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
     }
   }
@@ -2732,16 +2879,29 @@ function render(g){
   // スペシャル発動演出: 0.3秒暗転+スペシャル名を大きく表示
   if (g.specialFlash){
     var f=g.specialFlash, ft=clamp(f.age/f.life,0,1);
+    var fade = ft<0.6 ? 1 : 1-(ft-0.6)/0.4;          // 6割までしっかり見せてから消える
+    var pop = 1 + 0.35*(1-Math.min(1,ft/0.18));       // 出た瞬間だけ少し大きい
     ctx.save();
-    ctx.fillStyle='rgba(0,0,0,'+(0.6*(1-ft)).toFixed(2)+')';
+    ctx.fillStyle='rgba(0,0,0,'+(0.55*fade).toFixed(2)+')';
     ctx.fillRect(0,0,WORLD_W,WORLD_H);
+    // 発動者の色の帯を画面いっぱいに走らせる
+    ctx.globalAlpha=0.55*fade;
     ctx.fillStyle = f.owner===0?COLOR.p1:COLOR.p2;
-    ctx.globalAlpha = 1-ft;
-    ctx.font='bold '+Math.round(WORLD_W*0.075)+'px sans-serif';
+    ctx.fillRect(0, WORLD_H/2-WORLD_W*0.075, WORLD_W, WORLD_W*0.15);
+    ctx.globalAlpha = fade;
+    ctx.translate(WORLD_W/2, WORLD_H/2);
+    ctx.scale(pop, pop);
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=4;
-    ctx.strokeText(f.name+'!', WORLD_W/2, WORLD_H/2);
-    ctx.fillText(f.name+'!', WORLD_W/2, WORLD_H/2);
+    if (f.emoji){
+      ctx.font=Math.round(WORLD_W*0.09)+'px sans-serif';
+      ctx.fillStyle='#ffffff';
+      ctx.fillText(f.emoji, 0, -WORLD_W*0.085);
+    }
+    ctx.fillStyle='#ffffff';
+    ctx.font='bold '+Math.round(WORLD_W*0.075)+'px sans-serif';
+    ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=6;
+    ctx.strokeText(f.name+'!', 0, 0);
+    ctx.fillText(f.name+'!', 0, 0);
     ctx.restore();
   }
   ctx.restore();
@@ -2926,8 +3086,8 @@ function refreshSpecialUI(){
 function updateWeaponIcons(){
   $('wIconP1').textContent=WEAPONS[activeLiveGame.players[0].weapon].emoji;
   $('wIconP2').textContent=WEAPONS[activeLiveGame.players[1].weapon].emoji;
-  $('subBtnP1').textContent=SUBS[activeLiveGame.players[0].sub].emoji;
-  $('subBtnP2').textContent=SUBS[activeLiveGame.players[1].sub].emoji;
+  $('subBtnLblP1').textContent=SUBS[activeLiveGame.players[0].sub].emoji;
+  $('subBtnLblP2').textContent=SUBS[activeLiveGame.players[1].sub].emoji;
 }
 
 /* ---- アバターエディタUI(第6ラウンド) ---- */
@@ -3206,6 +3366,8 @@ function updateHUD(g){
     $('spFillP'+pn).style.width=spPct+'%';
     $('spBarP'+pn).classList.toggle('full', spPct>=100);
     $('spBtnP'+pn).classList.toggle('ready', spPct>=100 || p.specialActive);
+    // スペシャルのため具合はボタンの下から色がのぼる(発動中は満タン表示のまま)
+    $('spBtnFillP'+pn).style.height = (p.specialActive ? 100 : spPct) + '%';
     $('hpFillP'+pn).style.width=Math.max(0,p.hp)+'%';
     var nameLabel=avatarDisplayName(pn);
     $('hpP'+pn).textContent = p.alive ? (nameLabel+' HP '+Math.ceil(p.hp)) : (nameLabel+' ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
@@ -3213,6 +3375,13 @@ function updateHUD(g){
     var sub=SUBS[p.sub];
     var subAvail = p.alive && p.subCooldown<=0 && sub && p.ink>=sub.inkCost;
     $('subBtnP'+pn).classList.toggle('avail', subAvail);
+    // サブのチャージ具合: クールダウンの進みとインクの残りのうち「足りていない方」を下からの色づきで見せる。
+    // インクが足りないせいでためが止まっているときは色を灰色に変えて理由が分かるようにする
+    var cdFrac = SUB_COOLDOWN>0 ? clamp(1-p.subCooldown/SUB_COOLDOWN,0,1) : 1;
+    var inkFrac = sub ? clamp(p.ink/sub.inkCost,0,1) : 1;
+    var subFrac = Math.min(cdFrac, inkFrac);
+    $('subBtnFillP'+pn).style.height = (subFrac*100).toFixed(1)+'%';
+    $('subBtnP'+pn).classList.toggle('inkShort', !subAvail && inkFrac<cdFrac);
     var toastEl=$('hudToastP'+pn), toast=p.hudToast;
     if (toast){
       toastEl.textContent = toast.text;
