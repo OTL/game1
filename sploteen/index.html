@@ -483,7 +483,10 @@ var WEAPONS = {
     swingCount:7,
     swingBulletSpeed:900, swingRange:105, swingDamage:55, swingPaintRadius:1.1,
     swingInkCost:34, swingCooldown:0.9, // 実機フィードバックでswingCooldown0.7→0.9。ボット用の振りコスト。人間用は human.swingInkCost
-    human:{ swingInkCost:20, rollCostPerCell:0.05 }, // 第6ラウンド: 人間専用(転がし塗りは新規セル1つにつきこのインクを消費。自陣の上は新規扱いされないので無料)
+    // 第6ラウンド: 人間専用。第8ラウンド: 転がしはインクを「進んだ距離」でも消費するようにした
+    // (rollCostPerCell だけだと自陣の上を転がすのが完全に無料で、未塗りの上でも消費<回復になり、
+    //  いくら塗り続けてもインクが減らなかった)。rollCostPerPx は転がして進んだ1pxあたりの消費。
+    human:{ swingInkCost:20, rollCostPerCell:0.05, rollCostPerPx:0.045 },
   },
   charger:{
     name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ', defaultSub:'sprinkler', defaultSpecial:'sensei',
@@ -1518,10 +1521,17 @@ function updatePlayer(g, idx, dt){
       if (p.isBot){
         paintCircle(g, p.x, p.y, rad, idx+1); // ボット: 従来どおり無料・無条件
       } else if (p.ink>0){
-        // 第6ラウンド: 人間だけ、新しく塗ったセル数に応じてインクを消費(自陣の上は新規扱いされないので無料)。
-        // この消費は回復までの待ち時間(INK_REGEN_DELAY)をリセットしない(自陣を走りながらでも回復できる)
+        // 第8ラウンド: 人間の転がしは「進んだ距離」+「新しく塗ったセル数」でインクを消費する。
+        // 距離の分があるので、自陣の上を転がしていてもタンクは減っていく。
+        // さらにこの消費でも回復待ち(INK_REGEN_DELAY)をリセットするので、転がしている間は回復しない
+        // (エイムパッドを離して転がしをやめると、0.5秒後に地形に応じた回復が始まる)。
         var rollPainted = paintCircle(g, p.x, p.y, rad, idx+1);
-        if (rollPainted>0) p.ink = Math.max(0, p.ink - rollPainted*inkCost(p, weapon, 'rollCostPerCell'));
+        var rollCost = moved*inkCost(p, weapon, 'rollCostPerPx')
+                     + rollPainted*inkCost(p, weapon, 'rollCostPerCell');
+        if (rollCost>0){
+          p.ink = Math.max(0, p.ink - rollCost);
+          p.lastInkSpendAt = g.time;
+        }
       }
     }
     // 接触キルは「転がしモード中(押しながら)、ある程度の速さで動いている時だけ」有効
