@@ -468,13 +468,13 @@ var WEAPONS = {
     damage:35,            // 1発ダメージ (3発で撃破。第4ラウンドで27→35、射程短縮でチャージャー等に近づく間に被弾する分を、詰めきった後の火力で相殺)
     inkPerShot:6,         // 1発の消費インク(ボット用。人間用は human.inkPerShot)
     human:{ inkPerShot:2 }, // 第6ラウンド: 人間専用のインクコスト
-    paintRadius:2.05,     // 着弾の塗り半径(セル)(第4ラウンドで1.5→1.9→2.05。射程短縮による塗り効率低下を補い、対ローラー・対チャージャー勝率も引き上げる)
+    paintRadius:2.0,      // 着弾の塗り半径(セル)(第4ラウンドで1.5→1.9→2.05。第9ラウンドの実験計画法で2.05→2.0。塗り半径はシューター勝率への最大の梃子で、主効果は0.4セルあたり約18pt)
     spread:6*Math.PI/180, // 弾のばらつき角(片側)
     moveSpeedMul:1.14,    // 移動速度倍率(第4ラウンド追加調整で1.0→1.14。機動力のある近距離万能武器として、詰める/離脱するまでの被弾時間を短縮)
   },
   roller:{
     name:'ローラー', emoji:'🖌️', desc:'おもくて おそい。ボタンを おしながら ころがして ぬる。ひいて たおす', defaultSub:'quickbomb', defaultSpecial:'manta',
-    moveSpeedMul:0.78,     // 実機フィードバック(ローラー強すぎ)で0.85→0.78
+    moveSpeedMul:0.876,    // 実機フィードバック(ローラー強すぎ)で0.85→0.78。第9ラウンドの実験計画法で0.78→0.876(主効果は0.12あたり約16pt)
     enemyInkMul:0.44,      // ローラーだけ相手インク上の減速をさらに強く(ENEMY_INK_MUL 0.55×0.8=0.44。他武器より重く感じさせる)
     rollWidth:5,          // 移動時に塗る幅(セル。強みとして維持)
     contactDamage:60,    // 接触ダメージ(実機フィードバックで85→60。1回では倒せない。振り55+接触、または接触2回)
@@ -491,17 +491,19 @@ var WEAPONS = {
   charger:{
     name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ', defaultSub:'sprinkler', defaultSpecial:'sensei',
     moveSpeedMul:1.0,       // 通常時の移動速度倍率(ため中はCHARGER_CHARGE_MOVE_MULが追加でかかる)
-    maxCharge:1.2,          // フルチャージ秒数
+    maxCharge:1.11,         // フルチャージ秒数(第9ラウンドの実験計画法で1.2→1.11)
     maxRange:0.7*WORLD_H,   // フルチャージ時の射程
     maxDamage:100,
     minChargeFrac:0.45,      // 最低保証チャージ割合
-    beamPaintRadius:2.0,     // 通過線の塗り半径(セル)(第6ラウンド: 実験計画法の結果 1.4→2.0)
+    // 第9ラウンドの実験計画法では、全因子中この1つが突出して効いた(主効果 +42pt/1セル)。
+    // チャージャーが弱かったのは火力不足ではなく「塗れなさ」が原因だった
+    beamPaintRadius:2.44,    // 通過線の塗り半径(セル)(第6ラウンド: 1.4→2.0。第9ラウンドで2.0→2.44)
     inkBase:8, inkPerFrac:16, // ボット用 (第6ラウンド: 実験計画法の結果 15/35→8/16)。人間用は human.inkBase / human.inkPerFrac
     human:{ inkBase:6, inkPerFrac:12 }, // 第6ラウンド: 人間専用のインクコスト
   },
   bucket:{
     name:'バケツ', emoji:'🪣', desc:'ひろく ぬる。かべを こえて とどく', defaultSub:'shield', defaultSpecial:'utsubo',
-    fireInterval:0.48,      // 発射間隔(秒。触れている間この間隔で1発。バランス調整で0.55→0.48)
+    fireInterval:0.61,      // 発射間隔(秒。触れている間この間隔で1発。バランス調整で0.55→0.48。第9ラウンドの実験計画法で0.48→0.61)
     range:230,              // 射程px(壁を無視して届く)
     nearRange:8*CELL,       // このセル数以内なら高ダメージが乗る近距離(バランス調整で6→8セル)
     fanHalfAngle:20*Math.PI/180, // 扇の半角(幅4セル×長さ8セル相当。調整で14→20度、当てやすさ確保)
@@ -514,8 +516,8 @@ var WEAPONS = {
     name:'フデ', emoji:'🖌', desc:'かるくて はやい。れんぞくで ふりはらう', defaultSub:'quickbomb', defaultSpecial:'manta',
     moveSpeedMul:1.45,       // 実機フィードバックでローラーとの差別化のため1.35→1.45(最速をさらに強調)
     enemyInkMul:0.75,        // フデだけ相手インク上の減速を緩める(他武器のENEMY_INK_MUL 0.55の代わりに0.75)
-    trailWidth:2.0,          // 移動時に塗る幅(セル。実機フィードバックで2.3→2.0、ローラーとの塗り幅差別化)
-    swingCount:4, swingBulletSpeed:820, swingRange:150, swingDamage:10, swingPaintRadius:0.8,
+    trailWidth:2.81,         // 移動時に塗る幅(セル。実機フィードバックで2.3→2.0。第9ラウンドの実験計画法で2.0→2.81、主効果は1セルあたり約23pt)
+    swingCount:4, swingBulletSpeed:820, swingRange:150, swingDamage:12, swingPaintRadius:0.8, // swingDamageは第9ラウンドの実験計画法で10→12
     swingInkCost:6, swingCooldown:0.22, // ふりはらい: エイムパッドを押している間0.22秒ごとに自動連続(タップ単発から変更)。飛沫4発・1発18ダメージ・射程150px、1振りインク6
     human:{ brushCostPerCell:0.06 }, // 第6ラウンド: 人間専用(走り塗りは新規セル1つにつきこのインクを消費。自陣の上は新規扱いされないので無料)
   },
@@ -530,20 +532,22 @@ var SPECIAL_KILL_BONUS = 0.15;
 var SPECIALS = {
   sensei:{
     name:'せんせいストライク', emoji:'⚡', desc:'まっすぐ とおくまで こうげき。よけられても こおらせる',
-    delay:0.6,            // 発動から着弾までの予告時間(秒)。この間、赤い予告線を表示する
-    halfWidthCells:2.5,   // 直撃判定の半幅(セル。幅5セル)
+    delay:0.55,           // 発動から着弾までの予告時間(秒)。この間、赤い予告線を表示する(第9ラウンドで0.6→0.55)
+    halfWidthCells:3.0,   // 直撃判定の半幅(セル。幅6セル。第9ラウンドで2.5→3.0)
     iceExtraCells:3,      // 直撃の外側、さらに+3セルまでは「こおり」判定
     damage:100,
     iceTime:2,            // こおり状態の持続(秒)。動けないが撃つことはできる
   },
   utsubo:{
     name:'むらさめウツボ', emoji:'🐍', desc:'まえの ひろい はんいに ウツボの ぐんれいが ふりそそぐ',
-    duration:5, widthCells:12, depthCells:16, fillRate:0.4, dps:35,
+    // 幅/奥行/塗り速度は第9ラウンドの実験計画法で 12/16/0.4 から強化(3種中いちばん弱く27.5%だった)
+    duration:5, widthCells:16, depthCells:25, fillRate:0.53, dps:35,
     hakkoTime:4, hakkoSpeedMul:0.6, hakkoDamageMul:1.5, // はっこう状態: 移動×0.6・被ダメ×1.5
   },
   manta:{
     name:'マンタりんぶ', emoji:'🪁', desc:'むてきで マンタに のり、たいあたり と インクだんで あばれる',
-    duration:3, speedMul:1.3, trailCells:6, contactDamage:85,
+    // duration/trailCellsは第9ラウンドの実験計画法で 3/6 から弱体化(3種中いちばん強く67.8%だった)
+    duration:2.7, speedMul:1.3, trailCells:3.3, contactDamage:85,
     pullRadiusCells:6, pullForce:30,       // 引き寄せる力(px/s相当)
     shotRadiusCells:3, shotDamage:42, shotRate:2, shotSpeed:520, shotRange:15*CELL,
     aburiTime:3, aburiDps:12,              // あぶり状態: 3秒間 毎秒12ダメージ
@@ -559,16 +563,24 @@ var SUBS = {
   },
   quickbomb:{
     name:'クイックボム', emoji:'⚡', desc:'あたると すぐ ばくはつ。れんとうできる',
-    throwDist:160, fuse:0, radius:2.5, dmgCenter:35, dmgEdge:15, inkCost:28, // バランス調整でdmgCenter50→35, dmgEdge25→15(対スプリンクラー等の勝率調整)
+    throwDist:160, fuse:0, radius:3.3, dmgCenter:35, dmgEdge:15, inkCost:28, // バランス調整でdmgCenter50→35, dmgEdge25→15(対スプリンクラー等の勝率調整)。radiusは第9ラウンドで2.5→3.3
+    // botThrowGap/Span: ボットの再投げ待ち(秒)。既定の 5+0〜5 秒のままだと、「れんとうできる」はずのクイックボムが
+    // スプラッシュボムと同じ頻度(1試合4.4回)しか投げられていなかったので、連投できる値にした(1試合6.9回)
+    botThrowGap:1.2, botThrowGapSpan:1.5,
   },
   sprinkler:{
     name:'スプリンクラー', emoji:'🌀', desc:'おいとくと じどうで ぬってくれる',
-    throwDist:150, duration:8, radius:5, hp:30, inkCost:40, rate:3.0, splashR:0.9, // rate/splashRはバランス調整値。コストは50→40(±10の範囲内)
+    throwDist:150, duration:8, radius:5, hp:30, inkCost:40, rate:4.5, splashR:0.9, // rate/splashRはバランス調整値。コストは50→40(±10の範囲内)。rateは第9ラウンドで3.0→4.5
+    botMinUnpainted:9, // ボットが設置に踏み切る未塗りセル数のしきい値(既定4。置く場所を選ばせるため第9ラウンドで9に)
     // (対ボム系サブの勝率調整は主にボム側のダメージで行う。スプリンクラー自身は無傷での塗り面積確保が役割)
   },
   shield:{
     name:'スプラッシュシールド', emoji:'🛡', desc:'かべを つくって まもる',
     standoff:3, width:6, thickness:0.9, duration:5, inkCost:50, // バランス調整で60→50(コスト±10の範囲内)
+    // botProactiveCells: ボットが「まだ撃たれていなくても相手がこのセル数まで近づいたら先置きする」距離。
+    // 第8ラウンドまでボットは被弾直後にしか張らず、1試合0.9回しか使えていなかった(持っても勝率+2.5ptで実質無意味)。
+    // 先置き判断を入れたことで1試合5.8回・対サブなし勝率+6.7ptとなり、主効果+11.7ptで全サブ因子中の最大の梃子になった
+    botProactiveCells:10,
   },
 };
 for (var sk in SUBS) SUBS[sk].key = sk;
@@ -2006,8 +2018,11 @@ function botDecide(g, idx){
       input.sub=true;
       var bombAng=Math.atan2(opp.y-p.y, opp.x-p.x);
       input.aim={x:Math.cos(bombAng), y:Math.sin(bombAng)};
-      // 投げた後は連投しすぎない(クールダウン1秒いっぱいの連投を防ぎ、1試合3〜12回程度に収める)
-      mem.nextBombAttempt = g.time + 5 + g.rng()*5;
+      // 投げた後の再投げ待ち。サブごとに botThrowGap(最短) + botThrowGapSpan(ゆらぎ) 秒あける。
+      // 省略時は従来どおり 5 + 0〜5 秒(1試合3〜12回程度)
+      var throwGap = subDef.botThrowGap!=null ? subDef.botThrowGap : 5;
+      var throwSpan = subDef.botThrowGapSpan!=null ? subDef.botThrowGapSpan : 5;
+      mem.nextBombAttempt = g.time + throwGap + g.rng()*throwSpan;
     }
   }
   if ((isBombSub || isShieldSub || (isSprinklerSub && !hasOwnSprinkler)) && p.subCooldown<=0 && !input.sub){
@@ -2045,15 +2060,24 @@ function botDecideSub(g, idx, p, opp, weapon, distToOpp, oppTargetable, input){
     for (var i=0;i<g.sprinklers.length;i++) if (g.sprinklers[i].ownerIdx===idx){ already=true; break; }
     if (already) return false;
     var unpaintedNear = countUnpaintedNear(g, p.x, p.y, 6);
-    if (unpaintedNear < 4) return false;
+    if (unpaintedNear < (sub.botMinUnpainted!=null ? sub.botMinUnpainted : 4)) return false;
     // 未塗り・相手色が多い方向へ向いてから置く
     var sprinklerDir = pickCoverageDir(g, idx, p, false, false);
     if (input) input.aim = {x:sprinklerDir.x, y:sprinklerDir.y};
     return true;
   } else if (sub.key==='shield'){
-    var recentlyHit = (g.time - (p.lastHitAt!=null?p.lastHitAt:-999)) < 2.0;
+    // botHitWindow: 直近この秒数以内に撃たれていたら「守るべき場面」とみなす(省略時2.0)
+    var hitWindow = sub.botHitWindow!=null ? sub.botHitWindow : 2.0;
+    var recentlyHit = (g.time - (p.lastHitAt!=null?p.lastHitAt:-999)) < hitWindow;
     var threatWeapon = oppTargetable && (opp.weapon==='shooter' || opp.weapon==='charger' || opp.weapon==='bucket');
-    return recentlyHit && threatWeapon;
+    // botProactiveCells: まだ撃たれていなくても、相手がこのセル数まで近づいたら先置きする(0/省略で無効)
+    var proactiveCells = sub.botProactiveCells!=null ? sub.botProactiveCells : 0;
+    var proactive = proactiveCells>0 && oppTargetable && distToOpp <= proactiveCells*CELL;
+    if (proactive && input){
+      var shieldAng = Math.atan2(opp.y-p.y, opp.x-p.x);
+      input.aim = {x:Math.cos(shieldAng), y:Math.sin(shieldAng)};
+    }
+    return (recentlyHit && threatWeapon) || proactive;
   }
   return false;
 }
