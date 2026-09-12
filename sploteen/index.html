@@ -464,7 +464,7 @@ var WEAPONS = {
     name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ', defaultSub:'splashbomb', defaultSpecial:'sensei',
     fireRate:8,          // 毎秒発射数
     bulletSpeed:640,      // 弾速 px/s
-    range:280,            // 射程 px(第4ラウンドで470→280、マップ幅の4割程度に短縮。近づいて撃ち合う武器に)
+    range:230,            // 射程 px(第4ラウンドで470→280。第8ラウンドで280→230、さらに近づいて撃ち合う武器に)
     damage:35,            // 1発ダメージ (3発で撃破。第4ラウンドで27→35、射程短縮でチャージャー等に近づく間に被弾する分を、詰めきった後の火力で相殺)
     inkPerShot:6,         // 1発の消費インク(ボット用。人間用は human.inkPerShot)
     human:{ inkPerShot:2 }, // 第6ラウンド: 人間専用のインクコスト
@@ -1426,6 +1426,9 @@ function updatePlayer(g, idx, dt){
     p.respawnTimer -= dt;
     if (p.respawnTimer<=0){
       p.alive=true; p.hp=100; p.x=SPAWN[idx].x; p.y=SPAWN[idx].y; p.invuln=INVULN_TIME;
+      // 第8ラウンド: 復活時はインクも満タンに戻す(空のまま復活して何もできない状態を作らない)。
+      // 回復待ち(INK_REGEN_DELAY)の基準もリセットしておく
+      p.ink=INK_MAX; p.lastInkSpendAt=-1e9;
       p.status={frozenTimer:0, hakkoTimer:0, aburiTimer:0, aburiOwner:null};
     }
     p.fireCooldown=Math.max(0,p.fireCooldown-dt);
