@@ -173,7 +173,42 @@
   .seriesDots span.p1{ background:var(--p1); border-color:var(--p1); }
   .seriesDots span.p2{ background:var(--p2); border-color:var(--p2); }
   .nextBtn{ font:inherit; font-weight:700; color:#1a1206; background:#ffcc4d; border:none; border-radius:999px; padding:11px 28px; cursor:pointer; }
+  .nextBtn.no{ background:#3a4270; color:var(--text); }
+  /* 第7ラウンド: リセットボタン(マップ外の左端中央、上下の操作パッド帯から離した位置)。誤タップ防止に半透明 */
+  .resetBtn{
+    position:absolute; left:6px; top:50%; transform:translateY(-50%);
+    width:40px; height:40px; border-radius:50%; z-index:32;
+    border:2px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.16);
+    color:var(--text); font-size:20px; line-height:1; padding:0; opacity:0.55;
+  }
+  .resetBtn:active{ opacity:0.9; }
+  #resetConfirm{
+    position:fixed; inset:0; z-index:40; display:flex; flex-direction:column;
+    align-items:center; justify-content:space-between; padding:15vh 24px;
+    background:rgba(6,10,22,0.94); text-align:center;
+  }
+  .resetMsg{ font-size:18px; font-weight:700; }
+  .resetMsg.top{ transform:rotate(180deg); }
+  .resetBtnRow{ display:flex; gap:24px; }
   .champTitle{ font-size:min(9vw,34px); font-weight:800; color:#ffe08a; margin-bottom:18px; }
+  /* 第7ラウンド: HUDの顔アイコン(32px程度、アバターの顔だけを描く) */
+  .hudFace{ width:32px; height:32px; border-radius:50%; background:#1c2340; border:1px solid rgba(255,255,255,0.25); flex:0 0 auto; }
+  /* 第7ラウンド: VS画面(カウントダウン前1.2秒。P1向き下・P2向き上180度回転) */
+  #vsWrap{ position:absolute; inset:0; z-index:18; pointer-events:none; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:6% 0; }
+  .vsCard{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .vsCard.vsTop{ transform:rotate(180deg); }
+  .vsAvatarCanvas{ width:min(30vw,120px); height:min(30vw,120px); }
+  .vsName{ font-size:15px; font-weight:800; color:var(--text); text-shadow:0 2px 6px rgba(0,0,0,0.7); }
+  .vsWeapon{ font-size:12px; color:var(--sub); }
+  .vsLabel{ font-size:min(15vw,64px); font-weight:900; color:#ffcc4d; text-shadow:0 4px 16px rgba(0,0,0,0.7); }
+  /* 第7ラウンド: 結果画面・優勝画面の対戦アバター(勝った側を大きく・はねる。P2側は180度回転) */
+  .duelAvatars{ display:flex; align-items:flex-end; justify-content:center; gap:22px; min-height:132px; }
+  .duelAvatarWrap.flip{ transform:rotate(180deg); }
+  .duelAvatar{ display:block; width:64px; height:64px; transition:width 0.25s, height 0.25s, opacity 0.25s; }
+  .duelAvatar.big{ width:120px; height:120px; }
+  .duelAvatar.small{ width:56px; height:56px; opacity:0.6; }
+  @keyframes avatarBounce{ 0%{ transform:translateY(0); } 30%{ transform:translateY(-16px); } 55%{ transform:translateY(0); } 75%{ transform:translateY(-7px); } 100%{ transform:translateY(0); } }
+  .duelAvatar.bounce{ animation:avatarBounce 0.9s ease-out 1; }
   .hidden{ display:none!important; }
   /* 横持ち(幅>高さ)では縦に積まず、メイン/サブ/CPUパネルを横に並べて縦スペースを節約する。
      (このブロックは他の.selectHalf/.cpuPanelルールより後ろに置き、flex-directionの上書きを確実にする) */
@@ -188,7 +223,9 @@
 </head>
 <body>
 <div id="app">
+  <button id="resetBtn" class="resetBtn hidden" title="さいしょから やりなおす">↺</button>
   <div class="hud hudTop" id="hudP2" data-player="2">
+    <canvas class="hudFace" id="hudFaceP2" width="64" height="64"></canvas>
     <div class="wIcon" id="wIconP2">🔫</div>
     <div class="barCol">
       <div class="barRow"><div class="bar hp"><i id="hpFillP2"></i></div><div class="bar sp" id="spBarP2"><i id="spFillP2"></i></div></div>
@@ -204,6 +241,19 @@
     <div id="countdownWrap" class="hidden">
       <div class="cdNum cdTop" id="cdNumTop"></div>
       <div class="cdNum cdBottom" id="cdNumBottom"></div>
+    </div>
+    <div id="vsWrap" class="hidden">
+      <div class="vsCard vsTop">
+        <canvas class="vsAvatarCanvas" id="vsAvatarP2" width="200" height="200"></canvas>
+        <div class="vsName" id="vsNameP2"></div>
+        <div class="vsWeapon" id="vsWeaponP2"></div>
+      </div>
+      <div class="vsLabel">VS</div>
+      <div class="vsCard vsBottom">
+        <canvas class="vsAvatarCanvas" id="vsAvatarP1" width="200" height="200"></canvas>
+        <div class="vsName" id="vsNameP1"></div>
+        <div class="vsWeapon" id="vsWeaponP1"></div>
+      </div>
     </div>
     <div id="bigCount"></div>
     <div id="flashTint"></div>
@@ -322,6 +372,10 @@
     </div>
 
     <div class="panel" id="panelResult">
+      <div class="duelAvatars" id="resultAvatars">
+        <div class="duelAvatarWrap" id="resultAvatarWrapP1"><canvas class="duelAvatar" id="resultAvatarP1" width="200" height="200"></canvas></div>
+        <div class="duelAvatarWrap flip" id="resultAvatarWrapP2"><canvas class="duelAvatar" id="resultAvatarP2" width="200" height="200"></canvas></div>
+      </div>
       <div class="wipeStage">
         <div class="wipeBarBg"><div class="wipeFillP1" id="wipeFillP1"></div><div class="wipeFillP2" id="wipeFillP2"></div></div>
         <div class="rollerIcon" id="rollerIcon">🎨</div>
@@ -334,8 +388,21 @@
 
     <div class="panel" id="panelSeries">
       <div class="champTitle" id="champTitle">ゆうしょう!</div>
+      <div class="duelAvatars" id="champAvatars">
+        <div class="duelAvatarWrap" id="champAvatarWrapP1"><canvas class="duelAvatar" id="champAvatarP1" width="200" height="200"></canvas></div>
+        <div class="duelAvatarWrap flip" id="champAvatarWrapP2"><canvas class="duelAvatar" id="champAvatarP2" width="200" height="200"></canvas></div>
+      </div>
       <button class="nextBtn" id="seriesNextBtn">ぶきせんたくへ</button>
     </div>
+  </div>
+
+  <div id="resetConfirm" class="hidden">
+    <div class="resetMsg top">さいしょから やりなおす?</div>
+    <div class="resetBtnRow">
+      <button class="nextBtn" id="resetYesBtn">はい</button>
+      <button class="nextBtn no" id="resetNoBtn">いいえ</button>
+    </div>
+    <div class="resetMsg bottom">さいしょから やりなおす?</div>
   </div>
 </div>
 <script>
@@ -347,6 +414,9 @@ var CELL=14;                   // 1セルの内部px
 var WORLD_W=GRID_W*CELL, WORLD_H=GRID_H*CELL;
 var FIXED_DT=1/60;
 var ROUND_DURATION_DEFAULT=90; // 1ラウンドの秒数
+var VS_DURATION=1.2;           // 第7ラウンド: カウントダウン開始直後に出す「VS」画面の長さ(秒)
+var AVATAR_DISPLAY_SIZE=54;    // 第7ラウンド: ゲーム中のキャラ表示サイズ(高さ約54px=PLAYER_RADIUSの約2.4倍相当の見た目)。当たり判定はPLAYER_RADIUSのまま変えない
+var AVATAR_SPRITE_RES=108;     // 上のサイズの2倍の解像度でオフスクリーンに描いておき、毎フレームはdrawImageで貼るだけにする(高DPIでも滲まない)
 var SERIES_WINS=2;             // シリーズ先取本数(2本先取)
 var SERIES_MAX_ROUNDS=3;       // シリーズの最大ラウンド数(3本勝負)
 var INK_MAX=100;
@@ -364,6 +434,7 @@ var INK_SCALE=2;                // 塗りキャンバスの解像度倍率
 var STICK_RADIUS=46;            // スティック最大半径(px, 実画面px基準)
 var AIM_DEADZONE=8;
 var TAP_MAX_DURATION=0.25;      // タップ判定の最大長押し時間(秒)
+var ROLL_PAINT_MIN_SPEED_MUL=0.3; // 第7ラウンド: ローラーが転がしモードで塗るために必要な最低速度(×BASE_SPEED)
 
 var CONFIG = { BOT_SKILL: 0.6, ADVANCE_BIAS: 0.6, SHOOTER_OUTRANGE_CHASE: 0.8 };// BOT_SKILL:0〜1(大きいほど強い) / ADVANCE_BIAS:塗り方向選択が相手の方向へ寄る強さ(会敵率を上げて戦わせるため)。SHOOTER_OUTRANGE_CHASE:シューター・バケツが自分より射程の長い相手(チャージャー等)と対面した時、相手の射程のこの割合まで積極的に詰める追跡係数(第4ラウンドでシューター用に導入、既定値0.7。第5ラウンドでバケツにも適用し0.8に再調整)。実行時に書き換え可
 
@@ -402,7 +473,7 @@ var WEAPONS = {
     moveSpeedMul:1.14,    // 移動速度倍率(第4ラウンド追加調整で1.0→1.14。機動力のある近距離万能武器として、詰める/離脱するまでの被弾時間を短縮)
   },
   roller:{
-    name:'ローラー', emoji:'🖌️', desc:'おもくて おそい。ひろく ぬる。ひいて たおす', defaultSub:'quickbomb', defaultSpecial:'manta',
+    name:'ローラー', emoji:'🖌️', desc:'おもくて おそい。ボタンを おしながら ころがして ぬる。ひいて たおす', defaultSub:'quickbomb', defaultSpecial:'manta',
     moveSpeedMul:0.78,     // 実機フィードバック(ローラー強すぎ)で0.85→0.78
     enemyInkMul:0.44,      // ローラーだけ相手インク上の減速をさらに強く(ENEMY_INK_MUL 0.55×0.8=0.44。他武器より重く感じさせる)
     rollWidth:5,          // 移動時に塗る幅(セル。強みとして維持)
@@ -558,6 +629,7 @@ function makePlayer(idx){
     sp:0, charge:0, charging:false, specialActive:false, specialData:{},
     status:{frozenTimer:0, hakkoTimer:0, aburiTimer:0, aburiOwner:null}, // こおり/はっこう/あぶり(第6ラウンド)
     fireCooldown:0, swingCooldown:0, contactCooldown:0, subCooldown:0, rollDist:0, hitFlash:0, hudToast:null,
+    rolling:false, // 第7ラウンド: ローラーが転がしモード(fire押下)中かどうか(見た目のローラー棒の表示用)
     wasFiring:false, fireHeldStart:0, wasSpecial:false, wasSub:false,
     isBot:false, forced:null, lastInkSpendAt:-1e9, // 第6ラウンド: 人間専用インク経済の「最後に消費した時刻」(ボットは参照しない)
     input:{move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false, sub:false},
@@ -651,7 +723,7 @@ function startRound(g, handicapLoserIdx){
     p.botMem={ nextDecision:0, dir:{x:0, y:(i===0?-1:1)} };
   }
   g.time=0; g.remaining=g.duration;
-  g.phase='countdown'; g.countdown=3.999;
+  g.phase='countdown'; g.countdown=3.999; g.vsTimer=VS_DURATION;
 }
 
 function startSeries(g,p1w,p2w,seed,bot1,bot2,duration,p1sub,p2sub,p1sp,p2sp){
@@ -1419,6 +1491,7 @@ function updatePlayer(g, idx, dt){
   if (firing && !p.wasFiring) p.fireHeldStart=g.time;
   var releasedNow = (!firing && p.wasFiring);
   var heldDur = releasedNow ? (g.time-p.fireHeldStart) : 0;
+  if (weapon.key!=='roller' || p.specialActive) p.rolling=false; // ローラー以外・スペシャル中は転がしモード表示を出さない
 
   if (p.specialActive){
     // スペシャル発動中は専用の処理へ(マンタのみinp.fireでインク弾を撃てる。他の武器の通常射撃は行わない)
@@ -1433,8 +1506,11 @@ function updatePlayer(g, idx, dt){
     }
   } else if (weapon.key==='roller'){
     if (releasedNow && heldDur < TAP_MAX_DURATION) tryRollerSwing(g, idx, p, weapon);
+    // 第7ラウンド: エイムパッド(fire)を押している間だけ「転がしモード」。見た目の棒はこのフラグで出し引きする
+    p.rolling = firing;
     var moved = speed*dt;
-    if (moved > 0.4){
+    // 転がしモード中に、ある程度の速さ(BASE_SPEED×0.3以上)で動いている時だけ塗る(押していない/止まっている時は塗らない)
+    if (firing && speed >= BASE_SPEED*ROLL_PAINT_MIN_SPEED_MUL && moved > 0.4){
       // 塗り幅を移動距離に応じて揺らし、轢き跡の両端をギザギザにする
       p.rollDist += moved;
       var wobble = Math.sin(p.rollDist/(CELL*3.1))*CELL*0.55;
@@ -1448,8 +1524,9 @@ function updatePlayer(g, idx, dt){
         if (rollPainted>0) p.ink = Math.max(0, p.ink - rollPainted*inkCost(p, weapon, 'rollCostPerCell'));
       }
     }
-    // 接触キルは「ある程度の速さで動いている時だけ」有効(待ち伏せ即死を防ぐ。実機フィードバックでBASE_SPEED×0.5以上に変更)
-    if (opp.alive && !isInvulnerable(opp) && speed > BASE_SPEED*(weapon.contactMinSpeedMul!=null?weapon.contactMinSpeedMul:0.15)){
+    // 接触キルは「転がしモード中(押しながら)、ある程度の速さで動いている時だけ」有効
+    // (待ち伏せ即死を防ぐ。実機フィードバックでBASE_SPEED×0.5以上に変更。第7ラウンドでfire押下も条件に追加)
+    if (firing && opp.alive && !isInvulnerable(opp) && speed > BASE_SPEED*(weapon.contactMinSpeedMul!=null?weapon.contactMinSpeedMul:0.15)){
       var ddx=opp.x-p.x, ddy=opp.y-p.y;
       var rr=p.radius+opp.radius+10;
       if (ddx*ddx+ddy*ddy <= rr*rr && p.contactCooldown<=0){
@@ -1535,6 +1612,12 @@ function checkRoundEnd(g){
 function stepGame(g, dt){
   g.time += dt;
   if (g.phase==='countdown'){
+    // 第7ラウンド: 数字のカウントダウンの前に1.2秒だけ「VS」画面を挟む
+    if (g.vsTimer>0){
+      g.vsTimer -= dt;
+      if (!g.headless){ if (g.vsTimer<=0) hideVsUI(); else updateVsUI(g); }
+      return;
+    }
     g.countdown -= dt;
     if (!g.headless) updateCountdownUI(g);
     if (g.countdown<=0){ g.phase='playing'; g.remaining=g.duration; if (!g.headless) onPlayStartUI(g); }
@@ -1783,17 +1866,27 @@ function botDecide(g, idx){
     input.aim = {x:mem.dir.x, y:mem.dir.y};
     // 接触の間合いより少し手前(振りの射程内)から先に振って弱らせておく
     var meleeR = Math.max(p.radius+opp.radius+40, weapon.swingRange*0.9);
-    // 「短くタップ→離す」でしか振りが出ない仕様なので、既にパルス中は再トリガーしない
-    // (ここをg.time基準で毎ティック延長し続けると、fireが押しっぱなしのまま離れる瞬間が来ず
-    //  releasedNow が一生成立しないので tryRollerSwing が呼ばれずインクが減らない=振れないバグになる)
-    var pulseActive = mem.swingUntil && g.time < mem.swingUntil;
-    if (!pulseActive && oppTargetable && distToOpp < meleeR && p.swingCooldown<=0){
-      var swAng=Math.atan2(opp.y-p.y, opp.x-p.x);
-      input.aim={x:Math.cos(swAng),y:Math.sin(swAng)};
-      mem.swingUntil = g.time+FIXED_DT*1.5;
-      pulseActive = true;
+    // 第7ラウンド: 塗りたい方向へ移動する間はfireを押し続けて「転がしモード」で塗る。
+    // 振りの間合いに入ったら、転がしモードのfireを一瞬離してから短くタップし直す(離した瞬間に振りが出る仕様のため)。
+    // 「離す→短く押す→離す」の一連の遷移をmem.rollerReleaseUntil/rollerPulseUntilで管理する。
+    var inSwingCycle = mem.rollerPulseUntil && g.time < mem.rollerPulseUntil;
+    if (!inSwingCycle && oppTargetable && distToOpp < meleeR && p.swingCooldown<=0){
+      mem.rollerReleaseUntil = g.time + FIXED_DT*2; // まず一瞬離す(転がしモード解除)
+      mem.rollerPulseUntil = mem.rollerReleaseUntil + FIXED_DT*2; // その後すぐ短くタップ(TAP_MAX_DURATION未満)
+      inSwingCycle = true;
     }
-    input.fire = !!pulseActive;
+    if (inSwingCycle){
+      if (g.time < mem.rollerReleaseUntil){
+        input.fire = false;
+      } else {
+        var swAng=Math.atan2(opp.y-p.y, opp.x-p.x);
+        input.aim={x:Math.cos(swAng),y:Math.sin(swAng)};
+        input.fire = true;
+      }
+    } else {
+      // 転がしモード: 塗りたい方向へ移動している間はfireを押し続ける(既存の判断は変えない)
+      input.fire = !!(mem.dir.x || mem.dir.y);
+    }
   } else if (weapon.key==='charger'){
     if (p.charging){
       input.fire = g.time < (mem.chargeReleaseAt||0);
@@ -2269,8 +2362,11 @@ function drawShields(ctx, g){
 }
 
 // 頭上の小さなHPバー(自分色の枠+HPで色が変わるバー)
-function drawHpBar(ctx, p, col){
-  var w=p.radius*2.2, h=4, x=-w/2, y=-p.radius-14;
+function drawHpBar(ctx, p, col, visualRadius){
+  // 第7ラウンド: 見た目のキャラサイズ(visualRadius、当たり判定のp.radiusとは別)を基準に頭上の位置を決める。
+  // また、この関数は(ctx.translateされていない)絶対座標で呼ばれるので、p.x/p.yを明示的に足す
+  var vr = visualRadius!=null ? visualRadius : p.radius;
+  var w=vr*1.6, h=4, x=p.x-w/2, y=p.y-vr-14;
   var frac=clamp(p.hp/100,0,1);
   ctx.save();
   ctx.fillStyle='rgba(0,0,0,0.45)';
@@ -2424,60 +2520,84 @@ function drawPlayer(ctx, g, idx){
   var p=g.players[idx];
   var col = idx===0?COLOR.p1:COLOR.p2;
   var dark = idx===0?COLOR.p1dark:COLOR.p2dark;
-  var av = avatarState[idx+1];
   if (!p.alive){ drawRespawnCountdown(ctx, p, col); return; }
   var flashing = p.invuln>0 && Math.floor(g.time*10)%2===0;
+  var flip = idx===1; // 第7ラウンド: P2のアバターはP2側から正しく見えるよう180度回転して描く
+  var sprite = avatarSprite[idx+1];
+  var S = AVATAR_DISPLAY_SIZE;
+
   ctx.save();
   ctx.translate(p.x,p.y);
   ctx.globalAlpha = flashing?0.45:1;
-  // ヒレ・みみ(むき。しゅぞくで形が変わる)
-  ctx.rotate(p.angle);
-  ctx.fillStyle=dark;
-  if (av.species==='tako'){
-    ctx.beginPath(); ctx.ellipse(-p.radius*0.6,-p.radius*0.95, p.radius*0.5, p.radius*0.3, -0.3, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(-p.radius*0.6, p.radius*0.95, p.radius*0.5, p.radius*0.3,  0.3, 0, Math.PI*2); ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(p.radius*0.2, -p.radius*1.5);
-    ctx.lineTo(p.radius*1.7, 0);
-    ctx.lineTo(p.radius*0.2, p.radius*1.5);
-    ctx.closePath(); ctx.fill();
-  }
-  // 本体(ふく。ふちをチームインク色、ぬりをアバターのふくのいろにする)
-  ctx.beginPath();
-  ctx.fillStyle=av.outfit;
-  ctx.arc(0,0,p.radius,0,Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+
+  // 足元のかげ(チーム色の楕円。本体と一緒に回転させ、常にキャラの足元側に来るようにする)
+  ctx.save();
+  if (flip) ctx.rotate(Math.PI);
+  var baseAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = baseAlpha*0.4;
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.ellipse(0, S*0.46, S*0.32, S*0.12, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // 本体: キャラクリのプレビューと同じ正面向き上半身(第7ラウンド。事前にオフスクリーンへ描いたものをdrawImageで貼るだけ)
+  ctx.save();
+  if (flip) ctx.rotate(Math.PI);
+  if (sprite) ctx.drawImage(sprite, -S/2, -S/2, S, S);
   // 被弾フラッシュ: 一瞬全身を白く光らせる
   if (p.hitFlash>0){
     ctx.globalAlpha = flashing?0.45:Math.min(1,p.hitFlash/0.12)*0.85;
     ctx.fillStyle='#ffffff';
-    ctx.beginPath(); ctx.arc(0,0,p.radius,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha = flashing?0.45:1;
+    ctx.beginPath(); ctx.ellipse(0,-S*0.04,S*0.4,S*0.48,0,0,Math.PI*2); ctx.fill();
   }
-  drawAvatarTopDown(ctx, av, p.radius);
+  ctx.restore();
+  ctx.globalAlpha = flashing?0.45:1;
+
+  // 向き(エイム)を示す小さな三角矢印(チーム色)+ 手元の武器アイコン。本体の向き(P1/P2)とは独立にp.angleで回す
+  ctx.save();
+  ctx.rotate(p.angle);
+  ctx.fillStyle=col;
+  var ar=S*0.66;
+  ctx.beginPath(); ctx.moveTo(ar,0); ctx.lineTo(ar-10,-6); ctx.lineTo(ar-10,6); ctx.closePath(); ctx.fill();
+  var wpn=WEAPONS[p.weapon];
+  if (wpn){
+    ctx.font=Math.round(S*0.26)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(wpn.emoji, S*0.4, S*0.16);
+  }
   ctx.restore();
 
-  drawHpBar(ctx, p, col);
-  drawStatusIcons(ctx, p);
+  ctx.restore(); // translate(p.x,p.y) 終わり
+
+  // 第7ラウンド: ローラーが転がしモード(fire押下)中は、キャラの前に短い横棒(ローラー本体)を表示。離すと消える
+  if (p.rolling && WEAPONS[p.weapon] && WEAPONS[p.weapon].key==='roller'){
+    ctx.save();
+    ctx.translate(p.x,p.y);
+    ctx.rotate(p.angle);
+    ctx.strokeStyle=dark; ctx.lineWidth=5; ctx.lineCap='round';
+    var barX=S*0.62, barHalf=S*0.34;
+    ctx.beginPath(); ctx.moveTo(barX,-barHalf); ctx.lineTo(barX,barHalf); ctx.stroke();
+    ctx.restore();
+  }
+
+  drawHpBar(ctx, p, col, S*0.5);
+  drawStatusIcons(ctx, p, S*0.5);
 
   if (p.specialActive){
     ctx.save();
     ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.globalAlpha=0.85;
-    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+6,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x,p.y,S*0.56,0,Math.PI*2); ctx.stroke();
     ctx.restore();
   }
 }
 
 // 状態異常アイコン(頭上、残り時間のリングつき)
-function drawStatusIcons(ctx, p){
+function drawStatusIcons(ctx, p, visualRadius){
   var st=p.status, items=[];
   if (st.frozenTimer>0) items.push({icon:'❄️', frac:st.frozenTimer/SPECIALS.sensei.iceTime});
   if (st.hakkoTimer>0) items.push({icon:'🫧', frac:st.hakkoTimer/SPECIALS.utsubo.hakkoTime});
   if (st.aburiTimer>0) items.push({icon:'🔥', frac:st.aburiTimer/SPECIALS.manta.aburiTime});
   if (!items.length) return;
-  var baseY = p.y - p.radius - 24;
+  var vr = visualRadius!=null ? visualRadius : p.radius;
+  var baseY = p.y - vr - 24;
   for (var i=0;i<items.length;i++){
     var it=items[i], x=p.x + (i-(items.length-1)/2)*18;
     ctx.save();
@@ -2629,6 +2749,25 @@ function $(id){ return document.getElementById(id); }
 function showPanel(id){
   document.querySelectorAll('.panel').forEach(function(el){ el.classList.remove('show'); });
   if (id) $(id).classList.add('show');
+  // 第7ラウンド: リセットボタンはタイトル画面だけ非表示(武器選択・カウントダウン・対戦中・結果・優勝画面では表示)
+  var resetBtn=$('resetBtn');
+  if (resetBtn) resetBtn.classList.toggle('hidden', id==='panelTitle');
+}
+
+// 第7ラウンド: リセット確認「はい」。進行中のシリーズを中断し、スコア・ラウンド・塗りを初期化してタイトルへ戻る
+function resetToTitle(){
+  $('resetConfirm').classList.add('hidden');
+  var g=activeLiveGame;
+  if (g){
+    startRound(g, null);           // 塗り・プレイヤー・弾等を初期状態にリセット(既存のラウンド開始処理を流用)
+    g.seriesScore=[0,0]; g.roundResults=[]; g.lastRoundLoserIdx=null;
+    g.phase='idle'; g.countdown=0; // stepGame は phase!=='playing' かつ !=='countdown' の間は何もしない
+    g.specialFlash=null;
+  }
+  $('countdownWrap').classList.add('hidden');
+  $('vsWrap').classList.add('hidden');
+  selState.readyP1=false; selState.readyP2=false;
+  showPanel('panelTitle');
 }
 
 // 武器選択カードの行は3つ: P1側('1')・P2側('2')・CPUモード時にP1側から出す「CPUのぶき」選択('cpu')。
@@ -2787,8 +2926,9 @@ function buildAvatarEditor(pn){
     });
   }
 }
-function renderAvatarFaceIcon(pn){
-  var canvas=$('avatarFaceP'+pn); if (!canvas) return;
+// 顔だけの小さいアイコン(選択画面の「アバター」ボタン用・第7ラウンドでHUDの名前横用にも流用)を1つのcanvasに描く
+function drawFaceIconOn(canvas, pn){
+  if (!canvas) return;
   var ctx=canvas.getContext('2d');
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();
@@ -2797,11 +2937,24 @@ function renderAvatarFaceIcon(pn){
   drawAvatarTopDown(ctx, avatarState[pn], canvas.width*0.42);
   ctx.restore();
 }
+function renderAvatarFaceIcon(pn){
+  drawFaceIconOn($('avatarFaceP'+pn), pn);
+  drawFaceIconOn($('hudFaceP'+pn), pn); // 第7ラウンド: HUDの名前横の顔アイコン
+}
 function renderAvatarPreview(pn){
   var canvas=$('avatarPreviewP'+pn); if (!canvas) return;
   var ctx=canvas.getContext('2d');
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawAvatarPreview(ctx, avatarState[pn], canvas.width);
+}
+// 第7ラウンド: ゲーム中にdrawImageで貼るだけで済むよう、正面向き上半身をオフスクリーンcanvasに描いておく
+var avatarSprite = {1:null, 2:null};
+function renderAvatarSprite(pn){
+  var c=avatarSprite[pn];
+  if (!c){ c=document.createElement('canvas'); c.width=AVATAR_SPRITE_RES; c.height=AVATAR_SPRITE_RES; avatarSprite[pn]=c; }
+  var ctx=c.getContext('2d');
+  ctx.clearRect(0,0,AVATAR_SPRITE_RES,AVATAR_SPRITE_RES);
+  drawAvatarPreview(ctx, avatarState[pn], AVATAR_SPRITE_RES);
 }
 function refreshAvatarEditor(pn){
   var root=$('avatarEditorP'+pn); if (!root) return;
@@ -2815,6 +2968,7 @@ function refreshAvatarEditor(pn){
   if (nameInput && document.activeElement!==nameInput) nameInput.value=av.name;
   renderAvatarPreview(pn);
   renderAvatarFaceIcon(pn);
+  renderAvatarSprite(pn);
 }
 function randomAvatar(pn){
   function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
@@ -2845,6 +2999,7 @@ function avatarDisplayName(pn){
 
 function onPlayStartUI(g){
   $('countdownWrap').classList.add('hidden');
+  $('vsWrap').classList.add('hidden');
   showPanel(null);
 }
 
@@ -2857,8 +3012,45 @@ function updateCountdownUI(g){
   $('cdNumBottom').textContent=txt;
 }
 
+// 第7ラウンド: カウントダウン直前の「VS」画面(1.2秒。P1向き下・P2向き上180度回転でお互いの武器・なまえを見せる)
+function updateVsUI(g){
+  $('vsWrap').classList.remove('hidden');
+  $('vsNameP1').textContent = avatarDisplayName(1);
+  $('vsNameP2').textContent = avatarDisplayName(2);
+  $('vsWeaponP1').textContent = WEAPONS[g.players[0].weapon].name;
+  $('vsWeaponP2').textContent = WEAPONS[g.players[1].weapon].name;
+  drawAvatarInto('vsAvatarP1', 1);
+  drawAvatarInto('vsAvatarP2', 2);
+}
+function hideVsUI(){ $('vsWrap').classList.add('hidden'); }
+
+// 汎用: id のcanvasにpn(1/2)のアバター(正面向き上半身プレビュー)を描く。VS画面・結果画面・優勝画面で共用
+function drawAvatarInto(canvasId, pn){
+  var canvas=$(canvasId); if (!canvas) return;
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawAvatarPreview(ctx, avatarState[pn], canvas.width);
+}
+
+// 第7ラウンド: 結果画面・優勝画面の対戦アバター表示。winnerIdx: 0=P1の勝ち/1=P2の勝ち/null=ひきわけ
+function updateDuelAvatars(prefix, winnerIdx){
+  drawAvatarInto(prefix+'AvatarP1', 1);
+  drawAvatarInto(prefix+'AvatarP2', 2);
+  var c1=$(prefix+'AvatarP1'), c2=$(prefix+'AvatarP2');
+  if (!c1 || !c2) return;
+  c1.className='duelAvatar'; c2.className='duelAvatar';
+  if (winnerIdx===null){ c1.classList.add('big'); c2.classList.add('big'); }
+  else if (winnerIdx===0){ c1.classList.add('big'); c2.classList.add('small'); }
+  else { c1.classList.add('small'); c2.classList.add('big'); }
+  // クラスをリセットしてから付け直し、切り替えのたびにはねるアニメーションを再生させる
+  void c1.offsetWidth; void c2.offsetWidth;
+  if (winnerIdx===null || winnerIdx===0) c1.classList.add('bounce');
+  if (winnerIdx===null || winnerIdx===1) c2.classList.add('bounce');
+}
+
 function onRoundEndUI(g){
   $('countdownWrap').classList.add('hidden');
+  $('vsWrap').classList.add('hidden');
   $('bigCount').style.opacity=0;
   var pct1=g.lastRoundPct[0].toFixed(1), pct2=g.lastRoundPct[1].toFixed(1);
   $('wipeFillP1').style.width='50%';
@@ -2874,6 +3066,7 @@ function onRoundEndUI(g){
   });
   var lastResult=g.roundResults[g.roundResults.length-1];
   var winnerIdx=lastResult.winnerIdx;
+  updateDuelAvatars('result', winnerIdx);
   var n1=avatarDisplayName(1), n2=avatarDisplayName(2);
   var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">'+n1+' の かち!</span>' : '<span class="win2">'+n2+' の かち!</span>');
   var kills = lastResult.kills || [0,0];
@@ -2901,9 +3094,11 @@ function proceedFromResult(){
     var scoreSub = '<br><span style="font-size:0.55em;color:#9aa6cf;">('+g.seriesScore[0]+' - '+g.seriesScore[1]+')</span>';
     if (g.seriesScore[0]===g.seriesScore[1]){
       $('champTitle').innerHTML = 'ひきわけ!'+scoreSub;
+      updateDuelAvatars('champ', null);
     } else {
-      var champ = g.seriesScore[0]>g.seriesScore[1] ? 1 : 2;
-      $('champTitle').innerHTML = avatarDisplayName(champ)+' の ゆうしょう!'+scoreSub;
+      var champWinnerIdx = g.seriesScore[0]>g.seriesScore[1] ? 0 : 1;
+      $('champTitle').innerHTML = avatarDisplayName(champWinnerIdx+1)+' の ゆうしょう!'+scoreSub;
+      updateDuelAvatars('champ', champWinnerIdx);
     }
     showPanel('panelSeries');
   } else {
@@ -3145,6 +3340,11 @@ function boot(){
   });
   $('resultNextBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); proceedFromResult(); });
   $('seriesNextBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); backToSelect(); });
+
+  // 第7ラウンド: リセットボタン。タップで確認オーバーレイを開き、「はい」でタイトルへ戻る/「いいえ」で閉じて続行
+  $('resetBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); e.stopPropagation(); $('resetConfirm').classList.remove('hidden'); });
+  $('resetYesBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); e.stopPropagation(); resetToTitle(); });
+  $('resetNoBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); e.stopPropagation(); $('resetConfirm').classList.add('hidden'); });
 
   avatarState = { 1:loadAvatar(1), 2:loadAvatar(2) };
   buildAvatarEditor(1); buildAvatarEditor(2);
