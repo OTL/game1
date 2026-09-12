@@ -1237,7 +1237,8 @@ function readTouchChannel(playerNum, kind){
     var s=touchState[id];
     if (s.player!==playerNum || s.kind!==kind) continue;
     var dx=s.curX-s.anchorX, dy=s.curY-s.anchorY;
-    if (playerNum===2){ dx=-dx; dy=-dy; } // P2は180度回転して解釈する
+    // P2も画面座標のまま使う。CSSのrotate(180deg)はHUD/パッドの見た目だけを回転させており、
+    // pointerイベントのclientX/clientYとワールド座標(yは下向き正)は両プレイヤーとも画面座標系で一致する。
     return {dx:dx, dy:dy};
   }
   return null;
