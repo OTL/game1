@@ -78,7 +78,7 @@
   .bar.sp i{ background:linear-gradient(90deg,#ffb238,#ffe08a); }
   .bar.sp.full i{ box-shadow:0 0 10px 2px #ffe08a; }
   .barRow{ display:flex; align-items:center; gap:8px; flex:1 1 auto; min-width:0; }
-  .hpTxt{ font-size:15px; font-weight:700; color:var(--sub); flex:0 0 auto; width:76px; text-align:right; white-space:nowrap; }
+  .hpTxt{ font-size:13px; font-weight:700; color:var(--sub); flex:0 0 auto; width:128px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .killTxt{ font-size:15px; font-weight:700; color:#ffcf7a; flex:0 0 auto; white-space:nowrap; }
   .hudToast{
     position:absolute; left:50%; top:-2px; transform:translate(-50%,-100%);
@@ -107,32 +107,56 @@
   .modeRow{ margin-top:26px; display:flex; flex-direction:column; gap:14px; align-items:center; }
   .modeBtn{ width:min(78vw,320px); padding:14px 20px; font-size:15px; }
   .modeBtn.cpu{ background:#57e08a; }
-  .cpuPanel{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:2px 0; padding:6px 8px; background:rgba(255,255,255,0.04); border-radius:10px; }
-  .weaponRow.small .wCard{ padding:6px 2px; }
-  .weaponRow.small .wEmoji{ font-size:20px; }
-  .weaponRow.small .wName{ font-size:11px; }
+  .cpuPanel{ display:flex; flex-direction:column; align-items:center; gap:2px; margin:0; padding:3px 8px; background:rgba(255,255,255,0.04); border-radius:10px; }
+  .weaponRow.small .wCard{ padding:4px 2px; min-height:44px; }
+  .weaponRow.small .wEmoji{ font-size:17px; }
+  .weaponRow.small .wName{ font-size:10px; }
+  .cpuPanel .weaponRow{ max-width:340px; }
+  .cpuPanel .weaponRow.subRow{ max-width:260px; }
+  .cpuPanel .weaponRow.specialRow{ max-width:220px; }
   .diffRow{ display:flex; gap:8px; }
-  .diffBtn{ font:inherit; font-size:12px; padding:6px 14px; border-radius:999px; border:2px solid #2b3866; background:#161c34; color:var(--text); cursor:pointer; }
+  .diffBtn{ font:inherit; font-size:11px; padding:4px 12px; border-radius:999px; border:2px solid #2b3866; background:#161c34; color:var(--text); cursor:pointer; }
   .diffBtn.selected{ border-color:#57e08a; background:#123a22; color:#bdf5d3; }
   .weaponRow.readOnly{ pointer-events:none; opacity:0.75; }
-  .selGroup{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .selGroup{ display:flex; flex-direction:column; align-items:center; gap:2px; }
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
   #panelSelect{ flex-direction:column; padding:0; }
-  .selectHalf{ flex:1 1 50%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:8px; min-height:0; overflow:hidden; }
+  .selectHalf{ position:relative; flex:1 1 50%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:4px 8px; min-height:0; overflow:hidden; }
   .selectHalf.rot{ transform:rotate(180deg); }
   .selectHalf.ready{ background:rgba(255,255,255,0.04); }
   .selLabel{ font-size:13px; color:var(--sub); }
   .weaponRow{ display:flex; gap:8px; width:100%; max-width:520px; justify-content:center; }
-  .wCard{ flex:1 1 0; max-width:150px; min-width:56px; min-height:56px; background:#161c34; border:2px solid #2b3866; border-radius:12px; padding:8px 4px; color:var(--text); font:inherit; cursor:pointer; }
+  .wCard{ flex:1 1 0; max-width:150px; min-width:56px; min-height:48px; background:#161c34; border:2px solid #2b3866; border-radius:12px; padding:6px 4px; color:var(--text); font:inherit; cursor:pointer; }
   .wCard .wEmoji{ font-size:26px; }
   .wCard .wName{ font-size:13px; font-weight:700; margin-top:2px; }
   .wCard.selected{ border-color:#ffcc4d; background:#2a2410; }
   .weaponRow.subRow{ max-width:400px; }
   .weaponRow.subRow .wCard{ min-height:56px; padding:4px 2px; }
-  .wDesc{ font-size:11px; color:var(--sub); min-height:14px; max-width:90vw; line-height:1.3; }
+  .weaponRow.specialRow{ max-width:420px; }
+  .weaponRow.specialRow .wCard{ min-height:56px; padding:4px 2px; }
+  .wDesc{ font-size:10px; color:var(--sub); min-height:11px; max-width:90vw; line-height:1.15; }
   .wDesc.subDesc{ color:#8fd8ff; }
   .readyBtn{ font:inherit; font-weight:700; color:#1a1206; background:#8fa2ff; border:none; border-radius:999px; padding:9px 22px; cursor:pointer; }
   .readyBtn.on{ background:#57e08a; }
+  .selectHalf .readyBtn{ padding:6px 20px; }
+  /* アバター(第6ラウンド) */
+  .avatarBtn{ display:flex; align-items:center; gap:6px; font:inherit; font-size:11px; padding:3px 10px 3px 3px; border-radius:999px; border:2px solid #7ad6ff; background:#0e2a3a; color:#eafcff; cursor:pointer; }
+  .avatarFaceCanvas{ width:26px; height:26px; border-radius:50%; background:#1c2340; display:block; }
+  .avatarEditor{ position:absolute; inset:0; background:rgba(6,10,22,0.97); z-index:25; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:3px; padding:8px; overflow-y:auto; }
+  .avatarPreviewCanvas{ width:min(30vw,120px); height:min(30vw,120px); background:#1c2340; border-radius:14px; border:2px solid #2b3866; flex:0 0 auto; }
+  .avatarNameInput{ font:inherit; font-size:13px; width:150px; text-align:center; border-radius:8px; border:2px solid #2b3866; background:#161c34; color:var(--text); padding:4px; margin:2px 0; }
+  .avatarCatRow{ display:flex; flex-wrap:wrap; gap:4px; justify-content:center; max-width:min(94vw,440px); margin-bottom:2px; }
+  .avatarSwatch{ width:26px; height:26px; border-radius:7px; border:2px solid #2b3866; cursor:pointer; padding:0; }
+  .avatarSwatch.selected{ border-color:#ffcc4d; box-shadow:0 0 6px 2px rgba(255,204,77,0.6); }
+  .avatarLabelBtn{ font:inherit; font-size:11px; padding:5px 8px; border-radius:8px; border:2px solid #2b3866; background:#161c34; color:var(--text); cursor:pointer; }
+  .avatarLabelBtn.selected{ border-color:#ffcc4d; background:#2a2410; }
+  .avatarBtnRow{ display:flex; gap:10px; margin-top:4px; }
+  @media (orientation:landscape){
+    .avatarEditor{ flex-direction:row; flex-wrap:wrap; align-content:flex-start; justify-content:center; gap:4px 10px; }
+    .avatarEditor > .selLabel{ flex:0 0 100%; margin:2px 0 -2px; }
+    .avatarPreviewCanvas{ flex:0 0 auto; }
+    .avatarBtnRow{ flex:0 0 100%; justify-content:center; }
+  }
   #panelResult{ gap:14px; }
   .wipeStage{ position:relative; width:min(88vw,420px); }
   .wipeBarBg{ display:flex; width:100%; height:26px; border-radius:13px; overflow:hidden; background:#141a30; border:2px solid #2b3866; }
@@ -221,6 +245,7 @@
     <div class="panel" id="panelSelect">
       <div class="selectHalf rot" data-half="2">
         <div class="selLabel" id="labelP2">P2 (うえ) ぶきをえらぼう</div>
+        <button class="avatarBtn" id="avatarBtnP2" data-player="2"><canvas class="avatarFaceCanvas" id="avatarFaceP2" width="40" height="40"></canvas><span>アバター</span></button>
         <div class="selGroup">
           <div class="weaponRow" data-select-player="2"></div>
           <div class="wDesc" id="descP2"></div>
@@ -229,10 +254,30 @@
           <div class="weaponRow small subRow" data-select-sub="2"></div>
           <div class="wDesc subDesc" id="descSubP2"></div>
         </div>
+        <div class="selGroup">
+          <div class="weaponRow small specialRow" data-select-special="2"></div>
+          <div class="wDesc subDesc" id="descSpecialP2"></div>
+        </div>
         <button class="readyBtn" id="readyP2">じゅんび OK</button>
+        <div class="avatarEditor hidden" id="avatarEditorP2" data-player="2">
+          <canvas class="avatarPreviewCanvas" id="avatarPreviewP2" width="160" height="160"></canvas>
+          <input type="text" class="avatarNameInput" id="avatarNameP2" maxlength="6" placeholder="なまえ(P2)">
+          <div class="selLabel">しゅぞく</div><div class="avatarCatRow" data-avatar-cat="species"></div>
+          <div class="selLabel">かみがた</div><div class="avatarCatRow" data-avatar-cat="hair"></div>
+          <div class="selLabel">かみのいろ</div><div class="avatarCatRow" data-avatar-cat="hairColor"></div>
+          <div class="selLabel">め</div><div class="avatarCatRow" data-avatar-cat="eyes"></div>
+          <div class="selLabel">はだ</div><div class="avatarCatRow" data-avatar-cat="skin"></div>
+          <div class="selLabel">ぼうし・アクセ</div><div class="avatarCatRow" data-avatar-cat="accessory"></div>
+          <div class="selLabel">ふくのいろ</div><div class="avatarCatRow" data-avatar-cat="outfit"></div>
+          <div class="avatarBtnRow">
+            <button class="diffBtn avatarRandomBtn" data-player="2">ランダム</button>
+            <button class="readyBtn on avatarOkBtn" data-player="2">OK</button>
+          </div>
+        </div>
       </div>
       <div class="selectHalf" data-half="1">
         <div class="selLabel">P1 (した) ぶきをえらぼう</div>
+        <button class="avatarBtn" id="avatarBtnP1" data-player="1"><canvas class="avatarFaceCanvas" id="avatarFaceP1" width="40" height="40"></canvas><span>アバター</span></button>
         <div class="selGroup">
           <div class="weaponRow" data-select-player="1"></div>
           <div class="wDesc" id="descP1"></div>
@@ -241,10 +286,15 @@
           <div class="weaponRow small subRow" data-select-sub="1"></div>
           <div class="wDesc subDesc" id="descSubP1"></div>
         </div>
+        <div class="selGroup">
+          <div class="weaponRow small specialRow" data-select-special="1"></div>
+          <div class="wDesc subDesc" id="descSpecialP1"></div>
+        </div>
         <div class="cpuPanel hidden" id="cpuPanel">
           <div class="selLabel">CPU(うえ)の ぶきを えらぶ</div>
           <div class="weaponRow small" data-select-player="cpu"></div>
           <div class="weaponRow small subRow" data-select-sub="cpu"></div>
+          <div class="weaponRow small specialRow" data-select-special="cpu"></div>
           <div class="selLabel">CPU の つよさ</div>
           <div class="diffRow">
             <button class="diffBtn" data-diff="0.35">よわい</button>
@@ -253,6 +303,21 @@
           </div>
         </div>
         <button class="readyBtn" id="readyP1">じゅんび OK</button>
+        <div class="avatarEditor hidden" id="avatarEditorP1" data-player="1">
+          <canvas class="avatarPreviewCanvas" id="avatarPreviewP1" width="160" height="160"></canvas>
+          <input type="text" class="avatarNameInput" id="avatarNameP1" maxlength="6" placeholder="なまえ(P1)">
+          <div class="selLabel">しゅぞく</div><div class="avatarCatRow" data-avatar-cat="species"></div>
+          <div class="selLabel">かみがた</div><div class="avatarCatRow" data-avatar-cat="hair"></div>
+          <div class="selLabel">かみのいろ</div><div class="avatarCatRow" data-avatar-cat="hairColor"></div>
+          <div class="selLabel">め</div><div class="avatarCatRow" data-avatar-cat="eyes"></div>
+          <div class="selLabel">はだ</div><div class="avatarCatRow" data-avatar-cat="skin"></div>
+          <div class="selLabel">ぼうし・アクセ</div><div class="avatarCatRow" data-avatar-cat="accessory"></div>
+          <div class="selLabel">ふくのいろ</div><div class="avatarCatRow" data-avatar-cat="outfit"></div>
+          <div class="avatarBtnRow">
+            <button class="diffBtn avatarRandomBtn" data-player="1">ランダム</button>
+            <button class="readyBtn on avatarOkBtn" data-player="1">OK</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -282,9 +347,13 @@ var CELL=14;                   // 1セルの内部px
 var WORLD_W=GRID_W*CELL, WORLD_H=GRID_H*CELL;
 var FIXED_DT=1/60;
 var ROUND_DURATION_DEFAULT=90; // 1ラウンドの秒数
-var WINS_NEEDED=3;             // シリーズ先取本数
+var SERIES_WINS=2;             // シリーズ先取本数(2本先取)
+var SERIES_MAX_ROUNDS=3;       // シリーズの最大ラウンド数(3本勝負)
 var INK_MAX=100;
-var INK_REGEN_FAST=35, INK_REGEN_SLOW=8; // 自陣インク上 / それ以外
+var INK_REGEN_FAST=35, INK_REGEN_SLOW=8; // 自陣インク上 / それ以外 (ボット用。第5ラウンドまでと同じ、ボットには一切適用範囲を変えない)
+// 第6ラウンド: 人間プレイヤー専用のインク経済(CPUのインク管理が苦手、というハンデ扱い。ボットには絶対に使わない)
+var INK_REGEN_OWN_HUMAN=35, INK_REGEN_UNPAINTED_HUMAN=8, INK_REGEN_ENEMY_HUMAN=0; // 人間: 自陣上/未塗り/相手陣上
+var INK_REGEN_DELAY=0.5; // 人間: 最後にインクを消費してから回復が始まるまでの秒数
 var OWN_INK_MUL=1.3, ENEMY_INK_MUL=0.55; // 地形による移動速度倍率
 var RESPAWN_TIME=3, INVULN_TIME=1.5;
 var DEATH_SPLAT_RADIUS=4*CELL;
@@ -321,65 +390,92 @@ var SPAWN = [ {x:336,y:936}, {x:336,y:72} ]; // P1下端中央 / P2上端中央
 var SUB_COOLDOWN=1.0;           // サブウェポン使用後の共通クールダウン(秒)
 var WEAPONS = {
   shooter:{
-    name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ', defaultSub:'splashbomb',
+    name:'シューター', emoji:'🔫', desc:'バランスがた。まよったらこれ', defaultSub:'splashbomb', defaultSpecial:'sensei',
     fireRate:8,          // 毎秒発射数
     bulletSpeed:640,      // 弾速 px/s
     range:280,            // 射程 px(第4ラウンドで470→280、マップ幅の4割程度に短縮。近づいて撃ち合う武器に)
     damage:35,            // 1発ダメージ (3発で撃破。第4ラウンドで27→35、射程短縮でチャージャー等に近づく間に被弾する分を、詰めきった後の火力で相殺)
-    inkPerShot:6,         // 1発の消費インク
+    inkPerShot:6,         // 1発の消費インク(ボット用。人間用は human.inkPerShot)
+    human:{ inkPerShot:2 }, // 第6ラウンド: 人間専用のインクコスト
     paintRadius:2.05,     // 着弾の塗り半径(セル)(第4ラウンドで1.5→1.9→2.05。射程短縮による塗り効率低下を補い、対ローラー・対チャージャー勝率も引き上げる)
     spread:6*Math.PI/180, // 弾のばらつき角(片側)
     moveSpeedMul:1.14,    // 移動速度倍率(第4ラウンド追加調整で1.0→1.14。機動力のある近距離万能武器として、詰める/離脱するまでの被弾時間を短縮)
-    specialGaugeMax:880,  // スペシャルゲージ満タン値(塗ったセル数)
-    special:{ type:'inkbomb', count:3, radius:5, damage:100, fuse:1.0, speed:360, spreadDeg:26 },
   },
   roller:{
-    name:'ローラー', emoji:'🖌️', desc:'ころがしてぬる。ちかづくとつよい', defaultSub:'quickbomb',
-    moveSpeedMul:0.85,
-    rollWidth:5,          // 移動時に塗る幅(セル)
-    contactDamage:85,    // 接触ダメージ(ほぼ即死)
+    name:'ローラー', emoji:'🖌️', desc:'おもくて おそい。ひろく ぬる。ひいて たおす', defaultSub:'quickbomb', defaultSpecial:'manta',
+    moveSpeedMul:0.78,     // 実機フィードバック(ローラー強すぎ)で0.85→0.78
+    enemyInkMul:0.44,      // ローラーだけ相手インク上の減速をさらに強く(ENEMY_INK_MUL 0.55×0.8=0.44。他武器より重く感じさせる)
+    rollWidth:5,          // 移動時に塗る幅(セル。強みとして維持)
+    contactDamage:60,    // 接触ダメージ(実機フィードバックで85→60。1回では倒せない。振り55+接触、または接触2回)
+    contactMinSpeedMul:0.5, // この割合(×BASE_SPEED)以上で動いている時だけ接触キルが発動(じわじわ寄っただけでは轢けない)
     swingArc:70*Math.PI/180, // 振りの扇角度
     swingCount:7,
     swingBulletSpeed:900, swingRange:105, swingDamage:55, swingPaintRadius:1.1,
-    swingInkCost:34, swingCooldown:0.7,
-    specialGaugeMax:1250,
-    special:{ type:'giant', duration:5, widthMul:2, speedMul:1.2 },
+    swingInkCost:34, swingCooldown:0.9, // 実機フィードバックでswingCooldown0.7→0.9。ボット用の振りコスト。人間用は human.swingInkCost
+    human:{ swingInkCost:20, rollCostPerCell:0.05 }, // 第6ラウンド: 人間専用(転がし塗りは新規セル1つにつきこのインクを消費。自陣の上は新規扱いされないので無料)
   },
   charger:{
-    name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ', defaultSub:'sprinkler',
+    name:'チャージャー', emoji:'🎯', desc:'ためてうつ。とおくからねらえ', defaultSub:'sprinkler', defaultSpecial:'sensei',
     moveSpeedMul:1.0,       // 通常時の移動速度倍率(ため中はCHARGER_CHARGE_MOVE_MULが追加でかかる)
     maxCharge:1.2,          // フルチャージ秒数
     maxRange:0.7*WORLD_H,   // フルチャージ時の射程
     maxDamage:100,
     minChargeFrac:0.45,      // 最低保証チャージ割合
-    beamPaintRadius:1.4,     // 通過線の塗り半径(セル)
-    inkBase:15, inkPerFrac:35,
-    specialGaugeMax:385,
-    special:{ type:'rapid', duration:4, rate:3, damage:100 },
+    beamPaintRadius:2.0,     // 通過線の塗り半径(セル)(第6ラウンド: 実験計画法の結果 1.4→2.0)
+    inkBase:8, inkPerFrac:16, // ボット用 (第6ラウンド: 実験計画法の結果 15/35→8/16)。人間用は human.inkBase / human.inkPerFrac
+    human:{ inkBase:6, inkPerFrac:12 }, // 第6ラウンド: 人間専用のインクコスト
   },
   bucket:{
-    name:'バケツ', emoji:'🪣', desc:'ひろく ぬる。かべを こえて とどく', defaultSub:'shield',
+    name:'バケツ', emoji:'🪣', desc:'ひろく ぬる。かべを こえて とどく', defaultSub:'shield', defaultSpecial:'utsubo',
     fireInterval:0.48,      // 発射間隔(秒。触れている間この間隔で1発。バランス調整で0.55→0.48)
     range:230,              // 射程px(壁を無視して届く)
     nearRange:8*CELL,       // このセル数以内なら高ダメージが乗る近距離(バランス調整で6→8セル)
     fanHalfAngle:20*Math.PI/180, // 扇の半角(幅4セル×長さ8セル相当。調整で14→20度、当てやすさ確保)
     damage:70,              // 近距離ヒット時のダメージ(調整で60→70)
-    inkPerShot:19,          // 1発の消費インク(調整で22→19)
+    inkPerShot:19,          // 1発の消費インク(調整で22→19。ボット用。人間用は human.inkPerShot)
+    human:{ inkPerShot:8 }, // 第6ラウンド: 人間専用のインクコスト
     moveSpeedMul:1.06,      // バランス調整で0.92→1.06(遠距離武器から一方的に撃たれ続けず、フデ等の高機動武器にも置いていかれないよう機動力を確保)
-    specialGaugeMax:760,
-    special:{ type:'inkrain', duration:4, radius:9, dps:25 }, // インクのあめ: 半径9セルに雨を降らせ塗る/毎秒25ダメージ
   },
   brush:{
-    name:'フデ', emoji:'🖌', desc:'はしるだけで ぬれる。とにかく はやい', defaultSub:'quickbomb',
-    moveSpeedMul:1.35,       // 最速。移動しているだけで塗れる(接触ダメージなし)
-    trailWidth:2.3,          // 移動時に塗る幅(セル。バランス調整で2→2.3。ローラー(5セル)より細いが塗り効率を確保)
-    swingCount:5, swingBulletSpeed:820, swingRange:150, swingDamage:11, swingPaintRadius:0.8,
-    swingInkCost:15, swingCooldown:0.25, // ふりはらい: 前方短距離に小さな飛沫5発、クールダウン速い(バランス調整でswingDamage25→8。5発命中でも40程度に抑制)
-    specialGaugeMax:760,
-    special:{ type:'clone', duration:5, widthMul:2, speedMul:1.6 }, // ぶんしん
+    name:'フデ', emoji:'🖌', desc:'かるくて はやい。れんぞくで ふりはらう', defaultSub:'quickbomb', defaultSpecial:'manta',
+    moveSpeedMul:1.45,       // 実機フィードバックでローラーとの差別化のため1.35→1.45(最速をさらに強調)
+    enemyInkMul:0.75,        // フデだけ相手インク上の減速を緩める(他武器のENEMY_INK_MUL 0.55の代わりに0.75)
+    trailWidth:2.0,          // 移動時に塗る幅(セル。実機フィードバックで2.3→2.0、ローラーとの塗り幅差別化)
+    swingCount:4, swingBulletSpeed:820, swingRange:150, swingDamage:10, swingPaintRadius:0.8,
+    swingInkCost:6, swingCooldown:0.22, // ふりはらい: エイムパッドを押している間0.22秒ごとに自動連続(タップ単発から変更)。飛沫4発・1発18ダメージ・射程150px、1振りインク6
+    human:{ brushCostPerCell:0.06 }, // 第6ラウンド: 人間専用(走り塗りは新規セル1つにつきこのインクを消費。自陣の上は新規扱いされないので無料)
   },
 };
 for (var wk in WEAPONS) WEAPONS[wk].key = wk;
+
+/* スペシャル(第6ラウンド): 武器から独立した3種。選択画面3行目(メイン/サブ/スペシャル)で選ぶ。
+   ゲージは全武器共通のSPECIAL_GAUGE_MAXで統一(塗り効率の高い武器がたまりすぎないよう、加算は「新しく塗ったセル数」のみ)。
+   倒すと+SPECIAL_KILL_BONUS(ゲージ比)加算。1試合1〜2回発動できる量を目安に調整する */
+var SPECIAL_GAUGE_MAX = 1800;
+var SPECIAL_KILL_BONUS = 0.15;
+var SPECIALS = {
+  sensei:{
+    name:'せんせいストライク', emoji:'⚡', desc:'まっすぐ とおくまで こうげき。よけられても こおらせる',
+    delay:0.6,            // 発動から着弾までの予告時間(秒)。この間、赤い予告線を表示する
+    halfWidthCells:2.5,   // 直撃判定の半幅(セル。幅5セル)
+    iceExtraCells:3,      // 直撃の外側、さらに+3セルまでは「こおり」判定
+    damage:100,
+    iceTime:2,            // こおり状態の持続(秒)。動けないが撃つことはできる
+  },
+  utsubo:{
+    name:'むらさめウツボ', emoji:'🐍', desc:'まえの ひろい はんいに ウツボの ぐんれいが ふりそそぐ',
+    duration:5, widthCells:12, depthCells:16, fillRate:0.4, dps:35,
+    hakkoTime:4, hakkoSpeedMul:0.6, hakkoDamageMul:1.5, // はっこう状態: 移動×0.6・被ダメ×1.5
+  },
+  manta:{
+    name:'マンタりんぶ', emoji:'🪁', desc:'むてきで マンタに のり、たいあたり と インクだんで あばれる',
+    duration:3, speedMul:1.3, trailCells:6, contactDamage:85,
+    pullRadiusCells:6, pullForce:30,       // 引き寄せる力(px/s相当)
+    shotRadiusCells:3, shotDamage:42, shotRate:2, shotSpeed:520, shotRange:15*CELL,
+    aburiTime:3, aburiDps:12,              // あぶり状態: 3秒間 毎秒12ダメージ
+  },
+};
+for (var spk in SPECIALS) SPECIALS[spk].key = spk;
 
 /* サブウェポン。メインとは別に1つ選ぶ。使用後は共通クールダウン(SUB_COOLDOWN)がかかる */
 var SUBS = {
@@ -403,6 +499,45 @@ var SUBS = {
 };
 for (var sk in SUBS) SUBS[sk].key = sk;
 
+/* アバター(第6ラウンド): パーツごとのキャラクリ。すべてCanvasで描画し、ゲームロジックには影響しない */
+var AVATAR_PARTS = {
+  species:  ['squid','tako'],
+  hair:     ['short','long','twin','pony','odango','bozu'],
+  hairColor:['#2a2020','#4a2f1a','#8a5a2a','#d9c26b','#333333','#c94b4b','#4f7fd9','#efe9dd'],
+  eyes:     ['maru','tare','tsuri','hoshi','nemui'],
+  skin:     ['#ffe0bd','#f3c99a','#e0ac69','#c68642','#8d5524','#ffd0d0'],
+  accessory:['none','cap','ribbon','headphone','glasses','flower','helmet'],
+  outfit:   ['#ff7a1a','#3fa0ff','#57e08a','#ffcc4d','#e05a5a','#a17ae0','#4dd0e1','#ff8fd6'],
+};
+var AVATAR_LABELS = {
+  species:{squid:'イカ', tako:'タコ'},
+  hair:{short:'ショート', long:'ロング', twin:'ツインテ', pony:'ポニテ', odango:'おだんご', bozu:'ボウズ'},
+  eyes:{maru:'まる', tare:'たれ', tsuri:'つり', hoshi:'ほし', nemui:'ねむい'},
+  accessory:{none:'なし', cap:'キャップ', ribbon:'リボン', headphone:'ヘッドホン', glasses:'めがね', flower:'はな', helmet:'ヘルメット'},
+};
+var AVATAR_KEY_PREFIX='sploteen_avatar_v1_p';
+function defaultAvatar(pn){
+  return {
+    species:'squid', hair: pn===1?'short':'pony', hairColor: AVATAR_PARTS.hairColor[pn===1?1:6],
+    eyes:'maru', skin:AVATAR_PARTS.skin[0], accessory:'none',
+    outfit: AVATAR_PARTS.outfit[pn-1], name: 'P'+pn,
+  };
+}
+function loadAvatar(pn){
+  try{
+    var raw = window.localStorage && localStorage.getItem(AVATAR_KEY_PREFIX+pn);
+    if (!raw) return defaultAvatar(pn);
+    var d = JSON.parse(raw);
+    var def = defaultAvatar(pn);
+    for (var k in def) if (d[k]===undefined) d[k]=def[k];
+    d.name = (''+(d.name||def.name)).slice(0,6);
+    return d;
+  }catch(e){ return defaultAvatar(pn); }
+}
+function saveAvatar(pn, av){
+  try{ if (window.localStorage) localStorage.setItem(AVATAR_KEY_PREFIX+pn, JSON.stringify(av)); }catch(e){ /* 保存失敗は無視して続行 */ }
+}
+
 /* ==================== 2. 決定論的PRNG (mulberry32) ==================== */
 function mulberry32(seed){
   var a = seed>>>0;
@@ -417,15 +552,16 @@ function mulberry32(seed){
 /* ==================== 3. ゲーム状態生成 ==================== */
 function makePlayer(idx){
   return {
-    idx:idx, weapon:'shooter', sub:'splashbomb', x:0, y:0, radius:PLAYER_RADIUS,
+    idx:idx, weapon:'shooter', sub:'splashbomb', special:'sensei', x:0, y:0, radius:PLAYER_RADIUS,
     hp:100, ink:INK_MAX, alive:true, invuln:0, respawnTimer:0,
     angle: idx===0 ? -Math.PI/2 : Math.PI/2,
-    sp:0, charge:0, charging:false, specialActive:false, specialTimer:0, specialFireCooldown:0,
+    sp:0, charge:0, charging:false, specialActive:false, specialData:{},
+    status:{frozenTimer:0, hakkoTimer:0, aburiTimer:0, aburiOwner:null}, // こおり/はっこう/あぶり(第6ラウンド)
     fireCooldown:0, swingCooldown:0, contactCooldown:0, subCooldown:0, rollDist:0, hitFlash:0, hudToast:null,
     wasFiring:false, fireHeldStart:0, wasSpecial:false, wasSub:false,
-    isBot:false, forced:null,
+    isBot:false, forced:null, lastInkSpendAt:-1e9, // 第6ラウンド: 人間専用インク経済の「最後に消費した時刻」(ボットは参照しない)
     input:{move:{x:0,y:0}, aim:{x:0,y:0}, fire:false, special:false, sub:false},
-    stats:{paintedCells:0, specials:0, kills:0, subsUsed:0},
+    stats:{paintedCells:0, specials:0, kills:0, subsUsed:0, statusHits:0},
     botMem:{ nextDecision:0, dir:{x:0,y:1} },
   };
 }
@@ -479,13 +615,16 @@ function createGame(opts){
   return g;
 }
 
-function configurePlayers(g,p1w,p2w,bot1,bot2,p1sub,p2sub){
+function configurePlayers(g,p1w,p2w,bot1,bot2,p1sub,p2sub,p1sp,p2sp){
   if (!WEAPONS[p1w]) p1w='shooter';
   if (!WEAPONS[p2w]) p2w='shooter';
   if (!SUBS[p1sub]) p1sub=WEAPONS[p1w].defaultSub;
   if (!SUBS[p2sub]) p2sub=WEAPONS[p2w].defaultSub;
+  if (!SPECIALS[p1sp]) p1sp=WEAPONS[p1w].defaultSpecial;
+  if (!SPECIALS[p2sp]) p2sp=WEAPONS[p2w].defaultSpecial;
   g.players[0].weapon=p1w; g.players[1].weapon=p2w;
   g.players[0].sub=p1sub; g.players[1].sub=p2sub;
+  g.players[0].special=p1sp; g.players[1].special=p2sp;
   g.players[0].isBot=!!bot1; g.players[1].isBot=!!bot2;
 }
 
@@ -498,25 +637,27 @@ function startRound(g, handicapLoserIdx){
   g.popups.length=0; g.shakeTimer=0; g.shakeMag=0;
   if (!g.headless) g.inkCtx.clearRect(0,0,WORLD_W,WORLD_H);
   for (var i=0;i<2;i++){
-    var p=g.players[i], w=WEAPONS[p.weapon];
+    var p=g.players[i];
     p.x=SPAWN[i].x; p.y=SPAWN[i].y;
     p.hp=100; p.ink=INK_MAX; p.alive=true; p.invuln=0; p.respawnTimer=0;
     p.angle = i===0 ? -Math.PI/2 : Math.PI/2;
-    p.charge=0; p.charging=false; p.specialActive=false; p.specialTimer=0; p.specialFireCooldown=0;
+    p.charge=0; p.charging=false; p.specialActive=false; p.specialData={};
+    p.status={frozenTimer:0, hakkoTimer:0, aburiTimer:0, aburiOwner:null};
     p.fireCooldown=0; p.swingCooldown=0; p.contactCooldown=0; p.subCooldown=0; p.rollDist=0; p.hitFlash=0; p.hudToast=null;
     p.wasFiring=false; p.wasSpecial=false; p.wasSub=false;
-    p.sp = (handicapLoserIdx===i) ? Math.round(w.specialGaugeMax*0.5) : 0;
-    p.stats={paintedCells:0, specials:0, kills:0, subsUsed:0};
+    p.lastInkSpendAt=-1e9; // 第6ラウンド: ラウンド開始時点では回復開始条件を満たしておく
+    p.sp = (handicapLoserIdx===i) ? Math.round(SPECIAL_GAUGE_MAX*0.5) : 0;
+    p.stats={paintedCells:0, specials:0, kills:0, subsUsed:0, statusHits:0};
     p.botMem={ nextDecision:0, dir:{x:0, y:(i===0?-1:1)} };
   }
   g.time=0; g.remaining=g.duration;
   g.phase='countdown'; g.countdown=3.999;
 }
 
-function startSeries(g,p1w,p2w,seed,bot1,bot2,duration,p1sub,p2sub){
+function startSeries(g,p1w,p2w,seed,bot1,bot2,duration,p1sub,p2sub,p1sp,p2sp){
   g.rng = mulberry32((seed>>>0) || 1);
   g.duration = duration || ROUND_DURATION_DEFAULT;
-  configurePlayers(g,p1w,p2w,bot1,bot2,p1sub,p2sub);
+  configurePlayers(g,p1w,p2w,bot1,bot2,p1sub,p2sub,p1sp,p2sp);
   g.seriesScore=[0,0]; g.roundResults=[]; g.lastRoundLoserIdx=null;
   startRound(g, null);
 }
@@ -532,7 +673,17 @@ function cellAt(g,wx,wy){
 function isWallAt(g,wx,wy){ return cellAt(g,wx,wy)===9; }
 
 function isInvulnerable(p){
-  return p.invuln>0 || (p.weapon==='roller' && p.specialActive);
+  return p.invuln>0 || (p.specialActive && p.special==='manta');
+}
+
+// 状態異常(こおり/はっこう/あぶり)を付与する。stats.statusHitsは「新規に発生した回数」だけ数える
+// (毎ティック延長するウツボのはっこう等で水増しされないよう、既に付いていた場合はカウントしない)
+function applyStatus(g, ownerIdx, target, kind, duration){
+  var field = kind+'Timer';
+  var wasActive = target.status[field] > 0;
+  target.status[field] = duration;
+  if (kind==='aburi') target.status.aburiOwner = ownerIdx;
+  if (!wasActive) g.players[ownerIdx].stats.statusHits++;
 }
 
 function drawInkBrush(g,wx,wy,r,owner){
@@ -568,8 +719,8 @@ function paintCircle(g, wx, wy, radiusPx, owner){
     }
   }
   if (painted>0){
-    var pl=g.players[owner-1], w=WEAPONS[pl.weapon];
-    pl.sp=Math.min(w.specialGaugeMax, pl.sp+painted);
+    var pl=g.players[owner-1];
+    pl.sp=Math.min(SPECIAL_GAUGE_MAX, pl.sp+painted);
     pl.stats.paintedCells+=painted;
   }
   if (!g.headless) drawInkBrush(g,wx,wy,radiusPx,owner);
@@ -615,8 +766,8 @@ function paintEllipse(g, wx, wy, rx, ry, angle, owner){
     }
   }
   if (painted>0){
-    var pl=g.players[owner-1], w=WEAPONS[pl.weapon];
-    pl.sp=Math.min(w.specialGaugeMax, pl.sp+painted);
+    var pl=g.players[owner-1];
+    pl.sp=Math.min(SPECIAL_GAUGE_MAX, pl.sp+painted);
     pl.stats.paintedCells+=painted;
   }
   if (!g.headless) drawInkEllipse(g,wx,wy,rx,ry,angle,owner);
@@ -664,13 +815,16 @@ function resolveWallCollision(p, wallsPx){
 
 function applyDamage(g, target, dmg, ownerIdx){
   if (!target.alive || isInvulnerable(target)) return;
+  if (target.status.hakkoTimer>0) dmg *= SPECIALS.utsubo.hakkoDamageMul; // はっこう状態: 被ダメージ倍増
   target.hp -= dmg;
   target.hitFlash = 0.12; // 被弾で一瞬白く点滅
   target.lastHitAt = g.time; // シールドのボットAI判断用(直近の被弾時刻)
   if (target.hp<=0){
     target.hp=0; target.alive=false; target.respawnTimer=RESPAWN_TIME;
+    target.status={frozenTimer:0, hakkoTimer:0, aburiTimer:0, aburiOwner:null}; // やられたら状態異常は解除
     var killer=g.players[ownerIdx];
     killer.stats.kills++;
+    killer.sp = Math.min(SPECIAL_GAUGE_MAX, killer.sp + SPECIAL_GAUGE_MAX*SPECIAL_KILL_BONUS); // 倒すとスペシャルゲージ+15%
     paintCircle(g, target.x, target.y, DEATH_SPLAT_RADIUS, ownerIdx+1);
     spawnParticles(g, target.x, target.y, ownerIdx, 26);
     if (!g.headless){
@@ -709,8 +863,10 @@ function fireShooterBullet(g, idx, p, weapon){
 
 function tryRollerSwing(g, idx, p, weapon){
   if (p.swingCooldown>0) return;
-  if (p.ink < weapon.swingInkCost) return;
-  p.ink -= weapon.swingInkCost;
+  var swingCost = inkCost(p, weapon, 'swingInkCost');
+  if (p.ink < swingCost) return;
+  p.ink -= swingCost;
+  if (!p.isBot) p.lastInkSpendAt = g.time;
   p.swingCooldown = weapon.swingCooldown;
   var n=weapon.swingCount;
   for (var i=0;i<n;i++){
@@ -726,14 +882,14 @@ function tryRollerSwing(g, idx, p, weapon){
   }
 }
 
-function castChargerBeam(g, idx, p, weapon, frac, thin, dmgOverride){
+function castChargerBeam(g, idx, p, weapon, frac){
   var range = weapon.maxRange*frac;
-  var damage = (dmgOverride!=null?dmgOverride:weapon.maxDamage)*frac;
+  var damage = weapon.maxDamage*frac;
   var stepLen = 8;
   var steps = Math.ceil(range/stepLen);
   var hit=false;
   var target=g.players[1-idx];
-  var paintR = (thin? weapon.beamPaintRadius*0.6 : weapon.beamPaintRadius)*CELL;
+  var paintR = weapon.beamPaintRadius*CELL;
   var endX=p.x, endY=p.y;
   for (var s=1; s<=steps; s++){
     var d=s*stepLen; if (d>range) d=range;
@@ -755,10 +911,12 @@ function castChargerBeam(g, idx, p, weapon, frac, thin, dmgOverride){
 
 function releaseChargerBeam(g, idx, p, weapon){
   var frac = weapon.minChargeFrac + (1-weapon.minChargeFrac)*clamp(p.charge/weapon.maxCharge,0,1);
-  var cost = Math.min(p.ink, weapon.inkBase + weapon.inkPerFrac*frac);
+  var inkBase = inkCost(p, weapon, 'inkBase'), inkPerFrac = inkCost(p, weapon, 'inkPerFrac');
+  var cost = Math.min(p.ink, inkBase + inkPerFrac*frac);
   if (p.ink < 8){ p.charge=0; return; }
   p.ink -= cost;
-  castChargerBeam(g, idx, p, weapon, frac, false, null);
+  if (!p.isBot) p.lastInkSpendAt = g.time;
+  castChargerBeam(g, idx, p, weapon, frac);
   p.charge=0;
 }
 
@@ -788,8 +946,8 @@ function paintSector(g, cx, cy, angle, halfAngle, radius, owner){
     }
   }
   if (painted>0){
-    var pl=g.players[owner-1], w=WEAPONS[pl.weapon];
-    pl.sp=Math.min(w.specialGaugeMax, pl.sp+painted);
+    var pl=g.players[owner-1];
+    pl.sp=Math.min(SPECIAL_GAUGE_MAX, pl.sp+painted);
     pl.stats.paintedCells+=painted;
   }
   if (!g.headless){
@@ -821,8 +979,10 @@ function fireBucketShot(g, idx, p, weapon){
 // フデ: タップで前方に小さな飛沫5発(ふりはらい)
 function tryBrushSwing(g, idx, p, weapon){
   if (p.swingCooldown>0) return;
-  if (p.ink < weapon.swingInkCost) return;
-  p.ink -= weapon.swingInkCost;
+  var swingCost = inkCost(p, weapon, 'swingInkCost');
+  if (p.ink < swingCost) return;
+  p.ink -= swingCost;
+  if (!p.isBot) p.lastInkSpendAt = g.time;
   p.swingCooldown = weapon.swingCooldown;
   var n=weapon.swingCount;
   for (var i=0;i<n;i++){
@@ -968,53 +1128,127 @@ function updateSubThrows(g, dt){
   }
 }
 
-function explodeInkBomb(g, b){
-  var weapon=b.weapon;
-  paintCircle(g, b.x, b.y, weapon.special.radius*CELL, b.owner+1);
-  var target=g.players[1-b.owner];
-  if (target.alive && !isInvulnerable(target)){
-    var dx=target.x-b.x, dy=target.y-b.y;
-    var rr=weapon.special.radius*CELL;
-    if (dx*dx+dy*dy <= rr*rr) applyDamage(g, target, weapon.special.damage, b.owner);
-  }
-  spawnParticles(g, b.x, b.y, b.owner, 14);
-}
-
+/* ---- スペシャル(第6ラウンド。武器から独立した3種。それぞれ発動した瞬間に勝負が動く強さにする) ---- */
 function activateSpecial(g, idx){
-  var p=g.players[idx], weapon=WEAPONS[p.weapon];
-  if (!p.alive || p.specialActive || p.sp < weapon.specialGaugeMax) return;
+  var p=g.players[idx];
+  if (!p.alive || p.specialActive || p.sp < SPECIAL_GAUGE_MAX) return;
   p.sp = 0;
   p.stats.specials++;
-  if (p.weapon==='shooter'){
-    var n=weapon.special.count;
-    for (var i=0;i<n;i++){
-      var t = n<=1?0:(i/(n-1)-0.5);
-      var ang = p.angle + t*(weapon.special.spreadDeg*Math.PI/180);
-      g.bullets.push({
-        kind:'inkbomb', owner:idx, x:p.x, y:p.y,
-        vx:Math.cos(ang)*weapon.special.speed, vy:Math.sin(ang)*weapon.special.speed,
-        age:0, fuse:weapon.special.fuse, weapon:weapon, stopped:false,
-      });
-    }
-  } else if (p.weapon==='roller'){
-    p.specialActive=true; p.specialTimer=weapon.special.duration;
-  } else if (p.weapon==='charger'){
-    p.specialActive=true; p.specialTimer=weapon.special.duration; p.specialFireCooldown=0;
-    p.charging=false; p.charge=0;
-  } else if (p.weapon==='bucket' || p.weapon==='brush'){
-    p.specialActive=true; p.specialTimer=weapon.special.duration;
+  p.charging=false; p.charge=0;
+  p.specialActive = true;
+  if (p.special==='sensei'){
+    p.specialData = { timer: SPECIALS.sensei.delay, angle: p.angle };
+  } else if (p.special==='utsubo'){
+    p.specialData = { timer: SPECIALS.utsubo.duration, paintAcc:0 };
+  } else if (p.special==='manta'){
+    p.specialData = { timer: SPECIALS.manta.duration, shotCooldown:0 };
+  }
+  if (!g.headless){
+    g.specialFlash = { owner:idx, name:SPECIALS[p.special].name, age:0, life:0.3 };
   }
 }
 
-// バケツのスペシャル「インクのあめ」: 発動中、自分の周囲半径にランダムにインクが降って塗り、範囲内の敵に毎秒ダメージ
-function updateBucketRain(g, idx, p, weapon, dt){
-  var sp=weapon.special;
-  var a=g.rng()*Math.PI*2, d=g.rng()*sp.radius*CELL;
-  paintCircle(g, p.x+Math.cos(a)*d, p.y+Math.sin(a)*d, CELL*0.9, idx+1);
+// せんせいストライク: 予告0.6秒後に、発動時の向きへマップ端まで届く幅5セルの一撃。直撃で100ダメージ、
+// 直撃を免れても縁(幅+3セル)にいれば「こおり」(2秒動けない、撃つことはできる)
+function executeSenseiStrike(g, idx, p, angle){
+  var sp=SPECIALS.sensei;
+  var ox=p.x, oy=p.y;
+  var dirX=Math.cos(angle), dirY=Math.sin(angle);
+  var perpX=-dirY, perpY=dirX;
+  var maxRange = Math.hypot(WORLD_W, WORLD_H); // マップ端まで届けば十分な長さ(対角線)
+  var halfW = sp.halfWidthCells*CELL;
+  var iceHalfW = halfW + sp.iceExtraCells*CELL;
+  var stepLen = CELL*0.9, steps = Math.ceil(maxRange/stepLen);
+  for (var s=0; s<=steps; s++){
+    var d=s*stepLen, x=ox+dirX*d, y=oy+dirY*d;
+    if (x<-CELL || x>WORLD_W+CELL || y<-CELL || y>WORLD_H+CELL) break;
+    paintCircle(g, x, y, halfW, idx+1);
+  }
+  var target=g.players[1-idx];
+  if (target.alive && !isInvulnerable(target)){
+    var dx=target.x-ox, dy=target.y-oy;
+    var forward=dx*dirX+dy*dirY, perp=dx*perpX+dy*perpY;
+    if (forward>=-target.radius && forward<=maxRange){
+      if (Math.abs(perp)<=halfW+target.radius){
+        applyDamage(g, target, sp.damage, idx);
+      } else if (Math.abs(perp)<=iceHalfW+target.radius){
+        applyStatus(g, idx, target, 'frozen', sp.iceTime);
+      }
+    }
+  }
+  if (!g.headless){ g.shakeTimer=0.3; g.shakeMag=10; }
+}
+
+// むらさめウツボ: 前方の広い矩形範囲(キャラに追従)にウツボの群れが降り注ぎ、毎秒40%塗りつつ35ダメージ/秒。
+// 当たった敵は「はっこう」(4秒、移動×0.6・被ダメ×1.5)
+function updateUtsuboField(g, idx, p, dt){
+  var sp=SPECIALS.utsubo, sd=p.specialData;
+  var ang=p.angle, dirX=Math.cos(ang), dirY=Math.sin(ang), perpX=-dirY, perpY=dirX;
+  var halfW=sp.widthCells*CELL/2, depth=sp.depthCells*CELL;
+  var areaCells=sp.widthCells*sp.depthCells;
+  sd.paintAcc = (sd.paintAcc||0) + areaCells*sp.fillRate*dt;
+  while (sd.paintAcc>=1){
+    sd.paintAcc-=1;
+    var rf=g.rng()*depth, rp=(g.rng()*2-1)*halfW;
+    paintCircle(g, p.x+dirX*rf+perpX*rp, p.y+dirY*rf+perpY*rp, CELL*0.62, idx+1);
+  }
   var target=g.players[1-idx];
   if (target.alive && !isInvulnerable(target)){
     var dx=target.x-p.x, dy=target.y-p.y;
-    if (dx*dx+dy*dy <= (sp.radius*CELL)*(sp.radius*CELL)) applyDamage(g, target, sp.dps*dt, idx);
+    var forward=dx*dirX+dy*dirY, perp=dx*perpX+dy*perpY;
+    if (forward>=-target.radius && forward<=depth+target.radius && Math.abs(perp)<=halfW+target.radius){
+      applyDamage(g, target, sp.dps*dt, idx);
+      if (target.alive) applyStatus(g, idx, target, 'hakko', sp.hakkoTime);
+    }
+  }
+}
+
+// マンタりんぶ: 発動時間中マンタに乗って無敵・高速移動。幅6セルの跡を塗り、体当たりで高ダメージ、
+// 周囲の敵を引き寄せつつ、エイムパッドで大きなインク弾を投げられる。当てた敵は「あぶり」(3秒、毎秒12ダメージ)
+function updateMantaRide(g, idx, p, dt, inp){
+  var sp=SPECIALS.manta, sd=p.specialData;
+  paintCircle(g, p.x, p.y, sp.trailCells*CELL/2, idx+1);
+  var opp=g.players[1-idx];
+  if (opp.alive && !isInvulnerable(opp)){
+    var dx=opp.x-p.x, dy=opp.y-p.y, d=Math.hypot(dx,dy)||1e-4;
+    var contactR=p.radius+opp.radius+8;
+    if (d<=contactR){
+      applyDamage(g, opp, sp.contactDamage, idx);
+      if (opp.alive) applyStatus(g, idx, opp, 'aburi', sp.aburiTime);
+    } else if (d<=sp.pullRadiusCells*CELL){
+      opp.x -= dx/d*sp.pullForce*dt; opp.y -= dy/d*sp.pullForce*dt;
+    }
+  }
+  sd.shotCooldown = Math.max(0, (sd.shotCooldown||0)-dt);
+  if (inp.fire && sd.shotCooldown<=0){
+    sd.shotCooldown = 1/sp.shotRate;
+    var ang=p.angle;
+    g.bullets.push({
+      kind:'bullet', owner:idx, weaponKey:'manta',
+      x:p.x+Math.cos(ang)*p.radius, y:p.y+Math.sin(ang)*p.radius,
+      vx:Math.cos(ang)*sp.shotSpeed, vy:Math.sin(ang)*sp.shotSpeed,
+      damage:sp.shotDamage, range:sp.shotRange, traveled:0,
+      paintRadius:sp.shotRadiusCells*CELL, trailRadius:CELL*0.5, hitRadius:10,
+    });
+  }
+}
+
+// specialActive中の毎ティック処理をまとめて呼び出す。通常武器の発射処理はここでは行わない(マンタのみinp.fireでインク弾を撃てる)
+function handleSpecialTick(g, idx, p, dt, inp){
+  var sd=p.specialData;
+  if (p.special==='sensei'){
+    sd.timer -= dt;
+    if (sd.timer<=0){ executeSenseiStrike(g, idx, p, sd.angle); p.specialActive=false; }
+  } else if (p.special==='utsubo'){
+    sd.timer -= dt;
+    updateUtsuboField(g, idx, p, dt);
+    if (sd.timer<=0) p.specialActive=false;
+  } else if (p.special==='manta'){
+    sd.timer -= dt;
+    updateMantaRide(g, idx, p, dt, inp);
+    if (sd.timer<=0) p.specialActive=false;
+  } else {
+    p.specialActive=false;
   }
 }
 
@@ -1056,6 +1290,7 @@ function updateBullets(g, dt){
           var dx=target.x-b.x, dy=target.y-b.y;
           if (dx*dx+dy*dy <= (target.radius+(b.hitRadius||4))*(target.radius+(b.hitRadius||4))){
             applyDamage(g,target,b.damage,b.owner);
+            if (b.weaponKey==='manta' && target.alive) applyStatus(g, b.owner, target, 'aburi', SPECIALS.manta.aburiTime);
             paintBulletImpact(g,b);
             dead=true;
           }
@@ -1075,13 +1310,6 @@ function updateBullets(g, dt){
         }
         if (!dead && (b.x<0||b.x>WORLD_W||b.y<0||b.y>WORLD_H)) dead=true;
       }
-    } else if (b.kind==='inkbomb'){
-      b.age += dt;
-      if (!b.stopped){
-        b.x += b.vx*dt; b.y += b.vy*dt;
-        if (isWallAt(g,b.x,b.y) || b.x<0||b.x>WORLD_W||b.y<0||b.y>WORLD_H) b.stopped=true;
-      }
-      if (b.age >= b.fuse){ explodeInkBomb(g,b); dead=true; }
     }
     if (dead) arr.splice(i,1);
   }
@@ -1100,6 +1328,19 @@ function updateParticles(g, dt){
   }
 }
 
+// 第6ラウンド: 人間プレイヤー専用インク経済のヘルパー。ボット(p.isBot===true)は常に従来どおりの値を返し、
+// 挙動を一切変えない(weapon.human.*を参照するのは人間の時だけ)。
+function inkCost(p, weapon, kind){
+  if (!p.isBot && weapon.human && weapon.human[kind]!=null) return weapon.human[kind];
+  return weapon[kind];
+}
+function inkRegenRate(p, idx, terrain){
+  if (p.isBot) return terrain===(idx+1) ? INK_REGEN_FAST : INK_REGEN_SLOW; // ボット: 従来どおり
+  if (terrain===(idx+1)) return INK_REGEN_OWN_HUMAN;
+  if (terrain===(2-idx)) return INK_REGEN_ENEMY_HUMAN;
+  return INK_REGEN_UNPAINTED_HUMAN;
+}
+
 function updatePlayer(g, idx, dt){
   var p=g.players[idx], weapon=WEAPONS[p.weapon];
   var opp=g.players[1-idx];
@@ -1110,6 +1351,7 @@ function updatePlayer(g, idx, dt){
     p.respawnTimer -= dt;
     if (p.respawnTimer<=0){
       p.alive=true; p.hp=100; p.x=SPAWN[idx].x; p.y=SPAWN[idx].y; p.invuln=INVULN_TIME;
+      p.status={frozenTimer:0, hakkoTimer:0, aburiTimer:0, aburiOwner:null};
     }
     p.fireCooldown=Math.max(0,p.fireCooldown-dt);
     p.swingCooldown=Math.max(0,p.swingCooldown-dt);
@@ -1119,6 +1361,16 @@ function updatePlayer(g, idx, dt){
     return;
   }
   if (p.invuln>0) p.invuln=Math.max(0,p.invuln-dt);
+
+  // 状態異常(こおり/はっこう/あぶり)の経過。あぶりは毎ティックダメージを与える
+  var st=p.status;
+  if (st.frozenTimer>0) st.frozenTimer=Math.max(0,st.frozenTimer-dt);
+  if (st.hakkoTimer>0) st.hakkoTimer=Math.max(0,st.hakkoTimer-dt);
+  if (st.aburiTimer>0){
+    st.aburiTimer=Math.max(0,st.aburiTimer-dt);
+    applyDamage(g, p, SPECIALS.manta.aburiDps*dt, st.aburiOwner);
+    if (!p.alive) return; // あぶりダメージで倒れた場合はここで終了(復活処理は次ティック)
+  }
 
   var inp=p.input||{move:{x:0,y:0},aim:{x:0,y:0},fire:false,special:false};
 
@@ -1130,20 +1382,25 @@ function updatePlayer(g, idx, dt){
   var terrainBefore = cellAt(g,p.x,p.y);
   var terrainMul=1.0;
   if (terrainBefore===(idx+1)) terrainMul=OWN_INK_MUL;
-  else if (terrainBefore===(2-idx)) terrainMul=ENEMY_INK_MUL;
+  else if (terrainBefore===(2-idx)) terrainMul = weapon.enemyInkMul!=null ? weapon.enemyInkMul : ENEMY_INK_MUL;
   var weaponMul=weapon.moveSpeedMul;
   if (weapon.key==='charger' && p.charging) weaponMul *= CHARGER_CHARGE_MOVE_MUL;
-  if (p.specialActive && (weapon.key==='roller' || weapon.key==='brush')) weaponMul *= weapon.special.speedMul;
+  if (p.specialActive && p.special==='manta') weaponMul *= SPECIALS.manta.speedMul;
+  if (st.hakkoTimer>0) weaponMul *= SPECIALS.utsubo.hakkoSpeedMul;
   var speed = BASE_SPEED*weaponMul*terrainMul*speedFrac;
+  if (st.frozenTimer>0) speed = 0; // こおり: 動けない(撃つことはできる)
   p.x += moveDir.x*speed*dt;
   p.y += moveDir.y*speed*dt;
   resolveWallCollision(p, g.wallsPx);
   resolveShieldCollision(g, idx, p);
 
-  // 地形によるインク回復
+  // 地形によるインク回復(第6ラウンド: 人間だけ、直前の消費から INK_REGEN_DELAY 秒は回復しない。ボットは従来どおり)
   var terrainAfter = cellAt(g,p.x,p.y);
-  var onOwn = terrainAfter===(idx+1);
-  p.ink = Math.min(INK_MAX, p.ink + (onOwn?INK_REGEN_FAST:INK_REGEN_SLOW)*dt);
+  if (p.isBot){
+    p.ink = Math.min(INK_MAX, p.ink + inkRegenRate(p, idx, terrainAfter)*dt);
+  } else if ((g.time - p.lastInkSpendAt) >= INK_REGEN_DELAY){
+    p.ink = Math.min(INK_MAX, p.ink + inkRegenRate(p, idx, terrainAfter)*dt);
+  }
 
   // 向き(エイム)
   var av=inp.aim;
@@ -1163,10 +1420,15 @@ function updatePlayer(g, idx, dt){
   var releasedNow = (!firing && p.wasFiring);
   var heldDur = releasedNow ? (g.time-p.fireHeldStart) : 0;
 
-  if (weapon.key==='shooter'){
+  if (p.specialActive){
+    // スペシャル発動中は専用の処理へ(マンタのみinp.fireでインク弾を撃てる。他の武器の通常射撃は行わない)
+    handleSpecialTick(g, idx, p, dt, inp);
+  } else if (weapon.key==='shooter'){
     if (firing && p.ink>0 && p.fireCooldown<=0){
       p.fireCooldown = 1/weapon.fireRate;
-      p.ink = Math.max(0, p.ink-weapon.inkPerShot);
+      var shotCost = inkCost(p, weapon, 'inkPerShot');
+      p.ink = Math.max(0, p.ink-shotCost);
+      if (!p.isBot) p.lastInkSpendAt = g.time;
       fireShooterBullet(g, idx, p, weapon);
     }
   } else if (weapon.key==='roller'){
@@ -1176,11 +1438,18 @@ function updatePlayer(g, idx, dt){
       // 塗り幅を移動距離に応じて揺らし、轢き跡の両端をギザギザにする
       p.rollDist += moved;
       var wobble = Math.sin(p.rollDist/(CELL*3.1))*CELL*0.55;
-      var rad = Math.max(CELL*0.55, weapon.rollWidth*CELL/2 + wobble) * (p.specialActive?weapon.special.widthMul:1);
-      paintCircle(g, p.x, p.y, rad, idx+1);
+      var rad = Math.max(CELL*0.55, weapon.rollWidth*CELL/2 + wobble);
+      if (p.isBot){
+        paintCircle(g, p.x, p.y, rad, idx+1); // ボット: 従来どおり無料・無条件
+      } else if (p.ink>0){
+        // 第6ラウンド: 人間だけ、新しく塗ったセル数に応じてインクを消費(自陣の上は新規扱いされないので無料)。
+        // この消費は回復までの待ち時間(INK_REGEN_DELAY)をリセットしない(自陣を走りながらでも回復できる)
+        var rollPainted = paintCircle(g, p.x, p.y, rad, idx+1);
+        if (rollPainted>0) p.ink = Math.max(0, p.ink - rollPainted*inkCost(p, weapon, 'rollCostPerCell'));
+      }
     }
-    // 接触キルは「ある程度の速さで動いている時だけ」有効(待ち伏せ即死を防ぐ)
-    if (opp.alive && !isInvulnerable(opp) && speed > BASE_SPEED*0.15){
+    // 接触キルは「ある程度の速さで動いている時だけ」有効(待ち伏せ即死を防ぐ。実機フィードバックでBASE_SPEED×0.5以上に変更)
+    if (opp.alive && !isInvulnerable(opp) && speed > BASE_SPEED*(weapon.contactMinSpeedMul!=null?weapon.contactMinSpeedMul:0.15)){
       var ddx=opp.x-p.x, ddy=opp.y-p.y;
       var rr=p.radius+opp.radius+10;
       if (ddx*ddx+ddy*ddy <= rr*rr && p.contactCooldown<=0){
@@ -1189,41 +1458,40 @@ function updatePlayer(g, idx, dt){
       }
     }
   } else if (weapon.key==='charger'){
-    if (p.specialActive){
-      p.charging=false; p.charge=0;
-      p.specialFireCooldown=Math.max(0,p.specialFireCooldown-dt);
-      if (firing && p.specialFireCooldown<=0){
-        p.specialFireCooldown = 1/weapon.special.rate;
-        castChargerBeam(g, idx, p, weapon, 1.0, true, weapon.special.damage);
-      }
-    } else {
-      if (firing && p.ink>=8){
-        p.charging=true;
-        p.charge=Math.min(weapon.maxCharge, p.charge+dt);
-      } else if (!firing){
-        p.charging=false;
-      }
-      if (releasedNow && p.charge>0){
-        releaseChargerBeam(g, idx, p, weapon);
-      }
+    if (firing && p.ink>=8){
+      p.charging=true;
+      p.charge=Math.min(weapon.maxCharge, p.charge+dt);
+      if (!p.isBot) p.lastInkSpendAt = g.time; // 第6ラウンド: 人間はため中も消費扱い(回復しない)
+    } else if (!firing){
+      p.charging=false;
+    }
+    if (releasedNow && p.charge>0){
+      releaseChargerBeam(g, idx, p, weapon);
     }
   } else if (weapon.key==='bucket'){
-    if (firing && p.ink>=weapon.inkPerShot && p.fireCooldown<=0){
+    var bucketCost = inkCost(p, weapon, 'inkPerShot');
+    if (firing && p.ink>=bucketCost && p.fireCooldown<=0){
       p.fireCooldown = weapon.fireInterval;
-      p.ink = Math.max(0, p.ink-weapon.inkPerShot);
+      p.ink = Math.max(0, p.ink-bucketCost);
+      if (!p.isBot) p.lastInkSpendAt = g.time;
       fireBucketShot(g, idx, p, weapon);
     }
   } else if (weapon.key==='brush'){
-    if (releasedNow && heldDur < TAP_MAX_DURATION) tryBrushSwing(g, idx, p, weapon);
+    // 実機フィードバックでタップ単発→押しっぱなし連打(swingCooldownごとに自動連続)に変更
+    if (firing && p.swingCooldown<=0) tryBrushSwing(g, idx, p, weapon);
     var movedBrush = speed*dt;
     if (movedBrush > 0.3){
-      var radBrush = Math.max(CELL*0.35, weapon.trailWidth*CELL/2) * (p.specialActive?weapon.special.widthMul:1);
-      paintCircle(g, p.x, p.y, radBrush, idx+1);
+      var radBrush = Math.max(CELL*0.35, weapon.trailWidth*CELL/2);
+      if (p.isBot){
+        paintCircle(g, p.x, p.y, radBrush, idx+1); // ボット: 従来どおり無料・無条件
+      } else if (p.ink>0){
+        // 第6ラウンド: 人間だけ、新しく塗ったセル数に応じてインクを消費(ローラーと同じ仕組み)
+        var brushPainted = paintCircle(g, p.x, p.y, radBrush, idx+1);
+        if (brushPainted>0) p.ink = Math.max(0, p.ink - brushPainted*inkCost(p, weapon, 'brushCostPerCell'));
+      }
     }
   }
   p.wasFiring=firing;
-
-  if (weapon.key==='bucket' && p.specialActive) updateBucketRain(g, idx, p, weapon, dt);
 
   // サブウェポン(タップで使用。使用後は共通クールダウン)
   var subPressed=!!inp.sub;
@@ -1231,6 +1499,7 @@ function updatePlayer(g, idx, dt){
     var sub=SUBS[p.sub];
     if (sub && p.ink>=sub.inkCost){
       p.ink -= sub.inkCost;
+      if (!p.isBot) p.lastInkSpendAt = g.time; // 第6ラウンド: サブのコストは共通のまま、消費扱いだけ人間に適用
       p.subCooldown = SUB_COOLDOWN;
       p.stats.subsUsed++;
       if (sub.key==='splashbomb') throwSubBomb(g, idx, p, sub, false);
@@ -1245,11 +1514,6 @@ function updatePlayer(g, idx, dt){
   var specialPressed=!!inp.special;
   if (specialPressed && !p.wasSpecial) activateSpecial(g, idx);
   p.wasSpecial=specialPressed;
-
-  if (p.specialActive){
-    p.specialTimer -= dt;
-    if (p.specialTimer<=0){ p.specialActive=false; }
-  }
 }
 
 function checkRoundEnd(g){
@@ -1264,7 +1528,7 @@ function checkRoundEnd(g){
   g.roundResults.push({pct1:pct1, pct2:pct2, winnerIdx:winnerIdx, kills:[g.players[0].stats.kills, g.players[1].stats.kills]});
   g.lastRoundLoserIdx = winnerIdx===null ? null : (1-winnerIdx);
   g.lastRoundPct=[pct1,pct2];
-  g.seriesDone = g.seriesScore[0]>=WINS_NEEDED || g.seriesScore[1]>=WINS_NEEDED;
+  g.seriesDone = g.seriesScore[0]>=SERIES_WINS || g.seriesScore[1]>=SERIES_WINS || g.roundResults.length>=SERIES_MAX_ROUNDS;
   if (!g.headless) onRoundEndUI(g);
 }
 
@@ -1298,6 +1562,7 @@ function updateEffects(g, dt){
     if (t){ t.age+=dt; if (t.age>=t.life) g.players[i].hudToast=null; }
   }
   if (g.headless) return;
+  if (g.specialFlash){ g.specialFlash.age+=dt; if (g.specialFlash.age>=g.specialFlash.life) g.specialFlash=null; }
   var arr=g.popups;
   for (var j=arr.length-1;j>=0;j--){
     arr[j].age+=dt;
@@ -1363,6 +1628,27 @@ function botAimJitter(g, ang){
   return ang + (g.rng()*2-1)*spread;
 }
 
+// 前方の矩形範囲(幅widthCells×奥行depthCells、角度ang)を格子サンプリングし、
+// colorValueのセルが占める割合を返す(むらさめウツボの発動判断「相手色の多い方向を向いているか」に使用)
+function forwardColorFrac(g, p, ang, widthCells, depthCells, colorValue){
+  var dirX=Math.cos(ang), dirY=Math.sin(ang), perpX=-dirY, perpY=dirX;
+  var halfW=widthCells*CELL/2, depth=depthCells*CELL;
+  var stepsD=Math.max(1,Math.round(depthCells)), stepsW=Math.max(1,Math.round(widthCells));
+  var cnt=0, total=0;
+  for (var i=0;i<stepsD;i++){
+    var rf=(i+0.5)/stepsD*depth;
+    for (var j=0;j<stepsW;j++){
+      var rp=((j+0.5)/stepsW - 0.5)*2*halfW;
+      var sx=p.x+dirX*rf+perpX*rp, sy=p.y+dirY*rf+perpY*rp;
+      var cell=cellAt(g, sx, sy);
+      if (cell===9) continue;
+      total++;
+      if (cell===colorValue) cnt++;
+    }
+  }
+  return total>0 ? cnt/total : 0;
+}
+
 function botDecide(g, idx){
   var p=g.players[idx], opp=g.players[1-idx], weapon=WEAPONS[p.weapon];
   var mem=p.botMem;
@@ -1397,8 +1683,9 @@ function botDecide(g, idx){
   var keepEngaged = mem.engaged && oppTargetable && !wantRetreat && distToOpp <= engageDist*1.8;
   var engaged = wantEngage || keepEngaged;
   mem.engaged = engaged;
-  // ローラーが無敵スペシャル発動中は、間合いを気にせずまっすぐ突撃してよい
-  var specialRush = weapon.key==='roller' && p.specialActive && oppTargetable;
+  // ローラーがマンタりんぶ発動中は、間合いを気にせずまっすぐ突撃してよい(第6ラウンド:
+  // 旧ローラー専用「無敵スペシャル」の判定をp.special==='manta'に置き換えただけで、条件自体は変えていない)
+  var specialRush = weapon.key==='roller' && p.specialActive && p.special==='manta' && oppTargetable;
   // チャージャーが「近づかれすぎ」とみなして離脱を優先する間合い(ためている間は無防備なため)
   var chargerIdeal = 11*CELL;
   var chargerTooClose = weapon.key==='charger' && oppTargetable && distToOpp < chargerIdeal;
@@ -1455,7 +1742,34 @@ function botDecide(g, idx){
   }
   input.move = { x: mem.dir.x*(0.7+0.3*g.rng()), y: mem.dir.y*(0.7+0.3*g.rng()) };
 
-  if (weapon.key==='shooter'){
+  // スペシャル発動中の操作(第6ラウンドで追加。武器固有スペシャル向けの分岐は全て削除し、
+  // p.specialの3種に対する最小限の操作だけ行う。許可されているのは「マンタ操作の追加」のみ)
+  if (p.specialActive){
+    if (p.special==='manta'){
+      // マンタ中は無敵・高速なので、敵に向かって突進しつつインク弾を撃つ
+      if (oppTargetable){
+        var mantaDir = {x:(opp.x-p.x)/(distToOpp||1), y:(opp.y-p.y)/(distToOpp||1)};
+        mem.dir = mantaDir;
+        input.move = {x:mantaDir.x*(0.85+0.15*g.rng()), y:mantaDir.y*(0.85+0.15*g.rng())};
+        input.aim = {x:mantaDir.x, y:mantaDir.y};
+        input.fire = true;
+      } else {
+        input.aim = {x:mem.dir.x, y:mem.dir.y};
+        input.fire = false;
+      }
+    } else if (p.special==='utsubo'){
+      // むらさめウツボは向いている方向に降り注ぐので、敵がいれば向きを合わせ続ける
+      if (oppTargetable){
+        input.aim = {x:(opp.x-p.x)/(distToOpp||1), y:(opp.y-p.y)/(distToOpp||1)};
+      } else {
+        input.aim = {x:mem.dir.x, y:mem.dir.y};
+      }
+      input.fire = false;
+    } else {
+      // せんせいストライクは発動時の向きで固定されるため、以降の入力は不要
+      input.fire = false;
+    }
+  } else if (weapon.key==='shooter'){
     if (los && distToOpp < weapon.range*0.95){
       var ang=Math.atan2(opp.y-p.y, opp.x-p.x);
       ang = botAimJitter(g, ang);
@@ -1481,16 +1795,7 @@ function botDecide(g, idx){
     }
     input.fire = !!pulseActive;
   } else if (weapon.key==='charger'){
-    if (p.specialActive){
-      if (los){
-        var a2=Math.atan2(opp.y-p.y,opp.x-p.x);
-        input.aim={x:Math.cos(a2),y:Math.sin(a2)};
-        input.fire=true;
-      } else {
-        input.aim={x:mem.dir.x,y:mem.dir.y};
-        input.fire=g.rng()<0.5;
-      }
-    } else if (p.charging){
+    if (p.charging){
       input.fire = g.time < (mem.chargeReleaseAt||0);
       var tgtAng = los ? Math.atan2(opp.y-p.y,opp.x-p.x) : mem.chargeAng;
       input.aim = {x:Math.cos(tgtAng), y:Math.sin(tgtAng)};
@@ -1535,31 +1840,40 @@ function botDecide(g, idx){
   } else if (weapon.key==='brush'){
     input.aim = {x:mem.dir.x, y:mem.dir.y};
     var meleeRB = weapon.swingRange*0.9;
-    var pulseActiveB = mem.swingUntil && g.time < mem.swingUntil;
-    // 基本は逃げるが、詰められて間合いに入られた時は(相手のHPに関わらず)ふりはらいで応戦する。
-    // 逃げ切れず接触されるくらいなら、細くても攻撃を当てて反撃する機会を活かす。
-    // 間合いに入りっぱなしだと毎ティック条件を満たし続けてパルスが途切れず「離す」瞬間が来ない
-    // (releasedNowが成立せずtryBrushSwingが一生呼ばれない)ため、パルス終了後は必ず1ティック以上の
-    // 空白(mem.swingBlockUntil)を空けてから次のパルスを許可する
-    if (!pulseActiveB && (!mem.swingBlockUntil || g.time>=mem.swingBlockUntil) && oppTargetable && distToOpp < meleeRB && p.swingCooldown<=0){
+    // 実機フィードバックでふりはらいがタップ単発→押しっぱなし連打に変わったため、ボットの入力も
+    // 「間合いに入ったら撃ち続ける(=振り続ける)」という最小限の読み替えだけ行う
+    if (oppTargetable && distToOpp < meleeRB){
       var swAngB=Math.atan2(opp.y-p.y, opp.x-p.x);
       input.aim={x:Math.cos(swAngB),y:Math.sin(swAngB)};
-      mem.swingUntil = g.time+FIXED_DT*1.5;
-      mem.swingBlockUntil = mem.swingUntil + FIXED_DT*2;
-      pulseActiveB = true;
+      input.fire = true;
+    } else {
+      input.fire = false;
     }
-    input.fire = !!pulseActiveB;
   }
 
-  if (p.sp>=weapon.specialGaugeMax && !p.specialActive){
-    var chance;
-    if (weapon.key==='roller'){
-      // ローラーのスペシャルは無敵の突撃(逃げる敵を捕まえるのに使う)。遠くても狙って使ってよい
-      chance = oppTargetable ? 0.5 : 0.08;
-    } else {
-      chance = (oppTargetable && distToOpp<12*CELL) ? 0.4 : 0.03;
+  // スペシャル発動の判断(第6ラウンドで追加。ゲージ満タン時にのみ許可された最小限の判断):
+  // sensei=向き±20°以内かつ30セル以内、utsubo=前方16セル以内 or 相手色の多い方向を向いている、manta=12セル以内
+  if (p.sp>=SPECIAL_GAUGE_MAX && !p.specialActive){
+    var wantSpecial=false;
+    if (p.special==='sensei'){
+      if (oppTargetable){
+        var sAng=Math.atan2(opp.y-p.y,opp.x-p.x);
+        var angDiff=Math.atan2(Math.sin(sAng-p.angle),Math.cos(sAng-p.angle));
+        if (Math.abs(angDiff)<=20*Math.PI/180 && distToOpp<=30*CELL){
+          input.aim={x:Math.cos(sAng),y:Math.sin(sAng)};
+          wantSpecial=true;
+        }
+      }
+    } else if (p.special==='utsubo'){
+      var spU=SPECIALS.utsubo;
+      var forwardOpp = oppTargetable && distToOpp<=16*CELL &&
+        ((opp.x-p.x)*Math.cos(p.angle)+(opp.y-p.y)*Math.sin(p.angle))>0;
+      var facingEnemyColor = forwardColorFrac(g, p, p.angle, spU.widthCells, spU.depthCells, 2-idx) >= 0.3;
+      wantSpecial = forwardOpp || facingEnemyColor;
+    } else if (p.special==='manta'){
+      wantSpecial = oppTargetable && distToOpp<=12*CELL;
     }
-    if (g.rng() < chance) input.special=true;
+    if (wantSpecial) input.special=true;
   }
 
   // サブの判断: 投げ物系(スプラッシュボム/クイックボム)は「サブ→メイン射撃」の優先順で、
@@ -1864,8 +2178,8 @@ function drawBullets(ctx, g){
   for (var i=0;i<g.bullets.length;i++){
     var b=g.bullets[i];
     ctx.fillStyle = b.owner===0 ? COLOR.p1 : COLOR.p2;
-    if (b.kind==='inkbomb'){
-      ctx.beginPath(); ctx.arc(b.x,b.y,7,0,Math.PI*2); ctx.fill();
+    if (b.weaponKey==='manta'){
+      ctx.beginPath(); ctx.arc(b.x,b.y,6,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.5; ctx.stroke();
     } else {
       ctx.beginPath(); ctx.arc(b.x,b.y,3.2,0,Math.PI*2); ctx.fill();
@@ -1984,29 +2298,157 @@ function drawRespawnCountdown(ctx, p, col){
   ctx.restore();
 }
 
+/* ---- アバター描画(第6ラウンド。すべてCanvasで描く。ゲームロジックには影響しない) ---- */
+function drawAvatarStar(ctx,cx,cy,r){
+  ctx.beginPath();
+  for (var i=0;i<5;i++){
+    var a=-Math.PI/2+i*(Math.PI*2/5);
+    var x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r;
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    var a2=a+Math.PI/5;
+    ctx.lineTo(cx+Math.cos(a2)*r*0.45, cy+Math.sin(a2)*r*0.45);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function drawAvatarEyes(ctx, kind, r){
+  var ex=r*0.32, ey=r*0.32;
+  ctx.save();
+  if (kind==='tsuri'){
+    ctx.strokeStyle='#101018'; ctx.lineWidth=Math.max(1,r*0.11); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(ex-r*0.15,-ey-r*0.14); ctx.lineTo(ex+r*0.18,-ey+r*0.02); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex-r*0.15, ey+r*0.14); ctx.lineTo(ex+r*0.18, ey-r*0.02); ctx.stroke();
+  } else if (kind==='nemui'){
+    ctx.strokeStyle='#101018'; ctx.lineWidth=Math.max(1,r*0.1); ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(ex,-ey,r*0.17,Math.PI*0.1,Math.PI*0.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex, ey,r*0.17,Math.PI*0.1,Math.PI*0.9); ctx.stroke();
+  } else {
+    var offY = kind==='tare' ? r*0.07 : 0;
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(ex,-ey+offY, r*0.19,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex, ey+offY, r*0.19,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#101018';
+    if (kind==='hoshi'){
+      drawAvatarStar(ctx, ex+r*0.03,-ey+offY, r*0.12);
+      drawAvatarStar(ctx, ex+r*0.03, ey+offY, r*0.12);
+    } else {
+      ctx.beginPath(); ctx.arc(ex+r*0.05,-ey+offY, r*0.12,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex+r*0.05, ey+offY, r*0.12,0,Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+function drawAvatarAccessory(ctx, kind, r){
+  if (!kind || kind==='none') return;
+  ctx.save();
+  if (kind==='cap'){
+    ctx.fillStyle='#e05a5a';
+    ctx.beginPath(); ctx.arc(0,0, r*0.8, -Math.PI*0.62, Math.PI*0.62); ctx.lineTo(r*0.15,0); ctx.closePath(); ctx.fill();
+  } else if (kind==='ribbon'){
+    ctx.fillStyle='#ff6fae';
+    ctx.beginPath(); ctx.moveTo(-r*0.15,-r*0.65); ctx.lineTo(-r*0.5,-r*0.9); ctx.lineTo(-r*0.5,-r*0.4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-r*0.15,-r*0.65); ctx.lineTo(-r*0.5,-r*0.4); ctx.lineTo(-r*0.1,-r*0.45); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(-r*0.15,-r*0.65, r*0.09,0,Math.PI*2); ctx.fill();
+  } else if (kind==='headphone'){
+    ctx.strokeStyle='#333'; ctx.lineWidth=Math.max(1,r*0.16);
+    ctx.beginPath(); ctx.arc(0,0, r*0.88, Math.PI*0.72, Math.PI*1.28); ctx.stroke();
+    ctx.fillStyle='#333';
+    ctx.beginPath(); ctx.arc(0,-r*0.88, r*0.18,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, r*0.88, r*0.18,0,Math.PI*2); ctx.fill();
+  } else if (kind==='glasses'){
+    ctx.strokeStyle='#222'; ctx.lineWidth=Math.max(1,r*0.09);
+    ctx.beginPath(); ctx.arc(r*0.33,-r*0.32, r*0.22,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(r*0.33, r*0.32, r*0.22,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r*0.33,-r*0.1); ctx.lineTo(r*0.33,r*0.1); ctx.stroke();
+  } else if (kind==='flower'){
+    ctx.fillStyle='#ff8fd6';
+    for (var i=0;i<5;i++){
+      var a=i/5*Math.PI*2;
+      ctx.beginPath(); ctx.ellipse(-r*0.55+Math.cos(a)*r*0.16, -r*0.55+Math.sin(a)*r*0.16, r*0.11, r*0.16, a, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle='#ffe08a';
+    ctx.beginPath(); ctx.arc(-r*0.55,-r*0.55, r*0.1,0,Math.PI*2); ctx.fill();
+  } else if (kind==='helmet'){
+    ctx.strokeStyle='#c7cbe0'; ctx.lineWidth=Math.max(1,r*0.24);
+    ctx.beginPath(); ctx.arc(0,0, r*0.9, 0, Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+}
+// 見下ろしキャラの顔まわり(かみがた・かみのいろ・はだ・め・ぼうし)を簡略化して描く。
+// 呼び出し側で「前(+x)を向く」ようにtranslate/rotate済みであること
+function drawAvatarTopDown(ctx, av, r){
+  ctx.fillStyle = av.hairColor;
+  if (av.hair==='short'){
+    ctx.beginPath(); ctx.ellipse(-r*0.55,0, r*0.55, r*0.75, 0, Math.PI*0.5, Math.PI*1.5); ctx.fill();
+  } else if (av.hair==='long'){
+    ctx.beginPath(); ctx.ellipse(-r*0.42,0, r*0.85, r*0.98, 0, Math.PI*0.5, Math.PI*1.5); ctx.fill();
+  } else if (av.hair==='twin'){
+    ctx.beginPath(); ctx.arc(-r*0.5,-r*0.72, r*0.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-r*0.5, r*0.72, r*0.3,0,Math.PI*2); ctx.fill();
+  } else if (av.hair==='pony'){
+    ctx.beginPath(); ctx.arc(-r*0.95,0, r*0.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-r*0.5,0, r*0.5, r*0.68, 0, Math.PI*0.5, Math.PI*1.5); ctx.fill();
+  } else if (av.hair==='odango'){
+    ctx.beginPath(); ctx.arc(-r*0.78,0, r*0.4,0,Math.PI*2); ctx.fill();
+  } // bozu: かみは描かない
+  ctx.fillStyle = av.skin;
+  ctx.beginPath(); ctx.arc(r*0.05,0, r*0.66,0,Math.PI*2); ctx.fill();
+  drawAvatarEyes(ctx, av.eyes, r);
+  drawAvatarAccessory(ctx, av.accessory, r);
+}
+// キャラクリ画面用の正面向き上半身プレビュー(size角のCanvasに描く想定、呼び出し側でclearRect済み)
+function drawAvatarPreview(ctx, av, size){
+  var cx=size/2, cy=size*0.56, r=size*0.30;
+  ctx.save();
+  ctx.translate(cx,cy);
+  // からだ(ふく)
+  ctx.fillStyle=av.outfit;
+  ctx.beginPath(); ctx.ellipse(0, r*1.55, r*1.35, r*1.25, 0, 0, Math.PI*2); ctx.fill();
+  // しゅぞく: しっぽ/触手ふう装飾
+  ctx.strokeStyle=av.outfit; ctx.lineWidth=r*0.32; ctx.lineCap='round';
+  var legN = av.species==='tako'?8:6;
+  for (var i=0;i<legN;i++){
+    var t=(i/(legN-1)-0.5);
+    ctx.beginPath();
+    ctx.moveTo(t*r*1.7, r*2.5);
+    ctx.quadraticCurveTo(t*r*1.9, r*3.1+Math.abs(t)*r*0.3, t*r*1.5, r*3.5);
+    ctx.stroke();
+  }
+  // かお
+  ctx.save(); ctx.rotate(Math.PI/2); // drawAvatarTopDownは+xが正面なので90度回して正面向きにする
+  drawAvatarTopDown(ctx, av, r);
+  ctx.restore();
+  ctx.restore();
+}
+
 function drawPlayer(ctx, g, idx){
   var p=g.players[idx];
   var col = idx===0?COLOR.p1:COLOR.p2;
   var dark = idx===0?COLOR.p1dark:COLOR.p2dark;
+  var av = avatarState[idx+1];
   if (!p.alive){ drawRespawnCountdown(ctx, p, col); return; }
   var flashing = p.invuln>0 && Math.floor(g.time*10)%2===0;
   ctx.save();
   ctx.translate(p.x,p.y);
   ctx.globalAlpha = flashing?0.45:1;
-  // ヒレ(むき)
+  // ヒレ・みみ(むき。しゅぞくで形が変わる)
   ctx.rotate(p.angle);
   ctx.fillStyle=dark;
+  if (av.species==='tako'){
+    ctx.beginPath(); ctx.ellipse(-p.radius*0.6,-p.radius*0.95, p.radius*0.5, p.radius*0.3, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-p.radius*0.6, p.radius*0.95, p.radius*0.5, p.radius*0.3,  0.3, 0, Math.PI*2); ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(p.radius*0.2, -p.radius*1.5);
+    ctx.lineTo(p.radius*1.7, 0);
+    ctx.lineTo(p.radius*0.2, p.radius*1.5);
+    ctx.closePath(); ctx.fill();
+  }
+  // 本体(ふく。ふちをチームインク色、ぬりをアバターのふくのいろにする)
   ctx.beginPath();
-  ctx.moveTo(p.radius*0.2, -p.radius*1.5);
-  ctx.lineTo(p.radius*1.7, 0);
-  ctx.lineTo(p.radius*0.2, p.radius*1.5);
-  ctx.closePath(); ctx.fill();
-  // 本体(丸いイカ)
-  ctx.beginPath();
-  ctx.fillStyle=col;
+  ctx.fillStyle=av.outfit;
   ctx.arc(0,0,p.radius,0,Math.PI*2);
   ctx.fill();
-  ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
   // 被弾フラッシュ: 一瞬全身を白く光らせる
   if (p.hitFlash>0){
     ctx.globalAlpha = flashing?0.45:Math.min(1,p.hitFlash/0.12)*0.85;
@@ -2014,21 +2456,35 @@ function drawPlayer(ctx, g, idx){
     ctx.beginPath(); ctx.arc(0,0,p.radius,0,Math.PI*2); ctx.fill();
     ctx.globalAlpha = flashing?0.45:1;
   }
-  // 目
-  ctx.fillStyle='#fff';
-  ctx.beginPath(); ctx.arc(p.radius*0.25,-p.radius*0.35,2.6,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(p.radius*0.25, p.radius*0.35,2.6,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#101018';
-  ctx.beginPath(); ctx.arc(p.radius*0.5,-p.radius*0.35,1.2,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(p.radius*0.5, p.radius*0.35,1.2,0,Math.PI*2); ctx.fill();
+  drawAvatarTopDown(ctx, av, p.radius);
   ctx.restore();
 
   drawHpBar(ctx, p, col);
+  drawStatusIcons(ctx, p);
 
-  if (p.specialActive && p.weapon==='roller'){
+  if (p.specialActive){
     ctx.save();
-    ctx.strokeStyle='rgba(255,224,138,0.85)'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+5,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.globalAlpha=0.85;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+6,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// 状態異常アイコン(頭上、残り時間のリングつき)
+function drawStatusIcons(ctx, p){
+  var st=p.status, items=[];
+  if (st.frozenTimer>0) items.push({icon:'❄️', frac:st.frozenTimer/SPECIALS.sensei.iceTime});
+  if (st.hakkoTimer>0) items.push({icon:'🫧', frac:st.hakkoTimer/SPECIALS.utsubo.hakkoTime});
+  if (st.aburiTimer>0) items.push({icon:'🔥', frac:st.aburiTimer/SPECIALS.manta.aburiTime});
+  if (!items.length) return;
+  var baseY = p.y - p.radius - 24;
+  for (var i=0;i<items.length;i++){
+    var it=items[i], x=p.x + (i-(items.length-1)/2)*18;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, baseY, 9, -Math.PI/2, -Math.PI/2+Math.PI*2*clamp(it.frac,0,1));
+    ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(it.icon, x, baseY);
     ctx.restore();
   }
 }
@@ -2051,6 +2507,36 @@ function drawPopups(ctx, g){
   }
 }
 
+// スペシャル発動中の予告線・範囲表示(第6ラウンド)
+function drawSpecialEffects(ctx, g){
+  for (var i=0;i<2;i++){
+    var p=g.players[i];
+    if (!p.alive || !p.specialActive) continue;
+    var col = i===0?COLOR.p1:COLOR.p2;
+    if (p.special==='sensei'){
+      var sd=p.specialData, t=clamp(sd.timer/SPECIALS.sensei.delay,0,1);
+      var len=Math.hypot(WORLD_W,WORLD_H);
+      ctx.save();
+      ctx.strokeStyle='rgba(255,60,60,'+(0.35+0.5*(1-t)).toFixed(2)+')';
+      ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+Math.cos(sd.angle)*len, p.y+Math.sin(sd.angle)*len); ctx.stroke();
+      ctx.restore();
+    } else if (p.special==='utsubo'){
+      var ang2=p.angle, dX=Math.cos(ang2), dY=Math.sin(ang2), pX=-dY, pY=dX;
+      var sp=SPECIALS.utsubo, halfW=sp.widthCells*CELL/2, depth=sp.depthCells*CELL;
+      ctx.save();
+      ctx.fillStyle=col; ctx.globalAlpha=0.12;
+      ctx.beginPath();
+      ctx.moveTo(p.x-pX*halfW, p.y-pY*halfW);
+      ctx.lineTo(p.x+pX*halfW, p.y+pY*halfW);
+      ctx.lineTo(p.x+pX*halfW+dX*depth, p.y+pY*halfW+dY*depth);
+      ctx.lineTo(p.x-pX*halfW+dX*depth, p.y-pY*halfW+dY*depth);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
 function render(g){
   var ctx=g.ctx;
   if (!ctx) return;
@@ -2068,12 +2554,39 @@ function render(g){
   drawShields(ctx,g);
   drawSprinklers(ctx,g);
   drawChargeRings(ctx,g);
+  drawSpecialEffects(ctx,g);
   drawBullets(ctx,g);
   drawSubThrows(ctx,g);
   drawParticles(ctx,g);
   drawPlayer(ctx,g,0);
   drawPlayer(ctx,g,1);
   drawPopups(ctx,g);
+  // 発動中: 画面縁を発動者の色で脈打たせる
+  for (var pi=0;pi<2;pi++){
+    if (g.players[pi].specialActive){
+      var pulseCol = pi===0?COLOR.p1:COLOR.p2;
+      var pulse=0.25+0.25*Math.abs(Math.sin(g.time*6));
+      ctx.save();
+      ctx.strokeStyle=pulseCol; ctx.globalAlpha=pulse; ctx.lineWidth=14;
+      ctx.strokeRect(7,7,WORLD_W-14,WORLD_H-14);
+      ctx.restore();
+    }
+  }
+  // スペシャル発動演出: 0.3秒暗転+スペシャル名を大きく表示
+  if (g.specialFlash){
+    var f=g.specialFlash, ft=clamp(f.age/f.life,0,1);
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,'+(0.6*(1-ft)).toFixed(2)+')';
+    ctx.fillRect(0,0,WORLD_W,WORLD_H);
+    ctx.fillStyle = f.owner===0?COLOR.p1:COLOR.p2;
+    ctx.globalAlpha = 1-ft;
+    ctx.font='bold '+Math.round(WORLD_W*0.075)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=4;
+    ctx.strokeText(f.name+'!', WORLD_W/2, WORLD_H/2);
+    ctx.fillText(f.name+'!', WORLD_W/2, WORLD_H/2);
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -2081,9 +2594,11 @@ function render(g){
 var activeLiveGame=null;
 var selState = { 1:'shooter', 2:'roller', readyP1:false, readyP2:false };
 var subState = { 1:'splashbomb', 2:'quickbomb' };
+var specState = { 1:'sensei', 2:'manta' };
+var avatarState = { 1:defaultAvatar(1), 2:defaultAvatar(2) };
 var urlOpts = {};
 var gameMode = 'pvp'; // 'pvp' = ふたりで たいせん / 'cpu' = ひとりで れんしゅう(CPU)
-var LOADOUT_KEY = 'sploteen_loadout_v5';
+var LOADOUT_KEY = 'sploteen_loadout_v6';
 
 // 前回選んだ組み合わせをlocalStorageに読み書きする(使えない環境でも動くようtry/catchで囲む)
 function loadSavedLoadout(){
@@ -2093,15 +2608,18 @@ function loadSavedLoadout(){
     var d = JSON.parse(raw);
     if (d && d.p1 && WEAPONS[d.p1.main]) selState[1]=d.p1.main;
     if (d && d.p1 && SUBS[d.p1.sub]) subState[1]=d.p1.sub;
+    if (d && d.p1 && SPECIALS[d.p1.special]) specState[1]=d.p1.special;
     if (d && d.p2 && WEAPONS[d.p2.main]) selState[2]=d.p2.main;
     if (d && d.p2 && SUBS[d.p2.sub]) subState[2]=d.p2.sub;
+    if (d && d.p2 && SPECIALS[d.p2.special]) specState[2]=d.p2.special;
   }catch(e){ /* localStorageが使えなくても無視して既定値のまま進める */ }
 }
 function saveLoadout(){
   try{
     if (!window.localStorage) return;
     localStorage.setItem(LOADOUT_KEY, JSON.stringify({
-      p1:{main:selState[1], sub:subState[1]}, p2:{main:selState[2], sub:subState[2]},
+      p1:{main:selState[1], sub:subState[1], special:specState[1]},
+      p2:{main:selState[2], sub:subState[2], special:specState[2]},
     }));
   }catch(e){ /* 保存に失敗しても対戦は続行できる */ }
 }
@@ -2139,6 +2657,7 @@ function buildWeaponCards(){
     });
   });
   buildSubCards();
+  buildSpecialCards();
   refreshWeaponUI();
 }
 
@@ -2164,6 +2683,29 @@ function buildSubCards(){
   });
 }
 
+// スペシャル選択カード(第6ラウンド。武器から独立した3種を選ぶ3行目)
+function buildSpecialCards(){
+  ['1','2','cpu'].forEach(function(pn){
+    var row=document.querySelector('.weaponRow[data-select-special="'+pn+'"]');
+    if (!row) return;
+    row.innerHTML='';
+    Object.keys(SPECIALS).forEach(function(key){
+      var s=SPECIALS[key];
+      var btn=document.createElement('button');
+      btn.className='wCard';
+      btn.dataset.special=key;
+      btn.innerHTML='<div class="wEmoji">'+s.emoji+'</div>'; // サブと同じくアイコンのみ(名前は下の説明文で表示)、選択画面の縦幅を節約
+      btn.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        specState[stateKeyForRow(pn)]=key;
+        refreshSpecialUI();
+        saveLoadout();
+      });
+      row.appendChild(btn);
+    });
+  });
+}
+
 // 選択状態(selState)に合わせて、各武器カード列のハイライトと説明文を更新する
 function refreshWeaponUI(){
   ['1','2','cpu'].forEach(function(pn){
@@ -2176,6 +2718,7 @@ function refreshWeaponUI(){
   if ($('descP1')) $('descP1').textContent=w1.name+':「'+w1.desc+'」';
   if ($('descP2')) $('descP2').textContent=w2.name+':「'+w2.desc+'」';
   refreshSubUI();
+  refreshSpecialUI();
 }
 
 // 選択状態(subState)に合わせて、各サブカード列のハイライトと説明文を更新する
@@ -2191,11 +2734,113 @@ function refreshSubUI(){
   if ($('descSubP2')) $('descSubP2').textContent='サブ '+s2.name+':「'+s2.desc+'」';
 }
 
+// 選択状態(specState)に合わせて、各スペシャルカード列のハイライトと説明文を更新する
+function refreshSpecialUI(){
+  ['1','2','cpu'].forEach(function(pn){
+    var row=document.querySelector('.weaponRow[data-select-special="'+pn+'"]');
+    if (!row) return;
+    var key=specState[stateKeyForRow(pn)];
+    row.querySelectorAll('.wCard').forEach(function(c){ c.classList.toggle('selected', c.dataset.special===key); });
+  });
+  var sp1=SPECIALS[specState[1]], sp2=SPECIALS[specState[2]];
+  if ($('descSpecialP1')) $('descSpecialP1').textContent='SP '+sp1.name+':「'+sp1.desc+'」';
+  if ($('descSpecialP2')) $('descSpecialP2').textContent='SP '+sp2.name+':「'+sp2.desc+'」';
+}
+
 function updateWeaponIcons(){
   $('wIconP1').textContent=WEAPONS[activeLiveGame.players[0].weapon].emoji;
   $('wIconP2').textContent=WEAPONS[activeLiveGame.players[1].weapon].emoji;
   $('subBtnP1').textContent=SUBS[activeLiveGame.players[0].sub].emoji;
   $('subBtnP2').textContent=SUBS[activeLiveGame.players[1].sub].emoji;
+}
+
+/* ---- アバターエディタUI(第6ラウンド) ---- */
+function buildAvatarEditor(pn){
+  var root=$('avatarEditorP'+pn);
+  if (!root) return;
+  var cats=['species','hair','hairColor','eyes','skin','accessory','outfit'];
+  cats.forEach(function(cat){
+    var row=root.querySelector('.avatarCatRow[data-avatar-cat="'+cat+'"]');
+    if (!row) return;
+    row.innerHTML='';
+    var isColor = (cat==='hairColor' || cat==='skin' || cat==='outfit');
+    AVATAR_PARTS[cat].forEach(function(val){
+      var btn=document.createElement('button');
+      btn.dataset.val=val;
+      if (isColor){ btn.className='avatarSwatch'; btn.style.background=val; }
+      else { btn.className='avatarLabelBtn'; btn.textContent=(AVATAR_LABELS[cat]&&AVATAR_LABELS[cat][val])||val; }
+      btn.addEventListener('pointerdown', function(e){
+        e.preventDefault(); e.stopPropagation();
+        avatarState[pn][cat]=val;
+        refreshAvatarEditor(pn);
+      });
+      row.appendChild(btn);
+    });
+  });
+  var nameInput=$('avatarNameP'+pn);
+  if (nameInput){
+    nameInput.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+    nameInput.addEventListener('input', function(){
+      this.value=this.value.slice(0,6);
+      avatarState[pn].name = this.value;
+      renderAvatarFaceIcon(pn);
+    });
+  }
+}
+function renderAvatarFaceIcon(pn){
+  var canvas=$('avatarFaceP'+pn); if (!canvas) return;
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.rotate(Math.PI/2);
+  drawAvatarTopDown(ctx, avatarState[pn], canvas.width*0.42);
+  ctx.restore();
+}
+function renderAvatarPreview(pn){
+  var canvas=$('avatarPreviewP'+pn); if (!canvas) return;
+  var ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawAvatarPreview(ctx, avatarState[pn], canvas.width);
+}
+function refreshAvatarEditor(pn){
+  var root=$('avatarEditorP'+pn); if (!root) return;
+  var av=avatarState[pn];
+  ['species','hair','hairColor','eyes','skin','accessory','outfit'].forEach(function(cat){
+    var row=root.querySelector('.avatarCatRow[data-avatar-cat="'+cat+'"]');
+    if (!row) return;
+    row.querySelectorAll('button').forEach(function(b){ b.classList.toggle('selected', b.dataset.val===av[cat]); });
+  });
+  var nameInput=$('avatarNameP'+pn);
+  if (nameInput && document.activeElement!==nameInput) nameInput.value=av.name;
+  renderAvatarPreview(pn);
+  renderAvatarFaceIcon(pn);
+}
+function randomAvatar(pn){
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  var av=avatarState[pn];
+  av.species=pick(AVATAR_PARTS.species); av.hair=pick(AVATAR_PARTS.hair);
+  av.hairColor=pick(AVATAR_PARTS.hairColor); av.eyes=pick(AVATAR_PARTS.eyes);
+  av.skin=pick(AVATAR_PARTS.skin); av.accessory=pick(AVATAR_PARTS.accessory);
+  av.outfit=pick(AVATAR_PARTS.outfit);
+  refreshAvatarEditor(pn);
+}
+function openAvatarEditor(pn){
+  refreshAvatarEditor(pn);
+  $('avatarEditorP'+pn).classList.remove('hidden');
+}
+function closeAvatarEditor(pn){
+  var nameInput=$('avatarNameP'+pn);
+  var v = nameInput ? (nameInput.value||'').slice(0,6).trim() : '';
+  avatarState[pn].name = v || ('P'+pn);
+  saveAvatar(pn, avatarState[pn]);
+  $('avatarEditorP'+pn).classList.add('hidden');
+  refreshAvatarEditor(pn);
+}
+// HUDや結果画面のラベルを、なまえ未設定なら「P1」「P2」、設定していればその名前で表示する
+function avatarDisplayName(pn){
+  var n = avatarState[pn] && avatarState[pn].name;
+  return (n && n.trim()) ? n.trim() : ('P'+pn);
 }
 
 function onPlayStartUI(g){
@@ -2229,21 +2874,22 @@ function onRoundEndUI(g){
   });
   var lastResult=g.roundResults[g.roundResults.length-1];
   var winnerIdx=lastResult.winnerIdx;
-  var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">P1のかち!</span>' : '<span class="win2">P2のかち!</span>');
+  var n1=avatarDisplayName(1), n2=avatarDisplayName(2);
+  var label = winnerIdx===null ? 'ひきわけ!' : (winnerIdx===0 ? '<span class="win1">'+n1+' の かち!</span>' : '<span class="win2">'+n2+' の かち!</span>');
   var kills = lastResult.kills || [0,0];
   setTimeout(function(){
-    $('resultText').innerHTML = 'P1 '+pct1+'% / P2 '+pct2+'%<br>'+label;
+    $('resultText').innerHTML = n1+' '+pct1+'% / '+n2+' '+pct2+'%<br>'+label;
     $('killSummary').innerHTML =
-      '<span><b class="p1">P1</b> たおした:'+kills[0]+' / やられた:'+kills[1]+'</span>'+
-      '<span><b class="p2">P2</b> たおした:'+kills[1]+' / やられた:'+kills[0]+'</span>';
+      '<span><b class="p1">'+n1+'</b> たおした:'+kills[0]+' / やられた:'+kills[1]+'</span>'+
+      '<span><b class="p2">'+n2+'</b> たおした:'+kills[1]+' / やられた:'+kills[0]+'</span>';
   }, 600);
-  // 左からP1の勝ち分、右からP2の勝ち分を塗る (5個の丸)
+  // 左からP1の勝ち分、右からP2の勝ち分を塗る (SERIES_MAX_ROUNDS個の丸)
   var dotsEl=$('seriesDots'); dotsEl.innerHTML='';
   var left=g.seriesScore[0], right=g.seriesScore[1];
-  for (var j=0;j<5;j++){
+  for (var j=0;j<SERIES_MAX_ROUNDS;j++){
     var sp=document.createElement('span');
     if (j<left) sp.className='p1';
-    else if (j>=5-right) sp.className='p2';
+    else if (j>=SERIES_MAX_ROUNDS-right) sp.className='p2';
     dotsEl.appendChild(sp);
   }
   $('resultNextBtn').textContent = g.seriesDone ? 'けっか へ' : 'つぎのラウンドへ';
@@ -2252,8 +2898,13 @@ function onRoundEndUI(g){
 function proceedFromResult(){
   var g=activeLiveGame;
   if (g.seriesDone){
-    var champ = g.seriesScore[0]>g.seriesScore[1] ? 1 : 2;
-    $('champTitle').innerHTML = 'P'+champ+' の ゆうしょう!<br><span style="font-size:0.55em;color:#9aa6cf;">('+g.seriesScore[0]+' - '+g.seriesScore[1]+')</span>';
+    var scoreSub = '<br><span style="font-size:0.55em;color:#9aa6cf;">('+g.seriesScore[0]+' - '+g.seriesScore[1]+')</span>';
+    if (g.seriesScore[0]===g.seriesScore[1]){
+      $('champTitle').innerHTML = 'ひきわけ!'+scoreSub;
+    } else {
+      var champ = g.seriesScore[0]>g.seriesScore[1] ? 1 : 2;
+      $('champTitle').innerHTML = avatarDisplayName(champ)+' の ゆうしょう!'+scoreSub;
+    }
     showPanel('panelSeries');
   } else {
     startRound(g, g.lastRoundLoserIdx);
@@ -2273,6 +2924,8 @@ function applySelectModeUI(){
   p2Row.classList.toggle('readOnly', isCpu);
   var p2SubRow=document.querySelector('.weaponRow[data-select-sub="2"]');
   if (p2SubRow) p2SubRow.classList.toggle('readOnly', isCpu);
+  var p2SpecialRow=document.querySelector('.weaponRow[data-select-special="2"]');
+  if (p2SpecialRow) p2SpecialRow.classList.toggle('readOnly', isCpu);
   var readyBtn2=$('readyP2');
   if (isCpu){
     selState.readyP2=true;
@@ -2306,7 +2959,7 @@ function maybeStartCountdown(){
     // bot2: CPUモード、またはURLパラメータ(bot2=1 / bots=1)指定時。bot1は既存どおりURLパラメータのみ
     var bot1 = !!urlOpts.bot1;
     var bot2 = (gameMode==='cpu') || !!urlOpts.bot2;
-    startSeries(activeLiveGame, selState[1], selState[2], Date.now()&0xffffffff, bot1, bot2, urlOpts.duration, subState[1], subState[2]);
+    startSeries(activeLiveGame, selState[1], selState[2], Date.now()&0xffffffff, bot1, bot2, urlOpts.duration, subState[1], subState[2], specState[1], specState[2]);
     updateWeaponIcons();
     showPanel(null);
   }
@@ -2315,14 +2968,15 @@ function maybeStartCountdown(){
 function updateHUD(g){
   var totalPlayable=GRID_W*GRID_H-g.wallCount;
   for (var i=0;i<2;i++){
-    var p=g.players[i], pn=i+1, w=WEAPONS[p.weapon];
+    var p=g.players[i], pn=i+1;
     $('inkFillP'+pn).style.width=Math.max(0,p.ink)+'%';
-    var spPct=Math.min(100, p.sp/w.specialGaugeMax*100);
+    var spPct=Math.min(100, p.sp/SPECIAL_GAUGE_MAX*100);
     $('spFillP'+pn).style.width=spPct+'%';
     $('spBarP'+pn).classList.toggle('full', spPct>=100);
-    $('spBtnP'+pn).classList.toggle('ready', spPct>=100);
+    $('spBtnP'+pn).classList.toggle('ready', spPct>=100 || p.specialActive);
     $('hpFillP'+pn).style.width=Math.max(0,p.hp)+'%';
-    $('hpP'+pn).textContent = p.alive ? ('HP '+Math.ceil(p.hp)) : ('ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
+    var nameLabel=avatarDisplayName(pn);
+    $('hpP'+pn).textContent = p.alive ? (nameLabel+' HP '+Math.ceil(p.hp)) : (nameLabel+' ふっかつ '+Math.max(0,Math.ceil(p.respawnTimer)));
     $('killP'+pn).textContent = 'たおした '+p.stats.kills;
     var sub=SUBS[p.sub];
     var subAvail = p.alive && p.subCooldown<=0 && sub && p.ink>=sub.inkCost;
@@ -2374,7 +3028,7 @@ function simulate(opts){
   var duration=opts.duration||ROUND_DURATION_DEFAULT;
   var g=createGame({headless:true, live:false, seed:opts.seed||1});
   g.duration=duration;
-  configurePlayers(g, p1, p2, opts.bot1!==false, opts.bot2!==false, opts.sub1, opts.sub2);
+  configurePlayers(g, p1, p2, opts.bot1!==false, opts.bot2!==false, opts.sub1, opts.sub2, opts.sp1, opts.sp2);
   startRound(g, null);
   g.phase='playing'; g.remaining=duration; g.countdown=0;
   var steps=Math.round(duration/FIXED_DT);
@@ -2387,6 +3041,7 @@ function simulate(opts){
     specials: [g.players[0].stats.specials, g.players[1].stats.specials],
     kills: [g.players[0].stats.kills, g.players[1].stats.kills],
     subs: [g.players[0].stats.subsUsed, g.players[1].stats.subsUsed],
+    statusHits: [g.players[0].stats.statusHits, g.players[1].stats.statusHits],
     inkPainted: [g.counts[0], g.counts[1]],
   };
 }
@@ -2399,9 +3054,11 @@ function startMatch(opts){
   selState[2]=opts.p2||selState[2]||'shooter';
   subState[1]=opts.sub1||subState[1]||WEAPONS[selState[1]].defaultSub;
   subState[2]=opts.sub2||subState[2]||WEAPONS[selState[2]].defaultSub;
+  specState[1]=opts.sp1||specState[1]||WEAPONS[selState[1]].defaultSpecial;
+  specState[2]=opts.sp2||specState[2]||WEAPONS[selState[2]].defaultSpecial;
   startSeries(activeLiveGame, selState[1], selState[2], opts.seed!=null?opts.seed:1,
     opts.bot1!==undefined?opts.bot1:false, opts.bot2!==undefined?opts.bot2:false, opts.duration,
-    subState[1], subState[2]);
+    subState[1], subState[2], specState[1], specState[2]);
   updateWeaponIcons();
 }
 
@@ -2409,7 +3066,9 @@ function getState(){
   var g=activeLiveGame;
   if (!g) return null;
   function pub(p){
-    return { x:p.x, y:p.y, hp:p.hp, ink:p.ink, sp:p.sp, alive:p.alive, weapon:p.weapon, sub:p.sub, specialActive:p.specialActive, kills:p.stats.kills, subsUsed:p.stats.subsUsed };
+    return { x:p.x, y:p.y, hp:p.hp, ink:p.ink, sp:p.sp, alive:p.alive, weapon:p.weapon, sub:p.sub, special:p.special, specialActive:p.specialActive,
+      status:{frozen:p.status.frozenTimer>0, hakko:p.status.hakkoTimer>0, aburi:p.status.aburiTimer>0},
+      kills:p.stats.kills, subsUsed:p.stats.subsUsed };
   }
   var totalPlayable=GRID_W*GRID_H-g.wallCount;
   return {
@@ -2435,6 +3094,7 @@ function setInput(player, inputObj){
 window.SPLOTEEN = {
   WEAPONS: WEAPONS,
   SUBS: SUBS,
+  SPECIALS: SPECIALS,
   CONFIG: CONFIG,
   simulate: simulate,
   startMatch: startMatch,
@@ -2450,6 +3110,8 @@ function parseURLOpts(){
   if (sp.has('p2')) o.p2=sp.get('p2');
   if (sp.has('sub1')) o.sub1=sp.get('sub1');
   if (sp.has('sub2')) o.sub2=sp.get('sub2');
+  if (sp.has('sp1')) o.sp1=sp.get('sp1');
+  if (sp.has('sp2')) o.sp2=sp.get('sp2');
   o.auto = sp.get('auto')==='1';
   o.bots = sp.get('bots')==='1';
   o.bot1 = sp.get('bot1')==='1' || o.bots;
@@ -2474,15 +3136,28 @@ function boot(){
     if (gameMode==='cpu') return; // CPUモードではP2は常にじゅんびOK扱い(操作不要)
     selState.readyP2=!selState.readyP2; this.classList.toggle('on', selState.readyP2); this.textContent = selState.readyP2?'じゅんび かんりょう':'じゅんび OK'; maybeStartCountdown();
   });
-  document.querySelectorAll('.diffBtn').forEach(function(btn){
+  document.querySelectorAll('.diffRow .diffBtn').forEach(function(btn){
     btn.addEventListener('pointerdown', function(e){
       e.preventDefault();
       CONFIG.BOT_SKILL = +btn.dataset.diff;
-      document.querySelectorAll('.diffBtn').forEach(function(b){ b.classList.toggle('selected', b===btn); });
+      document.querySelectorAll('.diffRow .diffBtn').forEach(function(b){ b.classList.toggle('selected', b===btn); });
     });
   });
   $('resultNextBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); proceedFromResult(); });
   $('seriesNextBtn').addEventListener('pointerdown', function(e){ e.preventDefault(); backToSelect(); });
+
+  avatarState = { 1:loadAvatar(1), 2:loadAvatar(2) };
+  buildAvatarEditor(1); buildAvatarEditor(2);
+  refreshAvatarEditor(1); refreshAvatarEditor(2);
+  document.querySelectorAll('.avatarBtn').forEach(function(btn){
+    btn.addEventListener('pointerdown', function(e){ e.preventDefault(); e.stopPropagation(); openAvatarEditor(+btn.dataset.player); });
+  });
+  document.querySelectorAll('.avatarRandomBtn').forEach(function(btn){
+    btn.addEventListener('pointerdown', function(e){ e.preventDefault(); e.stopPropagation(); randomAvatar(+btn.dataset.player); });
+  });
+  document.querySelectorAll('.avatarOkBtn').forEach(function(btn){
+    btn.addEventListener('pointerdown', function(e){ e.preventDefault(); e.stopPropagation(); closeAvatarEditor(+btn.dataset.player); });
+  });
 
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
@@ -2492,7 +3167,8 @@ function boot(){
     activeLiveGame.duration = urlOpts.duration;
     var autoP1=urlOpts.p1||'shooter', autoP2=urlOpts.p2||'roller';
     var autoSub1=urlOpts.sub1||WEAPONS[autoP1].defaultSub, autoSub2=urlOpts.sub2||WEAPONS[autoP2].defaultSub;
-    startSeries(activeLiveGame, autoP1, autoP2, urlOpts.seed, urlOpts.bot1, urlOpts.bot2, urlOpts.duration, autoSub1, autoSub2);
+    var autoSp1=urlOpts.sp1||WEAPONS[autoP1].defaultSpecial, autoSp2=urlOpts.sp2||WEAPONS[autoP2].defaultSpecial;
+    startSeries(activeLiveGame, autoP1, autoP2, urlOpts.seed, urlOpts.bot1, urlOpts.bot2, urlOpts.duration, autoSub1, autoSub2, autoSp1, autoSp2);
     updateWeaponIcons();
     showPanel(null);
   }
