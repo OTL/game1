@@ -68,9 +68,11 @@
     var mag = Math.sqrt(mx * mx + mz * mz);
     if (mag > 1) { mx /= mag; mz /= mag; mag = 1; }
     var cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
-    /* yaw=0 で -Z 方向を向く */
-    var dirX = mx * cy - mz * sy;
-    var dirZ = -mx * sy - mz * cy;
+    /* yaw=0 のとき視線は -Z 方向。
+       前向きベクトル F = (-sin yaw, 0, -cos yaw)、右向きベクトル R = (cos yaw, 0, -sin yaw)。
+       mz は「手前に引く = +」なので、進む向きは R*mx + F*(-mz) になる。 */
+    var dirX = mx * cy + mz * sy;
+    var dirZ = -mx * sy + mz * cy;
 
     var speed;
     this.sneaking = !this.flying && !!ctrl.sneak && this.onGround;
