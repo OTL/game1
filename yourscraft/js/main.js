@@ -8,7 +8,7 @@
   var B = YC.Blocks, ID = B.ID, G = YC.Gen, UI = YC.UI, Save = YC.Save, Audio = YC.Audio;
   var DAY_LENGTH = 1200;        /* 1 日 20 分（マイクラと同じ） */
   var REACH = 5.0;              /* 手の届く距離 */
-  var VERSION = '1.0';
+  var VERSION = '1.1';
 
   var Game = {
     mode: 'boot',
@@ -38,7 +38,7 @@
   function boot() {
     ['gl', 'hud', 'crosshair', 'hotbar', 'itemname', 'debug', 'toast', 'hint', 'stick', 'knob',
       'rightpad', 'btn-jump', 'btn-up', 'btn-down', 'btn-fly', 'btn-inv', 'btn-pause', 'topright',
-      'actionpad', 'btn-break', 'btn-place',
+      'actionpad', 'btn-break', 'btn-place', 'ripples',
       'title', 'pause', 'settings', 'help', 'inventory', 'loading', 'newworld',
       'water-tint', 'lava-tint', 'logo', 'bar-fill', 'loading-text', 'btn-continue', 'btn-newworld',
       'inv-grid', 'inv-tabs', 'inv-hotbar', 'seed-input', 'sv'].forEach(function (id) { el[id] = $(id); });
@@ -346,13 +346,15 @@
     Audio.resume();
     if (!Game.hintShown) {
       Game.hintShown = true;
-      hint(isTouch() ? '⛏ こわす / ▣ おく ボタン（画面のタップで置く・長押しで壊すこともできます）' :
+      hint(isTouch() ? 'v' + VERSION + '：壊したいブロックを長押し / 置きたい場所をタップ（⛏ ▣ ボタンは画面中央の十字）' :
         'クリックで画面をつかむ → 左クリックで壊す / 右クリックで置く', 6000);
     }
   }
 
   function pauseGame() {
     if (Game.mode !== 'play') return;
+    var pv = document.getElementById('pause-version');
+    if (pv) pv.textContent = 'YoursCraft v' + VERSION;
     Game.mode = 'pause';
     showScreen('pause');
     releasePointerLock();
@@ -700,7 +702,7 @@
     hint(msg, 2200);
   }
   function outOfReachHint() {
-    failHint('とどく範囲にブロックがありません（画面の中心の十字を、' + REACH + 'マス以内のブロックに合わせてください）');
+    failHint('とどく範囲にブロックがありません（' + REACH + 'マス以内のブロックをねらってください）');
   }
 
   function isReplaceable(id) {
@@ -1223,6 +1225,7 @@
         });
         if (lookId === null) lookId = t.identifier;
         pendingTap = t.identifier;
+        ripple(t.clientX, t.clientY);
       }
     }, { passive: false });
 
@@ -1457,6 +1460,18 @@
       stickEnd();
       holdAction = null; holdSource = null;
     });
+  }
+
+  /* 触ったところに波紋を出す。手ごたえが出るだけでなく、
+     実機で「タッチがゲームに届いているか」をその場で確かめられる。 */
+  function ripple(x, y) {
+    if (!el.ripples) return;
+    var d = document.createElement('div');
+    d.className = 'ripple';
+    d.style.left = x + 'px';
+    d.style.top = y + 'px';
+    el.ripples.appendChild(d);
+    setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 420);
   }
 
   function look(dx, dy) {
