@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
 <title>game1 — ブラウザゲーム置き場</title>
-<meta name="description" content="ブラウザですぐ遊べる HTML5 ゲーム。みんなでたまごっち、ボムよけゲーム、CHAIN BLAST、おえかきスタジオ、シルエットクイズ、コズミック・イーター、スプロティーン。">
+<meta name="description" content="ブラウザですぐ遊べる HTML5 ゲーム。みんなでたまごっち、ボムよけゲーム、CHAIN BLAST、おえかきスタジオ、シルエットクイズ、コズミック・イーター、スプロティーン、ツインマレット・ホッケー。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="game1 — ブラウザゲーム置き場">
-<meta property="og:description" content="ブラウザですぐ遊べる HTML5 ゲーム。みんなでたまごっち、ボムよけゲーム、CHAIN BLAST、おえかきスタジオ、シルエットクイズ、コズミック・イーター、スプロティーン。">
+<meta property="og:description" content="ブラウザですぐ遊べる HTML5 ゲーム。みんなでたまごっち、ボムよけゲーム、CHAIN BLAST、おえかきスタジオ、シルエットクイズ、コズミック・イーター、スプロティーン、ツインマレット・ホッケー。">
 <meta property="og:image" content="https://otl.github.io/game1/assets/bomb-dodge.webp">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b1020'/><circle cx='16' cy='19' r='8' fill='%231d2438' stroke='%23ff5d5d' stroke-width='2'/><path d='M16 11 q3-3 5-5' stroke='%238a6a3c' stroke-width='2' fill='none'/><circle cx='21' cy='6' r='2.6' fill='%23ffd166'/></svg>">
@@ -291,6 +291,74 @@
           <span>お絵かき</span><span>レイヤー</span><span>手ブレ補正</span><span>お題チャレンジ</span>
         </div>
         <span class="play">描く →</span>
+      </div>
+    </a>
+    <a class="card" style="--glow:#38e1ff" href="hockey/">
+      <div class="shot">
+        <svg viewBox="0 0 480 360" role="img" aria-label="ツインマレット・ホッケーの画面イメージ。上から見たエアホッケー台に、上側にオレンジのマレット2つ、下側に水色のマレット2つ、白・金・ピンクのパックが4個散らばっている">
+          <defs>
+            <linearGradient id="hk-table" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#13243f"/>
+              <stop offset="50%" stop-color="#0a1626"/>
+              <stop offset="100%" stop-color="#13243f"/>
+            </linearGradient>
+            <radialGradient id="hk-m1" cx="35%" cy="32%" r="70%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="30%" stop-color="#38e1ff"/>
+              <stop offset="100%" stop-color="#0b5d7a"/>
+            </radialGradient>
+            <radialGradient id="hk-m2" cx="35%" cy="32%" r="70%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="30%" stop-color="#ff8a3d"/>
+              <stop offset="100%" stop-color="#7a3a0b"/>
+            </radialGradient>
+            <radialGradient id="hk-puck" cx="35%" cy="32%" r="70%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="55%" stop-color="#eef4ff"/>
+              <stop offset="100%" stop-color="#7f93bb"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="360" fill="#05080f"/>
+          <rect x="120" y="10" width="240" height="340" rx="18" fill="url(#hk-table)" stroke="#2e4a7d" stroke-width="4"/>
+          <g fill="#ffffff" opacity=".05">
+            <circle cx="140" cy="40" r="2"/><circle cx="170" cy="40" r="2"/><circle cx="200" cy="40" r="2"/>
+            <circle cx="230" cy="40" r="2"/><circle cx="260" cy="40" r="2"/><circle cx="290" cy="40" r="2"/>
+            <circle cx="320" cy="40" r="2"/><circle cx="140" cy="320" r="2"/><circle cx="200" cy="320" r="2"/>
+            <circle cx="260" cy="320" r="2"/><circle cx="320" cy="320" r="2"/>
+          </g>
+          <line x1="120" y1="180" x2="360" y2="180" stroke="#c8dcff" stroke-opacity=".3" stroke-width="3"/>
+          <circle cx="240" cy="180" r="44" fill="none" stroke="#c8dcff" stroke-opacity=".3" stroke-width="3"/>
+          <rect x="196" y="8" width="88" height="16" rx="5" fill="#0b1220" stroke="#ff8a3d" stroke-width="3"/>
+          <rect x="196" y="336" width="88" height="16" rx="5" fill="#0b1220" stroke="#38e1ff" stroke-width="3"/>
+          <path d="M176 10 A64 64 0 0 0 304 10" fill="none" stroke="#ff8a3d" stroke-opacity=".45" stroke-width="3"/>
+          <path d="M176 350 A64 64 0 0 1 304 350" fill="none" stroke="#38e1ff" stroke-opacity=".45" stroke-width="3"/>
+          <circle cx="186" cy="74" r="19" fill="url(#hk-m2)"/>
+          <circle cx="298" cy="110" r="19" fill="url(#hk-m2)"/>
+          <circle cx="178" cy="286" r="19" fill="url(#hk-m1)"/>
+          <circle cx="302" cy="252" r="19" fill="url(#hk-m1)"/>
+          <g opacity=".5" stroke="#eef4ff" stroke-width="3" fill="none">
+            <path d="M240 150 L252 196"/>
+          </g>
+          <circle cx="252" cy="198" r="11" fill="url(#hk-puck)"/>
+          <circle cx="162" cy="196" r="11" fill="#ffd34d" stroke="#a97b06" stroke-width="2"/>
+          <circle cx="320" cy="168" r="9" fill="#ff6b9d" stroke="#8d2550" stroke-width="2"/>
+          <circle cx="214" cy="120" r="14" fill="#9aa6c4" stroke="#4a5472" stroke-width="2"/>
+          <g font-family="system-ui, sans-serif" font-weight="700" text-anchor="middle">
+            <text x="62" y="300" font-size="44" fill="#38e1ff">3</text>
+            <text x="62" y="318" font-size="13" fill="#38e1ff" opacity=".7">1P</text>
+            <text x="418" y="76" font-size="44" fill="#ff8a3d">2</text>
+            <text x="418" y="94" font-size="13" fill="#ff8a3d" opacity=".7">2P</text>
+            <text x="62" y="60" font-size="13" fill="#8fa2c9">PUCK 4 / 5</text>
+          </g>
+        </svg>
+      </div>
+      <div class="body">
+        <h2>ツインマレット・ホッケー</h2>
+        <p>ゲームセンターのエアホッケー。1 人が両手で 2 つのマレットを動かす向かい合わせの 2 人対戦。試合が進むとパックがどんどん増えて乱戦になる。</p>
+        <div class="tags">
+          <span>2人対戦</span><span>両手で2マレット</span><span>マルチタッチ</span><span>パックが増える</span><span>パック4種</span><span>CPU対戦</span>
+        </div>
+        <span class="play">対戦する →</span>
       </div>
     </a>
     <a class="card" style="--glow:#ff7a1a" href="sploteen/">

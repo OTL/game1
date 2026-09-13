@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05080f">
+<title>ツインマレット・ホッケー — 両手で遊ぶ2人対戦エアホッケー</title>
+<meta name="description" content="ゲームセンターのエアホッケーをブラウザで。1人が両手で2つのマレットを動かす2人対戦。試合中にパックが増えていく乱戦ホッケー。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2305080f'/><circle cx='10' cy='11' r='5' fill='none' stroke='%2338e1ff' stroke-width='2.4'/><circle cx='22' cy='21' r='5' fill='none' stroke='%23ff8a3d' stroke-width='2.4'/><circle cx='16' cy='16' r='3' fill='%23f2f6ff'/></svg>">
+<style>
+  :root{
+    --p1:#38e1ff;
+    --p2:#ff8a3d;
+    --bg:#05080f;
+    --text:#eaf2ff;
+    --muted:#8fa2c9;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,-apple-system,sans-serif;
+    overflow:hidden;
+    touch-action:none;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #stage{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;touch-action:none;}
+
+  .overlay{
+    position:fixed;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    padding:18px;
+    background:radial-gradient(900px 620px at 50% 38%, rgba(30,52,96,.55) 0%, rgba(5,8,15,.9) 70%), rgba(5,8,15,.82);
+    backdrop-filter:blur(3px);
+    overflow:auto;
+    z-index:5;
+  }
+  .overlay.hidden{display:none;}
+  .panel{
+    width:min(520px,100%);
+    background:linear-gradient(180deg,#111a2e,#0a1020);
+    border:1px solid #24365e;
+    border-radius:20px;
+    padding:22px 20px 20px;
+    box-shadow:0 24px 60px rgba(0,0,0,.55);
+    text-align:center;
+  }
+  .panel h1{
+    margin:0 0 6px;
+    font-size:clamp(24px,6.4vw,34px);
+    letter-spacing:.04em;
+    line-height:1.2;
+  }
+  .panel h1 small{display:block;font-size:12px;letter-spacing:.28em;color:var(--muted);margin-bottom:8px;font-weight:400;}
+  .panel .lead{margin:0 0 16px;color:var(--muted);font-size:13.5px;line-height:1.7;}
+  .row{margin:0 0 12px;text-align:left;}
+  .row .label{font-size:12px;color:var(--muted);letter-spacing:.12em;margin-bottom:6px;}
+  .seg{display:flex;gap:8px;flex-wrap:wrap;}
+  .seg button{
+    flex:1 1 0;
+    min-width:72px;
+    padding:10px 8px;
+    font:inherit;
+    font-size:13.5px;
+    font-weight:700;
+    color:var(--muted);
+    background:#0e1729;
+    border:1px solid #26365c;
+    border-radius:12px;
+    cursor:pointer;
+  }
+  .seg button[aria-pressed="true"]{
+    color:#05080f;
+    background:linear-gradient(180deg,#8ff0ff,#38e1ff);
+    border-color:#7fe6ff;
+  }
+  .start{
+    width:100%;
+    margin-top:6px;
+    padding:15px 18px;
+    font:inherit;
+    font-size:17px;
+    font-weight:800;
+    letter-spacing:.1em;
+    color:#05080f;
+    background:linear-gradient(180deg,#fff0cc,#ffb347);
+    border:0;
+    border-radius:14px;
+    cursor:pointer;
+    box-shadow:0 10px 26px rgba(255,160,60,.28);
+  }
+  .ghost{
+    width:100%;
+    margin-top:10px;
+    padding:12px;
+    font:inherit;font-size:14px;font-weight:700;
+    color:var(--muted);
+    background:transparent;
+    border:1px solid #26365c;
+    border-radius:12px;
+    cursor:pointer;
+  }
+  .help{
+    margin:16px 0 0;
+    padding-top:14px;
+    border-top:1px solid #1e2b49;
+    text-align:left;
+    color:var(--muted);
+    font-size:12.5px;
+    line-height:1.8;
+  }
+  .help b{color:#cfe0ff;}
+  .help .k{
+    display:inline-block;
+    min-width:20px;
+    padding:1px 5px;
+    margin:0 1px;
+    font-size:11px;
+    text-align:center;
+    color:#eaf2ff;
+    background:#18233c;
+    border:1px solid #2d3e66;
+    border-radius:5px;
+  }
+  .score-line{
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    margin:4px 0 14px;
+    font-size:clamp(30px,9vw,46px);
+    font-weight:800;
+    letter-spacing:.02em;
+  }
+  .score-line .s1{color:var(--p1);}
+  .score-line .s2{color:var(--p2);}
+  .score-line .vs{color:#3d4d75;font-size:20px;}
+  .stats{
+    margin:0 0 14px;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.9;
+  }
+  .stats span{color:#cfe0ff;font-weight:700;}
+  .back{
+    position:fixed;left:12px;bottom:12px;
+    z-index:6;
+    padding:8px 14px;
+    font:inherit;font-size:12px;
+    color:var(--muted);
+    background:rgba(10,16,32,.8);
+    border:1px solid #26365c;
+    border-radius:999px;
+    text-decoration:none;
+  }
+  .back.hidden{display:none;}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+
+<div class="overlay" id="titleScreen">
+  <div class="panel">
+    <h1><small>ARCADE AIR HOCKEY</small>ツインマレット・ホッケー</h1>
+    <p class="lead">1人が<b>両手で2つのマレット</b>を動かす、向かい合わせの2人対戦。<br>試合が進むと<b>パックがどんどん増えて</b>いく乱戦エアホッケー。</p>
+
+    <div class="row">
+      <div class="label">たいせんモード</div>
+      <div class="seg" id="segMode">
+        <button data-v="2p" aria-pressed="true">2人対戦</button>
+        <button data-v="cpu" aria-pressed="false">CPU対戦</button>
+      </div>
+    </div>
+    <div class="row" id="rowLevel" hidden>
+      <div class="label">CPU の つよさ</div>
+      <div class="seg" id="segLevel">
+        <button data-v="0" aria-pressed="false">よわい</button>
+        <button data-v="1" aria-pressed="true">ふつう</button>
+        <button data-v="2" aria-pressed="false">つよい</button>
+        <button data-v="3" aria-pressed="false">鬼</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="label">しあい時間</div>
+      <div class="seg" id="segTime">
+        <button data-v="60" aria-pressed="false">60秒</button>
+        <button data-v="90" aria-pressed="true">90秒</button>
+        <button data-v="120" aria-pressed="false">120秒</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="label">パックの 最大数</div>
+      <div class="seg" id="segPucks">
+        <button data-v="3" aria-pressed="false">3個</button>
+        <button data-v="5" aria-pressed="true">5個</button>
+        <button data-v="7" aria-pressed="false">7個</button>
+      </div>
+    </div>
+
+    <button class="start" id="btnStart">しあい かいし</button>
+
+    <div class="help">
+      <b>タブレット / スマホ</b>：画面を向かい合わせに置いて、自分側の半面を<b>2本の指</b>でなぞる。指1本ごとに近いマレットがついてくる。<br>
+      <b>キーボード</b>：1P左手 <span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> ／ 1P右手 <span class="k">↑</span><span class="k">←</span><span class="k">↓</span><span class="k">→</span><br>
+      2P左手 <span class="k">T</span><span class="k">F</span><span class="k">G</span><span class="k">H</span> ／ 2P右手 <span class="k">I</span><span class="k">J</span><span class="k">K</span><span class="k">L</span><br>
+      <b>ルール</b>：相手のゴールにパックを入れると1点。<b>金のパックは2点</b>。時間切れで同点ならサドンデス。<span class="k">P</span> で一時停止。
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="resultScreen">
+  <div class="panel">
+    <h1 id="resTitle">しあい しゅうりょう</h1>
+    <div class="score-line"><span class="s1" id="resS1">0</span><span class="vs">－</span><span class="s2" id="resS2">0</span></div>
+    <p class="stats" id="resStats"></p>
+    <button class="start" id="btnRematch">もういちど</button>
+    <button class="ghost" id="btnToTitle">設定を かえる</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="pauseScreen">
+  <div class="panel">
+    <h1>一時停止</h1>
+    <p class="lead">画面から指をはなしても大丈夫。準備ができたら再開してね。</p>
+    <button class="start" id="btnResume">さいかい</button>
+    <button class="ghost" id="btnQuit">しあいを やめる</button>
+  </div>
+</div>
+
+<a class="back" id="backLink" href="../">← ゲーム一覧</a>
+
+<script>
+'use strict';
+
+/* ============================================================
+   ツインマレット・ホッケー
+   - フィールドは縦長の論理座標 (FW x FH)。1P は下側、2P は上側。
+   - 1 人が 2 つのマレットを同時に動かす（マルチタッチ or キーボード）。
+   - 試合時間の経過にあわせてパックが 1 個ずつ増えていく。
+   ============================================================ */
+
+const FW = 620;          // フィールド幅（論理座標）
+const FH = 1040;         // フィールド高さ
+const MID = FH / 2;
+const GOAL_W = 220;      // ゴールの幅（マレット2本でぎりぎり守りきれない幅）
+const GOAL_X0 = (FW - GOAL_W) / 2;
+const GOAL_X1 = (FW + GOAL_W) / 2;
+const GOAL_DEPTH = 58;   // ゴールポケットの深さ
+const MALLET_R = 46;
+const PUCK_R = 26;
+const PUCK_MAX_SPEED = 2050;
+const MALLET_SPEED = 3000;     // 指・キーに追従する最大速度
+const KEY_SPEED = 1350;        // キーボードでのねらい移動速度
+const SUBSTEPS = 4;
+
+const P1 = 0, P2 = 1;
+const COL = [
+  { main:'#38e1ff', deep:'#0b5d7a', soft:'rgba(56,225,255,.22)' },
+  { main:'#ff8a3d', deep:'#7a3a0b', soft:'rgba(255,138,61,.22)' },
+];
+
+/* ---------- 小物 ---------- */
+const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
+const rand  = (a,b) => a + Math.random() * (b - a);
+const len   = (x,y) => Math.hypot(x,y);
+
+/* ---------- サウンド（WebAudio の合成音のみ・外部ファイルなし） ---------- */
+const Sound = (() => {
+  let ctx = null, master = null, muted = false;
+  function ensure(){
+    if (ctx) return ctx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = 0.34;
+    master.connect(ctx.destination);
+    return ctx;
+  }
+  function resume(){ const c = ensure(); if (c && c.state === 'suspended') c.resume(); }
+  function blip(freq, dur, type, vol, slideTo){
+    if (muted) return;
+    const c = ensure(); if (!c) return;
+    const t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol == null ? 0.3 : vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, vol, freq){
+    if (muted) return;
+    const c = ensure(); if (!c) return;
+    const t = c.currentTime;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = freq || 1400; bp.Q.value = 0.8;
+    const g = c.createGain(); g.gain.value = vol == null ? 0.25 : vol;
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t);
+  }
+  return {
+    resume,
+    toggle(){ muted = !muted; return muted; },
+    isMuted(){ return muted; },
+    hit(power){
+      const p = clamp(power, 0, 1);
+      blip(420 + p*520, 0.07 + p*0.05, 'square', 0.16 + p*0.2, 200 + p*160);
+      if (p > 0.55) noise(0.06, 0.12 + p*0.12, 2400);
+    },
+    wall(power){ blip(180 + clamp(power,0,1)*120, 0.06, 'triangle', 0.12, 110); },
+    post(){ blip(1180, 0.1, 'square', 0.2, 760); noise(0.07, 0.16, 2600); },
+    goal(who){
+      const base = who === P1 ? 523 : 440;
+      [0, 0.09, 0.18, 0.3].forEach((d,i) => setTimeout(() => blip(base * Math.pow(1.26, i), 0.24, 'sawtooth', 0.16), d*1000));
+      noise(0.3, 0.16, 900);
+    },
+    spawn(){
+      [0,0.07,0.14].forEach((d,i) => setTimeout(() => blip(880 + i*260, 0.13, 'sine', 0.2), d*1000));
+    },
+    whistle(){ blip(1480, 0.5, 'sine', 0.16, 1180); noise(0.5, 0.05, 3000); },
+    count(){ blip(760, 0.12, 'sine', 0.18); },
+    go(){ blip(1000, 0.3, 'sine', 0.22, 1500); },
+  };
+})();
+
+/* ---------- 画面 / キャンバス ---------- */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let view = { scale:1, ox:0, oy:0, w:0, h:0, dpr:1 };
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const w = window.innerWidth, h = window.innerHeight;
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  // フィールド + 上下の HUD 帯(各 90) が収まるようにスケール
+  const needW = FW + 40, needH = FH + 250;
+  const scale = Math.min(w / needW, h / needH);
+  view = { scale, ox:(w - FW*scale)/2, oy:(h - FH*scale)/2, w, h, dpr };
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+function toField(clientX, clientY){
+  return { x:(clientX - view.ox) / view.scale, y:(clientY - view.oy) / view.scale };
+}
+
+/* ---------- 設定 ---------- */
+const cfg = { mode:'2p', level:1, time:90, maxPucks:5 };
+const CPU = [
+  { speed:620,  react:0.34, aim:150, aggro:0.26 }, // よわい
+  { speed:880,  react:0.22, aim:100, aggro:0.42 }, // ふつう
+  { speed:1520, react:0.11, aim:44,  aggro:0.70 }, // つよい
+  { speed:1950, react:0.06, aim:20,  aggro:0.88 }, // 鬼
+];
+
+/* ---------- ゲーム状態 ---------- */
+const G = {
+  phase:'title',      // title / countdown / play / goal / over
+  t:0,                // 経過時間（秒）
+  left:90,            // のこり時間
+  score:[0,0],
+  mallets:[],
+  pucks:[],
+  particles:[],
+  ripples:[],
+  banner:null,        // { text, sub, until, color }
+  shake:0,
+  flash:null,         // { color, a }
+  countdown:0,
+  nextPuckAt:0,
+  puckSerial:0,
+  suddenDeath:false,
+  stats:{ shots:[0,0], topSpeed:0, maxPucks:1 },
+  cpuTimer:0,
+  cpuPlan:[null,null],
+};
+
+function makeMallet(owner, side){
+  const y = owner === P1 ? MID + 190 : MID - 190;
+  const x = side === 0 ? FW*0.3 : FW*0.7;
+  return { owner, side, x, y, px:x, py:y, tx:x, ty:y, vx:0, vy:0, r:MALLET_R,
+           ptr:null, glow:0, homeX:x, homeY:y };
+}
+
+function malletBounds(owner){
+  return owner === P1
+    ? { x0:MALLET_R, x1:FW-MALLET_R, y0:MID + MALLET_R*0.1, y1:FH-MALLET_R }
+    : { x0:MALLET_R, x1:FW-MALLET_R, y0:MALLET_R, y1:MID - MALLET_R*0.1 };
+}
+
+const PUCK_KINDS = {
+  normal: { r:PUCK_R,      mass:1,    pts:1, col:'#eef4ff', edge:'#7f93bb', label:null },
+  fast:   { r:PUCK_R*0.82, mass:0.7,  pts:1, col:'#ff6b9d', edge:'#8d2550', label:'S' },
+  heavy:  { r:PUCK_R*1.34, mass:2.1,  pts:1, col:'#9aa6c4', edge:'#4a5472', label:'H' },
+  gold:   { r:PUCK_R,      mass:1,    pts:2, col:'#ffd34d', edge:'#a97b06', label:'2' },
+};
+
+function makePuck(kind, x, y, vx, vy){
+  const k = PUCK_KINDS[kind] || PUCK_KINDS.normal;
+  return { id:++G.puckSerial, kind, r:k.r, mass:k.mass, pts:k.pts,
+           x, y, vx:vx||0, vy:vy||0, trail:[], spin:rand(-3,3), ang:0, born:G.t, alive:true };
+}
+
+function pickKind(){
+  const n = G.pucks.length;
+  if (n === 0) return 'normal';
+  const r = Math.random();
+  if (r < 0.24) return 'fast';
+  if (r < 0.42) return 'heavy';
+  if (r < 0.56) return 'gold';
+  return 'normal';
+}
+
+function spawnPuck(kind, announce){
+  const k = kind || pickKind();
+  const ang = rand(0, Math.PI*2);
+  const sp = k === 'heavy' ? rand(260,380) : rand(420,640);
+  const p = makePuck(k, FW/2 + rand(-60,60), MID + rand(-40,40), Math.cos(ang)*sp, Math.sin(ang)*sp);
+  G.pucks.push(p);
+  G.stats.maxPucks = Math.max(G.stats.maxPucks, G.pucks.length);
+  for (let i = 0; i < 26; i++) burst(p.x, p.y, PUCK_KINDS[k].col, rand(120,420));
+  G.ripples.push({ x:p.x, y:p.y, r:10, max:220, a:0.9, col:PUCK_KINDS[k].col });
+  if (announce){
+    Sound.spawn();
+    const names = { normal:'ノーマルパック', fast:'スピードパック', heavy:'ヘビーパック', gold:'ゴールデンパック（2点）' };
+    setBanner('パック が ふえた！', names[k] + '／ぜんぶで ' + G.pucks.length + '個', 1.7, PUCK_KINDS[k].col);
+  }
+  return p;
+}
+
+function setBanner(text, sub, dur, color){
+  G.banner = { text, sub:sub||'', until:G.t + (dur||1.6), color:color||'#ffffff', born:G.t };
+}
+
+function burst(x, y, col, speed, n){
+  const c = n || 1;
+  for (let i = 0; i < c; i++){
+    const a = rand(0, Math.PI*2), s = rand(speed*0.3, speed);
+    G.particles.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:rand(0.22,0.6), age:0,
+                       col, r:rand(1.6,4.2) });
+  }
+}
+
+/* ============================================================
+   入力
+   ============================================================ */
+const pointers = new Map();   // pointerId -> malletIndex
+const keys = new Set();
+
+// キー割り当て: [上, 左, 下, 右]
+const KEYMAP = [
+  { mallet:0, keys:['w','a','s','d'] },                                    // 1P 左手
+  { mallet:1, keys:['arrowup','arrowleft','arrowdown','arrowright'] },     // 1P 右手
+  { mallet:2, keys:['t','f','g','h'] },                                    // 2P 左手
+  { mallet:3, keys:['i','j','k','l'] },                                    // 2P 右手
+];
+
+function ownerAt(fy){ return fy > MID ? P1 : P2; }
+
+function grabMallet(owner, fx, fy){
+  let best = -1, bestD = Infinity;
+  for (let i = 0; i < G.mallets.length; i++){
+    const m = G.mallets[i];
+    if (m.owner !== owner || m.ptr !== null) continue;
+    const d = len(m.x - fx, m.y - fy);
+    if (d < bestD){ bestD = d; best = i; }
+  }
+  return best;
+}
+
+cv.addEventListener('pointerdown', (e) => {
+  Sound.resume();
+  if (G.phase === 'title' || G.phase === 'over') return;
+  const f = toField(e.clientX, e.clientY);
+  // 休止ボタン（フィールド外）
+  if (f.x > FW - 104 && f.x < FW && f.y > FH + 46 && f.y < FH + 96){
+    togglePause();
+    e.preventDefault();
+    return;
+  }
+  if (paused) return;
+  if (f.y < -4 || f.y > FH + 4) return;      // フィールドの外
+  const owner = ownerAt(f.y);
+  if (cfg.mode === 'cpu' && owner === P2) return;   // CPU 側はさわれない
+  const idx = grabMallet(owner, f.x, f.y);
+  if (idx < 0) return;
+  const m = G.mallets[idx];
+  m.ptr = e.pointerId;
+  const b = malletBounds(owner);
+  m.tx = clamp(f.x, b.x0, b.x1);
+  m.ty = clamp(f.y, b.y0, b.y1);
+  pointers.set(e.pointerId, idx);
+  if (cv.setPointerCapture) { try { cv.setPointerCapture(e.pointerId); } catch(_){} }
+  e.preventDefault();
+}, { passive:false });
+
+cv.addEventListener('pointermove', (e) => {
+  const idx = pointers.get(e.pointerId);
+  if (idx === undefined) return;
+  const m = G.mallets[idx];
+  const f = toField(e.clientX, e.clientY);
+  const b = malletBounds(m.owner);
+  m.tx = clamp(f.x, b.x0, b.x1);
+  m.ty = clamp(f.y, b.y0, b.y1);
+  e.preventDefault();
+}, { passive:false });
+
+function releasePointer(e){
+  const idx = pointers.get(e.pointerId);
+  if (idx === undefined) return;
+  G.mallets[idx].ptr = null;
+  pointers.delete(e.pointerId);
+}
+cv.addEventListener('pointerup', releasePointer);
+cv.addEventListener('pointercancel', releasePointer);
+cv.addEventListener('pointerleave', releasePointer);
+
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'p' || k === 'escape'){
+    if (G.phase === 'play' || G.phase === 'countdown') togglePause();
+    else if (paused) togglePause();
+    e.preventDefault();
+    return;
+  }
+  if (k === 'm'){ Sound.toggle(); return; }
+  if (G.phase === 'title' && (k === 'enter' || k === ' ')){ startMatch(); e.preventDefault(); return; }
+  if (G.phase === 'over' && (k === 'enter' || k === ' ')){ startMatch(); e.preventDefault(); return; }
+  keys.add(k);
+  if (k.startsWith('arrow') || k === ' ') e.preventDefault();
+});
+window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => { keys.clear(); });
+
+function applyKeys(dt){
+  for (const km of KEYMAP){
+    const m = G.mallets[km.mallet];
+    if (!m || m.ptr !== null) continue;
+    if (cfg.mode === 'cpu' && m.owner === P2) continue;
+    let dx = 0, dy = 0;
+    if (keys.has(km.keys[0])) dy -= 1;
+    if (keys.has(km.keys[1])) dx -= 1;
+    if (keys.has(km.keys[2])) dy += 1;
+    if (keys.has(km.keys[3])) dx += 1;
+    if (!dx && !dy) continue;
+    const n = len(dx, dy) || 1;
+    const b = malletBounds(m.owner);
+    // 2P は向かい合わせなので上下左右を反転させる
+    const flip = m.owner === P2 ? -1 : 1;
+    m.tx = clamp(m.tx + (dx/n) * KEY_SPEED * dt * flip, b.x0, b.x1);
+    m.ty = clamp(m.ty + (dy/n) * KEY_SPEED * dt * flip, b.y0, b.y1);
+  }
+}
+
+/* ============================================================
+   CPU
+   ============================================================ */
+function updateCPU(dt){
+  const lv = CPU[clamp(cfg.level,0,3)];
+  G.cpuTimer -= dt;
+  if (G.cpuTimer <= 0){
+    G.cpuTimer = lv.react;
+    // 自陣に向かってくるパックを危険度順に並べる
+    const threats = G.pucks.slice().sort((a,b) => {
+      const da = a.y + (a.vy < 0 ? a.vy * 0.6 : 240);
+      const db = b.y + (b.vy < 0 ? b.vy * 0.6 : 240);
+      return da - db;
+    });
+    for (let i = 0; i < 2; i++){
+      const m = G.mallets[2 + i];
+      const p = threats[i] || threats[0] || null;
+      if (!p){ G.cpuPlan[i] = { x:FW/2, y:MID*0.45 }; continue; }
+      const b = malletBounds(P2);
+      // パックの未来位置を簡易予測
+      const lead = clamp(Math.abs(p.y - m.y) / Math.max(240, Math.abs(p.vy) + 160), 0, 0.42);
+      let tx = p.x + p.vx * lead + rand(-lv.aim, lv.aim);
+      let ty = p.y + p.vy * lead;
+      const attack = p.y < MID && (p.vy < 60) && Math.random() < lv.aggro + 0.2;
+      if (attack){
+        // 打ちに行く: パックの少し奥(ゴール側)に回り込んで押し出す
+        ty = ty - (p.r + m.r) * 0.72;
+        // ねらう先は相手ゴール中央 → パックをゴール方向に押す角度に回り込む
+        const gx = FW/2, gy = FH + 40;
+        const ang = Math.atan2(gy - p.y, gx - p.x);
+        tx = p.x - Math.cos(ang) * (p.r + m.r) * 0.8 + rand(-lv.aim*0.6, lv.aim*0.6);
+        ty = p.y - Math.sin(ang) * (p.r + m.r) * 0.8;
+      } else {
+        // 守る: 自ゴールとパックを結ぶ線上
+        const gx = FW/2, gy = -20;
+        const k = clamp(0.34 + (MID - p.y) / MID * 0.3, 0.22, 0.7);
+        tx = gx + (tx - gx) * (1 - k*0.2);
+        ty = clamp(gy + (ty - gy) * k, MALLET_R, MID*0.6);
+        if (i === 1) tx = clamp(tx + (tx < FW/2 ? 110 : -110), b.x0, b.x1);
+      }
+      G.cpuPlan[i] = { x:clamp(tx, b.x0, b.x1), y:clamp(ty, b.y0, b.y1) };
+    }
+  }
+  for (let i = 0; i < 2; i++){
+    const m = G.mallets[2 + i];
+    const plan = G.cpuPlan[i];
+    if (!plan) continue;
+    const dx = plan.x - m.tx, dy = plan.y - m.ty;
+    const d = len(dx, dy);
+    if (d > 1){
+      const step = Math.min(d, lv.speed * dt);
+      m.tx += dx/d * step;
+      m.ty += dy/d * step;
+    }
+  }
+}
+
+/* ============================================================
+   物理
+   ============================================================ */
+function moveMallets(dt){
+  for (const m of G.mallets){
+    m.px = m.x; m.py = m.y;
+    const dx = m.tx - m.x, dy = m.ty - m.y;
+    const d = len(dx, dy);
+    const max = MALLET_SPEED * dt;
+    if (d > max){ m.x += dx/d * max; m.y += dy/d * max; }
+    else { m.x = m.tx; m.y = m.ty; }
+    const b = malletBounds(m.owner);
+    m.x = clamp(m.x, b.x0, b.x1);
+    m.y = clamp(m.y, b.y0, b.y1);
+    m.vx = (m.x - m.px) / dt;
+    m.vy = (m.y - m.py) / dt;
+    m.glow = Math.max(m.glow - dt*3, Math.min(1, len(m.vx,m.vy) / 1600));
+  }
+  // 同じプレイヤーの 2 本は重ならないように押し合う
+  for (const pair of [[0,1],[2,3]]){
+    const a = G.mallets[pair[0]], b = G.mallets[pair[1]];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    let d = len(dx, dy);
+    const rr = a.r + b.r;
+    if (d < rr && d > 0.0001){
+      const push = (rr - d) / 2;
+      const nx = dx/d, ny = dy/d;
+      const ba = malletBounds(a.owner), bb = malletBounds(b.owner);
+      a.x = clamp(a.x - nx*push, ba.x0, ba.x1); a.y = clamp(a.y - ny*push, ba.y0, ba.y1);
+      b.x = clamp(b.x + nx*push, bb.x0, bb.x1); b.y = clamp(b.y + ny*push, bb.y0, bb.y1);
+    }
+  }
+}
+
+const POSTS = [
+  { x:GOAL_X0, y:0,  r:9 }, { x:GOAL_X1, y:0,  r:9 },
+  { x:GOAL_X0, y:FH, r:9 }, { x:GOAL_X1, y:FH, r:9 },
+];
+
+function puckVsPost(p){
+  for (const s of POSTS){
+    const dx = p.x - s.x, dy = p.y - s.y;
+    let d = len(dx, dy);
+    const rr = p.r + s.r;
+    if (d < rr && d > 0.0001){
+      const nx = dx/d, ny = dy/d;
+      p.x = s.x + nx*rr; p.y = s.y + ny*rr;
+      const vn = p.vx*nx + p.vy*ny;
+      if (vn < 0){
+        p.vx -= 1.85 * vn * nx;
+        p.vy -= 1.85 * vn * ny;
+        Sound.post();
+        burst(p.x, p.y, '#ffe9a8', 420, 14);
+        G.shake = Math.max(G.shake, 7);
+      }
+    }
+  }
+}
+
+function puckVsWalls(p){
+  const e = 0.94;
+  if (p.x - p.r < 0){ p.x = p.r; if (p.vx < 0){ p.vx = -p.vx * e; onWall(p); } }
+  if (p.x + p.r > FW){ p.x = FW - p.r; if (p.vx > 0){ p.vx = -p.vx * e; onWall(p); } }
+
+  const inGoalLane = p.x > GOAL_X0 + p.r*0.15 && p.x < GOAL_X1 - p.r*0.15;
+  if (p.y - p.r < 0){
+    if (!inGoalLane){ p.y = p.r; if (p.vy < 0){ p.vy = -p.vy * e; onWall(p); } }
+  }
+  if (p.y + p.r > FH){
+    if (!inGoalLane){ p.y = FH - p.r; if (p.vy > 0){ p.vy = -p.vy * e; onWall(p); } }
+  }
+  // ポケットの中では横に抜けないように閉じ込める
+  if (p.y < 0 || p.y > FH){
+    p.x = clamp(p.x, GOAL_X0 + p.r, GOAL_X1 - p.r);
+  }
+}
+
+function onWall(p){
+  const sp = len(p.vx, p.vy);
+  Sound.wall(sp / PUCK_MAX_SPEED);
+  burst(p.x, p.y, '#cfe0ff', 140 + sp*0.12, 4);
+}
+
+function puckVsMallet(p, m){
+  const dx = p.x - m.x, dy = p.y - m.y;
+  let d = len(dx, dy);
+  const rr = p.r + m.r;
+  if (d >= rr) return;
+  if (d < 0.0001){ d = 0.0001; }
+  const nx = dx/d, ny = dy/d;
+  p.x = m.x + nx*rr;
+  p.y = m.y + ny*rr;
+
+  // マレット速度は無限質量として扱い、相対速度を反発させる
+  const mvx = clamp(m.vx, -2600, 2600), mvy = clamp(m.vy, -2600, 2600);
+  let rvx = p.vx - mvx, rvy = p.vy - mvy;
+  const vn = rvx*nx + rvy*ny;
+  const rest = 0.92;
+  if (vn < 0){
+    rvx -= (1 + rest) * vn * nx;
+    rvy -= (1 + rest) * vn * ny;
+  }
+  p.vx = mvx + rvx;
+  p.vy = mvy + rvy;
+
+  // 最低限の押し出し（張り付き防止）。重いパックは押しにくい
+  const out = p.vx*nx + p.vy*ny;
+  const minOut = 150 / p.mass;
+  if (out < minOut){
+    p.vx += (minOut - out) * nx;
+    p.vy += (minOut - out) * ny;
+  }
+
+  let sp = len(p.vx, p.vy);
+  if (sp > PUCK_MAX_SPEED){ p.vx *= PUCK_MAX_SPEED/sp; p.vy *= PUCK_MAX_SPEED/sp; sp = PUCK_MAX_SPEED; }
+  p.spin += (mvx*ny - mvy*nx) * 0.004;
+
+  const power = clamp(sp / PUCK_MAX_SPEED, 0, 1);
+  Sound.hit(power);
+  burst(p.x, p.y, COL[m.owner].main, 200 + power*520, 8 + Math.round(power*14));
+  G.ripples.push({ x:p.x, y:p.y, r:p.r, max:70 + power*140, a:0.5 + power*0.4, col:COL[m.owner].main });
+  m.glow = 1;
+  G.shake = Math.max(G.shake, power * 9);
+  G.stats.shots[m.owner]++;
+  G.stats.topSpeed = Math.max(G.stats.topSpeed, sp);
+  p.lastHit = m.owner;
+}
+
+function puckVsPuck(a, b){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let d = len(dx, dy);
+  const rr = a.r + b.r;
+  if (d >= rr || d < 0.0001) return;
+  const nx = dx/d, ny = dy/d;
+  const overlap = rr - d;
+  const ma = a.mass, mb = b.mass, tm = ma + mb;
+  a.x -= nx * overlap * (mb/tm); a.y -= ny * overlap * (mb/tm);
+  b.x += nx * overlap * (ma/tm); b.y += ny * overlap * (ma/tm);
+  const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
+  const vn = rvx*nx + rvy*ny;
+  if (vn > 0) return;
+  const e = 0.95;
+  const j = -(1 + e) * vn / (1/ma + 1/mb);
+  a.vx -= j/ma * nx; a.vy -= j/ma * ny;
+  b.vx += j/mb * nx; b.vy += j/mb * ny;
+  const sp = Math.abs(vn);
+  Sound.wall(clamp(sp/1600, 0, 1) * 0.8);
+  burst((a.x+b.x)/2, (a.y+b.y)/2, '#ffffff', 120 + sp*0.2, 6);
+}
+
+function stepPucks(dt){
+  const h = dt / SUBSTEPS;
+  for (let s = 0; s < SUBSTEPS; s++){
+    for (const p of G.pucks){
+      if (!p.alive) continue;
+      p.x += p.vx * h;
+      p.y += p.vy * h;
+      // 空気抵抗（エアホッケーなのでごく弱い）
+      const damp = Math.pow(0.9994, h * 60);
+      p.vx *= damp; p.vy *= damp;
+      p.ang += p.spin * h;
+      p.spin *= Math.pow(0.985, h*60);
+      puckVsWalls(p);
+      puckVsPost(p);
+      for (const m of G.mallets) puckVsMallet(p, m);
+      const sp = len(p.vx, p.vy);
+      if (sp > PUCK_MAX_SPEED){ p.vx *= PUCK_MAX_SPEED/sp; p.vy *= PUCK_MAX_SPEED/sp; }
+    }
+    for (let i = 0; i < G.pucks.length; i++)
+      for (let j = i+1; j < G.pucks.length; j++)
+        puckVsPuck(G.pucks[i], G.pucks[j]);
+  }
+  for (const p of G.pucks){
+    p.trail.push({ x:p.x, y:p.y });
+    if (p.trail.length > 12) p.trail.shift();
+    // ほぼ止まったパックは少し押して膠着をふせぐ
+    const sp = len(p.vx, p.vy);
+    if (sp < 90){
+      p.slow = (p.slow || 0) + dt;
+      if (p.slow > 2.2){
+        p.slow = 0;
+        const a = rand(0, Math.PI*2);
+        const push = 340 / p.mass;
+        p.vx += Math.cos(a) * push;
+        p.vy += Math.sin(a) * push;
+        G.ripples.push({ x:p.x, y:p.y, r:p.r, max:90, a:0.5, col:'#9fb3da' });
+      }
+    } else p.slow = 0;
+  }
+}
+
+function checkGoals(){
+  for (const p of G.pucks){
+    if (!p.alive) continue;
+    if (p.y < -GOAL_DEPTH*0.45){ scoreGoal(P1, p); }
+    else if (p.y > FH + GOAL_DEPTH*0.45){ scoreGoal(P2, p); }
+  }
+}
+
+function scoreGoal(who, p){
+  p.alive = false;
+  G.score[who] += p.pts;
+  Sound.goal(who);
+  G.shake = 18;
+  G.flash = { color:COL[who].main, a:0.55 };
+  for (let i = 0; i < 70; i++) burst(p.x, clamp(p.y, -20, FH+20), i%2 ? COL[who].main : '#ffffff', rand(200,900));
+  G.ripples.push({ x:p.x, y:clamp(p.y,0,FH), r:20, max:420, a:1, col:COL[who].main });
+  const label = who === P1 ? '1P' : '2P';
+  setBanner('ゴール！ ' + label, p.pts > 1 ? 'ゴールデンパックで ' + p.pts + '点！' : '', 1.5, COL[who].main);
+  G.pucks = G.pucks.filter(q => q.alive);
+  if (G.suddenDeath){ endMatch(); return; }
+  // 取られたパックは少し後に復活（同じ個数をたもつ）
+  const kind = p.kind === 'gold' ? 'normal' : p.kind;
+  setTimeout(() => {
+    if (G.phase === 'play'){
+      const np = makePuck(kind, FW/2, MID, 0, 0);
+      // 点を取られた側からの再開にするため、失点側へ向けて出す
+      const ang = (who === P1 ? -1 : 1) * (Math.PI/2) + rand(-0.9, 0.9);
+      const sp = rand(340, 520);
+      np.vx = Math.cos(ang) * sp; np.vy = Math.sin(ang) * sp;
+      G.pucks.push(np);
+      G.ripples.push({ x:np.x, y:np.y, r:10, max:160, a:0.8, col:'#ffffff' });
+    }
+  }, 900);
+}
+
+/* ============================================================
+   試合の流れ
+   ============================================================ */
+let paused = false;
+const titleScreen  = document.getElementById('titleScreen');
+const resultScreen = document.getElementById('resultScreen');
+const pauseScreen  = document.getElementById('pauseScreen');
+const backLink     = document.getElementById('backLink');
+
+function resetMatch(){
+  G.phase = 'countdown';
+  G.t = 0;
+  G.left = cfg.time;
+  G.score = [0,0];
+  G.mallets = [makeMallet(P1,0), makeMallet(P1,1), makeMallet(P2,0), makeMallet(P2,1)];
+  G.pucks = [];
+  G.particles = [];
+  G.ripples = [];
+  G.banner = null;
+  G.shake = 0;
+  G.flash = null;
+  G.countdown = 3.2;
+  G.puckSerial = 0;
+  G.suddenDeath = false;
+  G.stats = { shots:[0,0], topSpeed:0, maxPucks:1 };
+  G.cpuTimer = 0;
+  G.cpuPlan = [null,null];
+  pointers.clear();
+  keys.clear();
+  // パックが増えるタイミング（試合時間を均等割り）
+  G.addTimes = [];
+  for (let i = 1; i < cfg.maxPucks; i++){
+    G.addTimes.push(Math.round(cfg.time * i / cfg.maxPucks));
+  }
+}
+
+function startMatch(){
+  Sound.resume();
+  resetMatch();
+  titleScreen.classList.add('hidden');
+  resultScreen.classList.add('hidden');
+  pauseScreen.classList.add('hidden');
+  backLink.classList.add('hidden');
+  paused = false;
+  resize();
+}
+
+function endMatch(){
+  G.phase = 'over';
+  Sound.whistle();
+  backLink.classList.remove('hidden');
+  const s1 = G.score[P1], s2 = G.score[P2];
+  const t = document.getElementById('resTitle');
+  if (s1 === s2) t.textContent = 'ひきわけ！';
+  else if (s1 > s2) t.textContent = (cfg.mode === 'cpu' ? 'あなたの 勝ち！' : '1P の 勝ち！');
+  else t.textContent = (cfg.mode === 'cpu' ? 'CPU の 勝ち…' : '2P の 勝ち！');
+  document.getElementById('resS1').textContent = s1;
+  document.getElementById('resS2').textContent = s2;
+  document.getElementById('resStats').innerHTML =
+    '最速ショット <span>' + Math.round(G.stats.topSpeed/10) + ' km/h</span><br>' +
+    '打った回数 1P <span>' + G.stats.shots[P1] + '</span> ／ 2P <span>' + G.stats.shots[P2] + '</span><br>' +
+    '同時に出ていたパック 最大 <span>' + G.stats.maxPucks + '個</span>' +
+    (G.suddenDeath ? '<br><span>サドンデス 決着</span>' : '');
+  resultScreen.classList.remove('hidden');
+}
+
+function togglePause(){
+  if (G.phase === 'title' || G.phase === 'over') return;
+  paused = !paused;
+  pauseScreen.classList.toggle('hidden', !paused);
+  if (paused){ pointers.clear(); for (const m of G.mallets) m.ptr = null; }
+}
+
+function updatePlay(dt){
+  if (G.phase === 'countdown'){
+    const before = Math.ceil(G.countdown - 0.2);
+    G.countdown -= dt;
+    const after = Math.ceil(G.countdown - 0.2);
+    if (after !== before){
+      if (after >= 1) Sound.count();
+      else if (after === 0) Sound.go();
+    }
+    moveMallets(dt);
+    applyKeys(dt);
+    if (cfg.mode === 'cpu') updateCPU(dt);
+    if (G.countdown <= 0){
+      G.phase = 'play';
+      spawnPuck('normal', false);
+      setBanner('スタート！', 'パックは 時間がたつと ふえていく', 1.4, '#ffffff');
+    }
+    return;
+  }
+
+  applyKeys(dt);
+  if (cfg.mode === 'cpu') updateCPU(dt);
+  moveMallets(dt);
+  stepPucks(dt);
+  checkGoals();
+
+  G.t += dt;
+  if (!G.suddenDeath){
+    G.left = Math.max(0, cfg.time - G.t);
+    // パック追加
+    while (G.addTimes.length && G.t >= G.addTimes[0]){
+      G.addTimes.shift();
+      if (G.pucks.length < cfg.maxPucks) spawnPuck(null, true);
+    }
+    if (G.left <= 0){
+      if (G.score[P1] === G.score[P2]){
+        G.suddenDeath = true;
+        setBanner('サドンデス！', '先に 1点 とった方の 勝ち', 2.2, '#ffd34d');
+        Sound.whistle();
+      } else {
+        endMatch();
+      }
+    }
+  }
+}
+
+function updateFx(dt){
+  for (const p of G.particles){
+    p.age += dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 0.94; p.vy *= 0.94;
+  }
+  G.particles = G.particles.filter(p => p.age < p.life);
+  if (G.particles.length > 900) G.particles.splice(0, G.particles.length - 900);
+  for (const r of G.ripples){
+    r.r += (r.max - r.r) * Math.min(1, dt * 6);
+    r.a -= dt * 1.6;
+  }
+  G.ripples = G.ripples.filter(r => r.a > 0.02);
+  G.shake = Math.max(0, G.shake - dt * 42);
+  if (G.flash){ G.flash.a -= dt * 1.4; if (G.flash.a <= 0) G.flash = null; }
+}
+
+/* ============================================================
+   描画
+   ============================================================ */
+function drawRoundRect(c, x, y, w, h, r){
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.arcTo(x+w, y,   x+w, y+h, r);
+  c.arcTo(x+w, y+h, x,   y+h, r);
+  c.arcTo(x,   y+h, x,   y,   r);
+  c.arcTo(x,   y,   x+w, y,   r);
+  c.closePath();
+}
+
+function drawRink(){
+  // 外枠
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.6)';
+  ctx.shadowBlur = 40;
+  const g = ctx.createLinearGradient(0, 0, 0, FH);
+  g.addColorStop(0, '#10203a');
+  g.addColorStop(0.5, '#0b1828');
+  g.addColorStop(1, '#10203a');
+  ctx.fillStyle = g;
+  drawRoundRect(ctx, 0, 0, FW, FH, 34);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  drawRoundRect(ctx, 0, 0, FW, FH, 34);
+  ctx.clip();
+
+  // エアホッケー台の穴（ドット）
+  ctx.fillStyle = 'rgba(255,255,255,.035)';
+  for (let y = 26; y < FH; y += 34){
+    for (let x = 26; x < FW; x += 34){
+      ctx.beginPath(); ctx.arc(x, y, 2.1, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // 陣地の色付け
+  const g1 = ctx.createLinearGradient(0, FH, 0, MID);
+  g1.addColorStop(0, COL[P1].soft); g1.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g1; ctx.fillRect(0, MID, FW, MID);
+  const g2 = ctx.createLinearGradient(0, 0, 0, MID);
+  g2.addColorStop(0, COL[P2].soft); g2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, FW, MID);
+
+  // センターライン・サークル
+  ctx.strokeStyle = 'rgba(200,220,255,.3)';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(0, MID); ctx.lineTo(FW, MID); ctx.stroke();
+  ctx.beginPath(); ctx.arc(FW/2, MID, 120, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(FW/2, MID, 14, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(200,220,255,.3)'; ctx.fill();
+
+  // ゴールクリース
+  for (const side of [0, 1]){
+    const owner = side === 0 ? P2 : P1;     // 上のゴールは 2P が守る
+    const y = side === 0 ? 0 : FH;
+    const dir = side === 0 ? 1 : -1;
+    ctx.strokeStyle = COL[owner].main;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(FW/2, y, 175, side === 0 ? 0 : Math.PI, side === 0 ? Math.PI : Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // ゴール口
+    const gy = y;
+    const grad = ctx.createLinearGradient(0, gy, 0, gy + dir*GOAL_DEPTH);
+    grad.addColorStop(0, COL[owner].main);
+    grad.addColorStop(1, 'rgba(0,0,0,.85)');
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(GOAL_X0, side === 0 ? 0 : FH - GOAL_DEPTH, GOAL_W, GOAL_DEPTH);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = COL[owner].main;
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(GOAL_X0, gy); ctx.lineTo(GOAL_X1, gy); ctx.stroke();
+  }
+  ctx.restore();
+
+  // ゴールポケット（枠の外側に見える口）
+  for (const side of [0,1]){
+    const owner = side === 0 ? P2 : P1;
+    const y = side === 0 ? -GOAL_DEPTH : FH;
+    ctx.save();
+    ctx.fillStyle = 'rgba(3,6,12,.92)';
+    drawRoundRect(ctx, GOAL_X0, y, GOAL_W, GOAL_DEPTH, 10);
+    ctx.fill();
+    ctx.strokeStyle = COL[owner].main;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 枠線
+  ctx.strokeStyle = '#2e4a7d';
+  ctx.lineWidth = 7;
+  drawRoundRect(ctx, 0, 0, FW, FH, 34);
+  ctx.stroke();
+
+  // ポスト
+  for (const s of POSTS){
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = '#f2f6ff'; ctx.fill();
+  }
+}
+
+function drawMallet(m){
+  const c = COL[m.owner];
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  // 影
+  ctx.beginPath(); ctx.arc(3, 6, m.r, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fill();
+  // 本体
+  const g = ctx.createRadialGradient(-m.r*0.3, -m.r*0.35, m.r*0.2, 0, 0, m.r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.25, c.main);
+  g.addColorStop(1, c.deep);
+  ctx.beginPath(); ctx.arc(0, 0, m.r, 0, Math.PI*2);
+  ctx.fillStyle = g; ctx.fill();
+  // リング
+  ctx.beginPath(); ctx.arc(0, 0, m.r*0.62, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(5,10,20,.55)'; ctx.lineWidth = 5; ctx.stroke();
+  // つまみ
+  const g2 = ctx.createRadialGradient(-m.r*0.18, -m.r*0.22, 2, 0, 0, m.r*0.5);
+  g2.addColorStop(0, '#ffffff'); g2.addColorStop(1, c.deep);
+  ctx.beginPath(); ctx.arc(0, 0, m.r*0.44, 0, Math.PI*2);
+  ctx.fillStyle = g2; ctx.fill();
+  // 発光
+  if (m.glow > 0.02){
+    ctx.globalAlpha = clamp(m.glow, 0, 1) * 0.8;
+    ctx.beginPath(); ctx.arc(0, 0, m.r + 8 + m.glow*10, 0, Math.PI*2);
+    ctx.strokeStyle = c.main; ctx.lineWidth = 4; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+
+  // 指で持っていない方がわかるように点線
+  if (m.ptr === null && !(cfg.mode === 'cpu' && m.owner === P2)){
+    ctx.save();
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 14, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPuck(p){
+  const k = PUCK_KINDS[p.kind];
+  // トレイル
+  for (let i = 0; i < p.trail.length; i++){
+    const t = p.trail[i];
+    const a = (i / p.trail.length) * 0.3;
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(t.x, t.y, p.r * (0.4 + 0.6*i/p.trail.length), 0, Math.PI*2);
+    ctx.fillStyle = k.col; ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.beginPath(); ctx.arc(3, 5, p.r, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fill();
+  if (p.kind === 'gold'){
+    ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 22;
+  }
+  const g = ctx.createRadialGradient(-p.r*0.3, -p.r*0.35, p.r*0.15, 0, 0, p.r);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, k.col); g.addColorStop(1, k.edge);
+  ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.rotate(p.ang);
+  ctx.strokeStyle = 'rgba(10,16,30,.45)';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, p.r*0.6, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-p.r*0.6, 0); ctx.lineTo(p.r*0.6, 0); ctx.stroke();
+  if (k.label){
+    ctx.rotate(-p.ang);
+    ctx.fillStyle = 'rgba(10,16,30,.8)';
+    ctx.font = 'bold ' + Math.round(p.r*0.9) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(k.label, 0, 1);
+  }
+  ctx.restore();
+}
+
+function drawFx(){
+  for (const r of G.ripples){
+    ctx.globalAlpha = clamp(r.a, 0, 1) * 0.5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+    ctx.strokeStyle = r.col; ctx.lineWidth = 4; ctx.stroke();
+  }
+  for (const p of G.particles){
+    const a = 1 - p.age / p.life;
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a + 0.4, 0, Math.PI*2);
+    ctx.fillStyle = p.col; ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawScorePanel(owner, flip){
+  // フィールド外の HUD 帯。2P 側は 180 度回転して表示する
+  const s = G.score[owner];
+  const label = owner === P1 ? (cfg.mode === 'cpu' ? 'YOU' : '1P') : (cfg.mode === 'cpu' ? 'CPU' : '2P');
+  ctx.save();
+  if (flip) ctx.rotate(Math.PI);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = COL[owner].main;
+  ctx.font = 'bold 68px system-ui, sans-serif';
+  ctx.fillText(String(s), 0, 0);
+  ctx.font = 'bold 18px system-ui, sans-serif';
+  ctx.globalAlpha = 0.75;
+  ctx.fillText(label, 0, -46);
+  ctx.restore();
+}
+
+function drawHud(){
+  // ゴールポケットに重ならないよう、それぞれの手前から見て左寄りに置く
+  ctx.save(); ctx.translate(FW*0.17, FH + 70); drawScorePanel(P1, false); ctx.restore();
+  ctx.save(); ctx.translate(FW*0.83, -70);    drawScorePanel(P2, true);  ctx.restore();
+
+  // 残り時間（センターライン上）
+  const tt = G.suddenDeath ? 'SUDDEN DEATH' : (Math.ceil(G.left) + '');
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.9;
+  if (G.suddenDeath){
+    ctx.fillStyle = '#ffd34d';
+    ctx.font = 'bold 26px system-ui, sans-serif';
+  } else {
+    ctx.fillStyle = G.left <= 10 ? '#ff6b6b' : '#dbe7ff';
+    ctx.font = 'bold 44px system-ui, sans-serif';
+  }
+  ctx.fillText(tt, FW/2, MID);
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = '#9fb3da';
+  ctx.font = 'bold 15px system-ui, sans-serif';
+  ctx.fillText('PUCK ' + G.pucks.length + ' / ' + cfg.maxPucks, FW/2, MID + 42);
+  ctx.restore();
+
+  // 一時停止ボタン（左右の帯）
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = 'rgba(16,26,46,.9)';
+  drawRoundRect(ctx, FW - 104, FH + 46, 104, 50, 14); ctx.fill();
+  ctx.strokeStyle = '#2c3e68'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#cfe0ff';
+  ctx.font = 'bold 16px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('‖ 休止', FW - 52, FH + 71);
+  ctx.restore();
+}
+
+function drawBanner(){
+  if (!G.banner || G.t > G.banner.until) return;
+  const age = G.t - G.banner.born;
+  const life = G.banner.until - G.banner.born;
+  let a = 1;
+  if (age < 0.16) a = age / 0.16;
+  else if (age > life - 0.3) a = Math.max(0, (life - age) / 0.3);
+  const pop = 1 + Math.max(0, 0.18 - age) * 1.6;
+  for (const flip of [false, true]){
+    ctx.save();
+    ctx.translate(FW/2, flip ? MID - 150 : MID + 150);
+    if (flip) ctx.rotate(Math.PI);
+    ctx.scale(pop, pop);
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = 16;
+    ctx.fillStyle = G.banner.color;
+    ctx.font = 'bold 40px system-ui, sans-serif';
+    ctx.fillText(G.banner.text, 0, 0);
+    if (G.banner.sub){
+      ctx.fillStyle = '#dbe7ff';
+      ctx.font = 'bold 18px system-ui, sans-serif';
+      ctx.fillText(G.banner.sub, 0, 34);
+    }
+    ctx.restore();
+  }
+}
+
+function drawCountdown(){
+  const n = Math.ceil(G.countdown - 0.2);
+  const txt = n >= 1 ? String(n) : 'GO!';
+  const frac = (G.countdown - 0.2) % 1;
+  const sc = 1 + (1 - frac) * 0.5;
+  for (const flip of [false, true]){
+    ctx.save();
+    ctx.translate(FW/2, flip ? MID - 180 : MID + 180);
+    if (flip) ctx.rotate(Math.PI);
+    ctx.scale(sc, sc);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.35 + frac*0.6;
+    ctx.fillStyle = n >= 1 ? '#ffffff' : '#ffd34d';
+    ctx.font = 'bold 92px system-ui, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 18;
+    ctx.fillText(txt, 0, 0);
+    ctx.restore();
+  }
+  // 操作ガイド
+  for (const owner of [P1, P2]){
+    if (cfg.mode === 'cpu' && owner === P2) continue;
+    ctx.save();
+    ctx.translate(FW/2, owner === P1 ? FH - 70 : 70);
+    if (owner === P2) ctx.rotate(Math.PI);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = COL[owner].main;
+    ctx.font = 'bold 19px system-ui, sans-serif';
+    ctx.fillText('両手の指で 2つのマレットを うごかそう', 0, 0);
+    ctx.restore();
+  }
+}
+
+function render(){
+  const c = ctx;
+  c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  c.clearRect(0, 0, view.w, view.h);
+
+  // 背景
+  const bg = c.createRadialGradient(view.w/2, view.h*0.45, 60, view.w/2, view.h*0.5, Math.max(view.w,view.h)*0.75);
+  bg.addColorStop(0, '#0c1426');
+  bg.addColorStop(1, '#04060c');
+  c.fillStyle = bg;
+  c.fillRect(0, 0, view.w, view.h);
+
+  const sx = G.shake ? rand(-G.shake, G.shake) : 0;
+  const sy = G.shake ? rand(-G.shake, G.shake) : 0;
+  c.save();
+  c.translate(view.ox + sx*view.scale, view.oy + sy*view.scale);
+  c.scale(view.scale, view.scale);
+
+  drawRink();
+  if (G.phase !== 'title'){
+    drawHud();
+    drawFx();
+    for (const p of G.pucks) drawPuck(p);
+    for (const m of G.mallets) drawMallet(m);
+    if (G.phase === 'countdown') drawCountdown();
+    drawBanner();
+  }
+  c.restore();
+
+  if (G.flash){
+    c.globalAlpha = clamp(G.flash.a, 0, 1) * 0.5;
+    c.fillStyle = G.flash.color;
+    c.fillRect(0, 0, view.w, view.h);
+    c.globalAlpha = 1;
+  }
+}
+
+/* ============================================================
+   メインループ
+   ============================================================ */
+let last = performance.now();
+function frame(now){
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.05) dt = 0.05;          // タブ復帰などで飛ばないように
+  if (!paused && (G.phase === 'play' || G.phase === 'countdown')) updatePlay(dt);
+  if (!paused) updateFx(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+function bindSeg(id, onPick){
+  const root = document.getElementById(id);
+  root.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    for (const x of root.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+    onPick(b.dataset.v);
+    Sound.resume();
+    Sound.count();
+  });
+}
+bindSeg('segMode', v => {
+  cfg.mode = v;
+  document.getElementById('rowLevel').hidden = (v !== 'cpu');
+});
+bindSeg('segLevel', v => { cfg.level = parseInt(v, 10); });
+bindSeg('segTime',  v => { cfg.time  = parseInt(v, 10); });
+bindSeg('segPucks', v => { cfg.maxPucks = parseInt(v, 10); });
+
+document.getElementById('btnStart').addEventListener('click', startMatch);
+document.getElementById('btnRematch').addEventListener('click', startMatch);
+document.getElementById('btnToTitle').addEventListener('click', () => {
+  resultScreen.classList.add('hidden');
+  titleScreen.classList.remove('hidden');
+  backLink.classList.remove('hidden');
+  G.phase = 'title';
+});
+document.getElementById('btnResume').addEventListener('click', togglePause);
+document.getElementById('btnQuit').addEventListener('click', () => {
+  paused = false;
+  pauseScreen.classList.add('hidden');
+  endMatch();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && (G.phase === 'play' || G.phase === 'countdown') && !paused) togglePause();
+});
+
+resize();
+// タイトル画面でも台を描いておく
+G.mallets = [makeMallet(P1,0), makeMallet(P1,1), makeMallet(P2,0), makeMallet(P2,1)];
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
