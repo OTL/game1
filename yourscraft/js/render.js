@@ -560,6 +560,7 @@
     M4.view(this.viewM, s.cam.x, s.cam.y, s.cam.z, s.cam.yaw, s.cam.pitch);
     M4.multiply(this.vp, this.proj, this.viewM);
     M4.invert(this.invVP, this.vp);
+    this.lastCam = [s.cam.x, s.cam.y, s.cam.z];   /* 画面上の点から視線を逆算するのに使う */
     this._extractPlanes(this.vp);
 
     var fog = s.sky.fog;
