@@ -982,7 +982,16 @@
   var pointers = new Map();
   var lookId = null;
   var stickId = null;
-  var holdAction = null, holdStart = 0, holdLast = 0, holdMoved = 0;
+  var holdAction = null, holdSource = null, holdStart = 0, holdLast = 0, holdMoved = 0;
+  var lastTouchAt = 0;   /* タッチの直後に来る「合成マウスイベント」を無視するため */
+  var TAP_MS = 350;      /* これより短ければ「タップ（置く）」、長ければ「長押し（壊す）」 */
+
+  /* タッチ端末では、指の操作のあとにブラウザが mousedown/mouseup/mousemove を
+     追加で投げてくる（互換のための合成イベント）。これを本物のマウスとして扱うと
+     ・置く／壊すが二重に走る（連打のようになる）
+     ・ポインタロックがかかって視点が二重に動く
+     ということが起きるので、直近にタッチがあったら無視する。 */
+  function fromTouch() { return performance.now() - lastTouchAt < 900; }
 
   function updateControl(dt) {
     var c = Game.ctrl;
@@ -1045,15 +1054,20 @@
 
     /* ---- マウス（ポインタロック） ---- */
     canvas.addEventListener('mousedown', function (e) {
-      if (Game.mode !== 'play') return;
+      if (Game.mode !== 'play' || fromTouch()) return;
+      /* 本物のマウスを一度も見ていないタッチ端末では、マウス操作系をまるごと使わない
+         （ポインタロックがかかると指のドラッグと二重に視点が動いてしまう） */
+      if (Game.touchUI && !Game.sawMouse) return;
       if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
-      if (e.button === 0) { digBlock(); holdAction = 'dig'; holdLast = performance.now(); }
-      else if (e.button === 2) { placeBlock(); holdAction = 'place'; holdLast = performance.now(); }
+      if (e.button === 0) { digBlock(); holdAction = 'dig'; holdSource = 'mouse'; holdLast = performance.now(); }
+      else if (e.button === 2) { placeBlock(); holdAction = 'place'; holdSource = 'mouse'; holdLast = performance.now(); }
       else if (e.button === 1) { pickBlock(); }
     });
-    window.addEventListener('mouseup', function () { if (!isTouch()) holdAction = null; });
+    window.addEventListener('mouseup', function () {
+      if (holdSource === 'mouse') { holdAction = null; holdSource = null; }
+    });
     document.addEventListener('mousemove', function (e) {
-      if (document.pointerLockElement !== canvas) return;
+      if (document.pointerLockElement !== canvas || fromTouch()) return;
       /* ロックした直後は、カーソルが画面中央へ飛ぶぶんの大きな移動量が来るので少しの間捨てる */
       if (performance.now() - (Game.lockTime || 0) < 120) return;
       look(e.movementX, e.movementY);
@@ -1066,7 +1080,10 @@
     /* ---- タッチ ---- */
     canvas.addEventListener('pointerdown', function (e) {
       if (Game.mode !== 'play') return;
-      if (e.pointerType === 'mouse') return;
+      if (e.pointerType === 'mouse') { Game.sawMouse = true; return; }
+      /* 合成マウスイベントが飛んでこないようにする（二重入力の元） */
+      if (e.cancelable) e.preventDefault();
+      lastTouchAt = performance.now();
       capture(canvas, e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: 0 });
       if (lookId === null) lookId = e.pointerId;
@@ -1075,8 +1092,10 @@
       Game.pendingTap = e.pointerId;
     });
     canvas.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'mouse') Game.sawMouse = true;
       var p = pointers.get(e.pointerId);
       if (!p) return;
+      lastTouchAt = performance.now();
       var dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
       p.moved += Math.abs(dx) + Math.abs(dy);
@@ -1093,8 +1112,8 @@
       pointers.delete(e.pointerId);
       var held = performance.now() - p.t;
       if (e.pointerId === lookId) lookId = pointers.size ? pointers.keys().next().value : null;
-      if (holdAction) { holdAction = null; return; }
-      if (Game.pendingTap === e.pointerId && p.moved < 16 && held < 260) {
+      if (holdAction && holdSource === 'touch') { holdAction = null; holdSource = null; return; }
+      if (Game.pendingTap === e.pointerId && p.moved < 16 && held < TAP_MS) {
         /* 短いタップ */
         if (Game.settings.swapTap) digBlock(); else placeBlock();
       }
@@ -1109,8 +1128,9 @@
       if (Game.pendingTap === null || Game.pendingTap === undefined) return;
       var p = pointers.get(Game.pendingTap);
       if (!p) return;
-      if (performance.now() - p.t > 250 && p.moved < 26) {
+      if (performance.now() - p.t > TAP_MS && p.moved < 26) {
         holdAction = Game.settings.swapTap ? 'place' : 'dig';
+        holdSource = 'touch';
         holdLast = 0;
         Game.pendingTap = null;
       }
@@ -1118,30 +1138,42 @@
 
     /* ---- バーチャルスティック ---- */
     var stick = el.stick, knob = el.knob;
+    var DEAD = 0.14;          /* 中心付近の遊び。指を置いただけで動き出さないように */
     function stickMove(e) {
       var r = stick.getBoundingClientRect();
       var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       var dx = e.clientX - cx, dy = e.clientY - cy;
       var max = r.width / 2 - 12;
-      var d = Math.sqrt(dx * dx + dy * dy);
-      if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+      var d = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+      if (d > max) { dx = dx / d * max; dy = dy / d * max; d = max; }
       knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-      Game.ctrl.moveX = dx / max;
-      Game.ctrl.moveZ = dy / max;
-      Game.stickFull = (d / max) > 0.92;
+      var t = d / max;
+      if (t < DEAD) {
+        Game.ctrl.moveX = 0; Game.ctrl.moveZ = 0;
+        Game.stickFull = false;
+        return;
+      }
+      var scale = ((t - DEAD) / (1 - DEAD)) / t;   /* 遊びのぶんを引いて再スケール */
+      Game.ctrl.moveX = (dx / max) * scale;
+      Game.ctrl.moveZ = (dy / max) * scale;
+      /* ダッシュは、はっきり外周まで倒したときだけ（戻すときのしきい値は低くしてバタつかせない） */
+      Game.stickFull = Game.stickFull ? t > 0.82 : t > 0.95;
     }
     stick.addEventListener('pointerdown', function (e) {
       e.preventDefault();
+      if (stickId !== null) return;      /* すでに別の指がスティックを持っているなら奪わない */
+      lastTouchAt = performance.now();
       capture(stick, e.pointerId);
       stickId = e.pointerId;
       stickMove(e);
     });
     stick.addEventListener('pointermove', function (e) {
       if (stickId !== e.pointerId) return;
+      if (e.pointerType !== 'mouse') lastTouchAt = performance.now();
       stickMove(e);
     });
     function stickEnd(e) {
-      if (stickId !== e.pointerId) return;
+      if (e && stickId !== e.pointerId) return;
       stickId = null;
       knob.style.transform = 'translate(0,0)';
       Game.ctrl.moveX = 0; Game.ctrl.moveZ = 0;
@@ -1149,20 +1181,31 @@
     }
     stick.addEventListener('pointerup', stickEnd);
     stick.addEventListener('pointercancel', stickEnd);
+    stick.addEventListener('lostpointercapture', stickEnd);
 
     /* ---- 右下のボタン ---- */
+    var btnUps = [];      /* 取りこぼしたときに、まとめて離すため */
     function holdBtn(id, onDown, onUp) {
       var b = el[id];
+      var heldId = null;
       b.addEventListener('pointerdown', function (e) {
         e.preventDefault();
+        if (e.pointerType !== 'mouse') lastTouchAt = performance.now();
+        heldId = e.pointerId;
         capture(b, e.pointerId);
         b.classList.add('on');
         onDown();
       });
-      function up(e) { b.classList.remove('on'); onUp && onUp(); }
+      function up(e) {
+        if (e && heldId !== null && e.pointerId !== heldId) return;
+        heldId = null;
+        b.classList.remove('on');
+        onUp && onUp();
+      }
       b.addEventListener('pointerup', up);
       b.addEventListener('pointercancel', up);
-      b.addEventListener('pointerleave', up);
+      b.addEventListener('lostpointercapture', up);
+      btnUps.push(up);
     }
     holdBtn('btn-jump', function () {
       Game.btnJump = true; Game.ctrl.jump = true;
@@ -1187,6 +1230,17 @@
     el.hotbar.addEventListener('pointerup', function () { clearTimeout(hbTimer); });
     el.hotbar.addEventListener('pointercancel', function () { clearTimeout(hbTimer); });
 
+    /* ---- 保険：ボタンやスティックの上で指が離れなかった場合でも必ず戻す ----
+       （pointerup を要素が取りこぼすと「押されっぱなし」になり、
+         勝手に歩き続ける・飛び続けるという症状になる） */
+    function globalRelease(e) {
+      if (stickId === e.pointerId) stickEnd(e);
+      for (var i = 0; i < btnUps.length; i++) btnUps[i](e);
+      if (pointers.has(e.pointerId)) endPointer(e);
+    }
+    window.addEventListener('pointerup', globalRelease, true);
+    window.addEventListener('pointercancel', globalRelease, true);
+
     /* ---- 離脱時にセーブ ---- */
     window.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') doSave(true);
@@ -1195,7 +1249,10 @@
     window.addEventListener('blur', function () {
       keys = {};
       Game.ctrl.jump = false; Game.ctrl.sneak = false;
-      holdAction = null;
+      Game.ctrl.moveX = 0; Game.ctrl.moveZ = 0;
+      Game.btnJump = Game.btnUp = Game.btnDown = false;
+      stickEnd(null);
+      holdAction = null; holdSource = null;
     });
   }
 
@@ -1244,6 +1301,12 @@
   }
 
   /* デバッグ・動作確認用に内部関数を少しだけ出しておく */
+  /* 入力まわりの不具合を追うためのデバッグ窓口 */
+  Game.inputState = function () {
+    return { holdAction: holdAction, holdSource: holdSource, pendingTap: Game.pendingTap,
+      lookId: lookId, stickId: stickId, pointers: pointers.size, sawMouse: !!Game.sawMouse,
+      fromTouch: fromTouch() };
+  };
   Game.dig = digBlock;
   Game.refreshHotbar = refreshHotbar;
   Game.place = placeBlock;
