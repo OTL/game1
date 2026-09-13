@@ -135,7 +135,9 @@
     /* --- 自動ジャンプ（1 ブロックの段差を勝手に登る。タブレットだと効く） --- */
     if (opts && opts.autoJump && !this.flying && this.onGround && (hitX || hitZ) && mag > 0.2) {
       if (!this.collides(this.x + dx, this.y + 1.05, this.z + dz)) {
-        this.vy = JUMP_V * 0.72;
+        /* 1 ブロックの段差を越えるには 1.0 以上の高さが必要。
+           控えめな初速だと 0.64 しか上がらず、跳ぶのに乗れなかった。 */
+        this.vy = JUMP_V;
         this.onGround = false;
       }
     }
