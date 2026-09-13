@@ -8,7 +8,7 @@
   var B = YC.Blocks, ID = B.ID, G = YC.Gen, UI = YC.UI, Save = YC.Save, Audio = YC.Audio;
   var DAY_LENGTH = 1200;        /* 1 日 20 分（マイクラと同じ） */
   var REACH = 5.0;              /* 手の届く距離 */
-  var VERSION = '1.1';
+  var VERSION = '1.2';
 
   var Game = {
     mode: 'boot',
