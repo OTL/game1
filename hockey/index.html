@@ -243,7 +243,8 @@
 const FW = 620;          // フィールド幅（論理座標）
 const FH = 1040;         // フィールド高さ
 const MID = FH / 2;
-const GOAL_W = 220;      // ゴールの幅（マレット2本でぎりぎり守りきれない幅）
+const GOAL_W = 280;      // ゴールの幅
+const CREASE_D = 60;     // ゴール前クリース（マレットが入れない帯）の深さ
 const GOAL_X0 = (FW - GOAL_W) / 2;
 const GOAL_X1 = (FW + GOAL_W) / 2;
 const GOAL_DEPTH = 58;   // ゴールポケットの深さ
@@ -390,6 +391,26 @@ function makeMallet(owner, side){
   const x = side === 0 ? FW*0.3 : FW*0.7;
   return { owner, side, x, y, px:x, py:y, tx:x, ty:y, vx:0, vy:0, r:MALLET_R,
            ptr:null, glow:0, homeX:x, homeY:y };
+}
+
+// ゴール前のクリース。自陣ゴールの真ん前にはマレットを置けない
+function creaseRect(owner){
+  return owner === P1
+    ? { x0:GOAL_X0, x1:GOAL_X1, y0:FH - CREASE_D, y1:FH + GOAL_DEPTH }
+    : { x0:GOAL_X0, x1:GOAL_X1, y0:-GOAL_DEPTH,   y1:CREASE_D };
+}
+
+function pushOutOfCrease(owner, x, y, r){
+  const R = creaseRect(owner);
+  const cx = clamp(x, R.x0, R.x1), cy = clamp(y, R.y0, R.y1);
+  const dx = x - cx, dy = y - cy;
+  const d = len(dx, dy);
+  if (d > r) return { x, y };
+  if (d < 0.0001){
+    // 中心が完全に矩形の内側。コート中央がわへ出す
+    return { x, y: owner === P1 ? R.y0 - r : R.y1 + r };
+  }
+  return { x:cx + dx/d*r, y:cy + dy/d*r };
 }
 
 function malletBounds(owner){
@@ -622,6 +643,25 @@ function updateCPU(dt){
 /* ============================================================
    物理
    ============================================================ */
+// 自陣・クリース・壁のすべてを満たす位置に丸める
+function legalSpot(owner, x, y, r){
+  const b = malletBounds(owner);
+  let nx = clamp(x, b.x0, b.x1), ny = clamp(y, b.y0, b.y1);
+  const out = pushOutOfCrease(owner, nx, ny, r);
+  nx = clamp(out.x, b.x0, b.x1);
+  ny = clamp(out.y, b.y0, b.y1);
+  // 角のクリアランスが足りないときは、クリースの手前まで下げる
+  const R = creaseRect(owner);
+  const cx = clamp(nx, R.x0, R.x1), cy = clamp(ny, R.y0, R.y1);
+  if (len(nx - cx, ny - cy) < r) ny = owner === P1 ? R.y0 - r : R.y1 + r;
+  return { x:nx, y:ny };
+}
+
+function place(m, x, y){
+  const s = legalSpot(m.owner, x, y, m.r);
+  m.x = s.x; m.y = s.y;
+}
+
 function moveMallets(dt){
   for (const m of G.mallets){
     m.px = m.x; m.py = m.y;
@@ -630,9 +670,9 @@ function moveMallets(dt){
     const max = MALLET_SPEED * dt;
     if (d > max){ m.x += dx/d * max; m.y += dy/d * max; }
     else { m.x = m.tx; m.y = m.ty; }
-    const b = malletBounds(m.owner);
-    m.x = clamp(m.x, b.x0, b.x1);
-    m.y = clamp(m.y, b.y0, b.y1);
+    place(m, m.x, m.y);
+    const t = legalSpot(m.owner, m.tx, m.ty, m.r);
+    m.tx = t.x; m.ty = t.y;
     m.vx = (m.x - m.px) / dt;
     m.vy = (m.y - m.py) / dt;
     m.glow = Math.max(m.glow - dt*3, Math.min(1, len(m.vx,m.vy) / 1600));
@@ -646,9 +686,8 @@ function moveMallets(dt){
     if (d < rr && d > 0.0001){
       const push = (rr - d) / 2;
       const nx = dx/d, ny = dy/d;
-      const ba = malletBounds(a.owner), bb = malletBounds(b.owner);
-      a.x = clamp(a.x - nx*push, ba.x0, ba.x1); a.y = clamp(a.y - ny*push, ba.y0, ba.y1);
-      b.x = clamp(b.x + nx*push, bb.x0, bb.x1); b.y = clamp(b.y + ny*push, bb.y0, bb.y1);
+      place(a, a.x - nx*push, a.y - ny*push);
+      place(b, b.x + nx*push, b.y + ny*push);
     }
   }
 }
@@ -736,6 +775,11 @@ function puckVsMallet(p, m){
   if (sp > PUCK_MAX_SPEED){ p.vx *= PUCK_MAX_SPEED/sp; p.vy *= PUCK_MAX_SPEED/sp; sp = PUCK_MAX_SPEED; }
   p.spin += (mvx*ny - mvy*nx) * 0.004;
 
+  // マレットに押し出された先が壁の外にならないよう位置だけ丸める（速度はそのまま）
+  p.x = clamp(p.x, p.r, FW - p.r);
+  const inGoalLane = p.x > GOAL_X0 + p.r*0.15 && p.x < GOAL_X1 - p.r*0.15;
+  if (!inGoalLane) p.y = clamp(p.y, p.r, FH - p.r);
+
   const power = clamp(sp / PUCK_MAX_SPEED, 0, 1);
   Sound.hit(power);
   burst(p.x, p.y, COL[m.owner].main, 200 + power*520, 8 + Math.round(power*14));
@@ -800,7 +844,12 @@ function stepPucks(dt){
       p.slow = (p.slow || 0) + dt;
       if (p.slow > 2.2){
         p.slow = 0;
-        const a = rand(0, Math.PI*2);
+        // クリースの中で止まるとだれも触れないので、コート中央へ向けて出す
+        let a = rand(0, Math.PI*2);
+        if (p.x > GOAL_X0 && p.x < GOAL_X1){
+          if (p.y > FH - CREASE_D) a = -Math.PI/2 + rand(-0.7, 0.7);
+          else if (p.y < CREASE_D) a = Math.PI/2 + rand(-0.7, 0.7);
+        }
         const push = 340 / p.mass;
         p.vx += Math.cos(a) * push;
         p.vy += Math.sin(a) * push;
@@ -1048,6 +1097,22 @@ function drawRink(){
     ctx.arc(FW/2, y, 175, side === 0 ? 0 : Math.PI, side === 0 ? Math.PI : Math.PI*2);
     ctx.stroke();
     ctx.globalAlpha = 1;
+
+    // クリース（マレットが入れない帯）
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'rgba(6,12,24,.55)';
+    ctx.fillRect(GOAL_X0, side === 0 ? 0 : FH - CREASE_D, GOAL_W, CREASE_D);
+    ctx.strokeStyle = COL[owner].main;
+    ctx.setLineDash([9, 7]);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const cy = side === 0 ? CREASE_D : FH - CREASE_D;
+    ctx.moveTo(GOAL_X0, cy); ctx.lineTo(GOAL_X1, cy);
+    ctx.moveTo(GOAL_X0, cy); ctx.lineTo(GOAL_X0, y);
+    ctx.moveTo(GOAL_X1, cy); ctx.lineTo(GOAL_X1, y);
+    ctx.stroke();
+    ctx.restore();
 
     // ゴール口
     const gy = y;
