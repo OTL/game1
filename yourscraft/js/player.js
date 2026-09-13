@@ -74,7 +74,7 @@
 
     var speed;
     this.sneaking = !this.flying && !!ctrl.sneak && this.onGround;
-    if (this.flying) speed = this.sprinting ? 21 : 10.9;
+    if (this.flying) speed = this.sprinting ? 16 : 10.9;   /* 飛行の全開は速すぎると狙えないので控えめに */
     else if (this.inWater) speed = 2.4;
     else if (this.sneaking) speed = 1.3;          /* しゃがみ歩き */
     else speed = this.sprinting ? 5.6 : 4.317;
