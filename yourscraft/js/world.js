@@ -109,7 +109,9 @@
     var c = this.chunks.get(key(cx, cz));
     if (!c || !c.hasTerrain) return false;
     var lx = wx & CHM, lz = wz & CHM;
-    var i = lidx(lx, wy, wz);
+    /* ここはチャンク内のローカル座標で引く。ワールド座標の z を渡すと、
+       チャンクの外（z が 0〜15 以外）で置く・壊すが別の場所に書かれてしまう。 */
+    var i = lidx(lx, wy, lz);
     if (c.blocks[i] === id) return false;
     c.blocks[i] = id;
     if (record !== false) {

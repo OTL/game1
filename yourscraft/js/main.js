@@ -151,6 +151,10 @@
       } else {
         var sp = Game.world.gen.findSpawn();
         p.x = sp.x; p.y = sp.y; p.z = sp.z;
+        p.yaw = 0;
+        /* 水平を向いていると足もとが手の届く範囲に入らず「壊せない・置けない」と
+           感じてしまうので、はじめは少し下を向かせる */
+        p.pitch = -0.32;
         p.flying = false;
         Game.pendingSpawn = true;
       }
@@ -624,6 +628,46 @@
     return Game.world.raycast(p.x, p.eyeY(), p.z, d[0], d[1], d[2], REACH, false);
   }
 
+  /* 画面上の点（指で触った場所）から、世界のどの向きを見ているかを逆算する。
+     マイクラ統合版と同じで、タッチ操作では「触ったところのブロック」を相手にする。 */
+  function screenDir(clientX, clientY) {
+    var r = Game.renderer;
+    if (!r || !r.invVP || !r.lastCam) return null;
+    var rect = el.gl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    var nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+    var ny = -(((clientY - rect.top) / rect.height) * 2 - 1);
+    var m = r.invVP;
+    var o = [];
+    for (var i = 0; i < 4; i++) {
+      o[i] = m[i] * nx + m[4 + i] * ny + m[8 + i] * 1 + m[12 + i] * 1;
+    }
+    if (!o[3]) return null;
+    var dx = o[0] / o[3] - r.lastCam[0];
+    var dy = o[1] / o[3] - r.lastCam[1];
+    var dz = o[2] / o[3] - r.lastCam[2];
+    var len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (!len) return null;
+    return [dx / len, dy / len, dz / len];
+  }
+
+  /* いま指が触れている場所の相手ブロック（選択枠をそこに出すため） */
+  function activeTouchTarget() {
+    if (touchMap.size === 0) return null;
+    var id = (holdTouch !== null) ? holdTouch : pendingTap;
+    var p = (id !== null) ? touchMap.get(id) : null;
+    if (!p) touchMap.forEach(function (v) { if (!p) p = v; });
+    return p ? targetAtScreen(p.x, p.y) : null;
+  }
+
+  /* 画面上の点をねらったときの相手ブロック */
+  function targetAtScreen(clientX, clientY) {
+    var d = screenDir(clientX, clientY);
+    if (!d) return Game.target;
+    var r = Game.renderer;
+    return Game.world.raycast(r.lastCam[0], r.lastCam[1], r.lastCam[2], d[0], d[1], d[2], REACH, false);
+  }
+
   function setBlock(x, y, z, id) {
     if (Game.world.setBlock(x, y, z, id, true)) {
       var k = (x >> 4) + ',' + (z >> 4);
@@ -635,8 +679,8 @@
     return false;
   }
 
-  function digBlock() {
-    var t = Game.target;
+  function digBlock(t) {
+    if (!t) t = Game.target;
     Game.lastDig = t ? 'ok' : '狙っているブロックがない';
     if (!t) { outOfReachHint(); return; }
     if (t.id === ID.BEDROCK && t.y === 0) { hint('岩盤は壊せません'); return; }
@@ -648,19 +692,23 @@
 
   /* 手がとどく範囲に何もないとき（空を狙っているとき）に、そっと知らせる。
      黙って無反応だと「壊せない・置けない」と見えてしまう。 */
-  function outOfReachHint() {
+  /* 操作しても何も起きなかったときは、理由を短く知らせる（黙って無反応にしない） */
+  function failHint(msg) {
     var now = performance.now();
-    if (now - (Game.lastReachHint || 0) < 1500) return;
-    Game.lastReachHint = now;
-    hint('とどく範囲にブロックがありません（' + REACH + 'マス以内をねらってください）', 2200);
+    if (now - (Game.lastFailHint || 0) < 1200) return;
+    Game.lastFailHint = now;
+    hint(msg, 2200);
+  }
+  function outOfReachHint() {
+    failHint('とどく範囲にブロックがありません（画面の中心の十字を、' + REACH + 'マス以内のブロックに合わせてください）');
   }
 
   function isReplaceable(id) {
     return id === 0 || id === ID.WATER || id === ID.LAVA || B.isCross(id);
   }
 
-  function placeBlock() {
-    var t = Game.target;
+  function placeBlock(t) {
+    if (!t) t = Game.target;
     var id = Game.hotbar[Game.sel];
     Game.lastPlace = null;
     if (!t) { Game.lastPlace = '狙っているブロックがない'; outOfReachHint(); return; }
@@ -668,17 +716,22 @@
     var x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
     if (y < 0 || y >= G.WH) { Game.lastPlace = '世界の外'; return; }
     var cur = Game.world.getBlock(x, y, z);
-    if (!isReplaceable(cur)) { Game.lastPlace = 'すでにブロックがある:' + cur; return; }
+    if (!isReplaceable(cur)) {
+      Game.lastPlace = 'すでにブロックがある:' + cur;
+      failHint('そこにはもうブロックがあります');
+      return;
+    }
     var def = B.get(id);
     if (def.solid && Game.player.blocksSpace(x, y, z)) {
       Game.lastPlace = '自分のいる場所';
-      hint('自分のいる場所には置けません'); return;
+      failHint('自分のいる場所には置けません'); return;
     }
     /* 草花は土や草の上だけ（マイクラと同じ） */
     if (def.render === 'cross' && id !== ID.TORCH) {
       var below = Game.world.getBlock(x, y - 1, z);
       if (below !== ID.GRASS && below !== ID.DIRT && below !== ID.SAND) {
-        Game.lastPlace = '草花は土・草・砂の上だけ'; return;
+        Game.lastPlace = '草花は土・草・砂の上だけ';
+        failHint('草花は 土・草・砂 の上にだけ置けます'); return;
       }
     }
     Game.lastPlace = 'ok';
@@ -906,6 +959,7 @@
         onStep: function (id) { if (Game.settings.sound) Audio.step(id); }
       });
       Game.target = targetBlock();
+      Game.touchTarget = activeTouchTarget();
       handleHold(dt, now);
       if (Game.swing > 0) { Game.swing += dt; if (Game.swing > 0.26) Game.swing = 0; }
       var p = Game.player;
@@ -915,6 +969,7 @@
       autosave();
     } else {
       Game.target = null;
+      Game.touchTarget = null;
     }
     updateParticles(dt);
 
@@ -962,7 +1017,7 @@
       renderDist: Game.settings.renderDist,
       underwater: underwater || inLava,
       clouds: Game.settings.clouds,
-      selection: (playing && Game.target) ? Game.target : null,
+      selection: playing ? (Game.touchTarget || Game.target) : null,
       particles: buildParticleMesh(cam),
       hand: playing ? { mesh: Game.handMesh, matrix: handMatrix() } : null
     });
@@ -984,8 +1039,18 @@
     var hh = String(Math.floor(mins / 60)).padStart(2, '0');
     var mm = String(mins % 60).padStart(2, '0');
     var sl = w.getLight(bx, Math.floor(p.eyeY()), bz);
+    var tgt = Game.target;
+    var tgtName = tgt ? (B.get(tgt.id) ? B.get(tgt.id).name : tgt.id) : 'なし';
+    var lt = Game.lastTap;
+    var ist = Game.inputState();
     el.debug.textContent =
       'YoursCraft ' + VERSION + '  |  ' + Game.stats.fps + ' fps\n' +
+      '狙い: ' + (tgt ? (tgt.x + ' ' + tgt.y + ' ' + tgt.z + ' ' + tgtName + ' 距離' + tgt.dist.toFixed(1)) : 'なし（とどく範囲に何もない）') + '\n' +
+      '指: ' + ist.touches + '  長押し: ' + (ist.holdAction || 'なし') +
+        '  最後のタップ: ' + (lt ? (lt.held + 'ms/' + lt.dist + 'px→' + (lt.tap ? (lt.result || 'タップ') : '長押し扱い')) : 'なし') + '\n' +
+      '置く: ' + (Game.lastPlace || '-') + '  壊す: ' + (Game.lastDig || '-') + '\n' +
+      'イベント: 指開始' + Game.ev.ts + ' 移動' + Game.ev.tm + ' 終了' + Game.ev.te +
+        ' ボタン' + Game.ev.btn + ' マウス' + Game.ev.md + '\n' +
       'XYZ: ' + p.x.toFixed(1) + ' / ' + p.y.toFixed(1) + ' / ' + p.z.toFixed(1) + '\n' +
       'ブロック: ' + bx + ' ' + by + ' ' + bz + '  チャンク: ' + (bx >> 4) + ',' + (bz >> 4) + '\n' +
       '向き: ' + dirs[di] + '  バイオーム: ' + biome + '\n' +
@@ -1003,7 +1068,10 @@
   var stickId = null;         /* スティックを持っている指 */
   var pendingTap = null;      /* まだタップか長押しか決まっていない指 */
   var holdAction = null, holdSource = null, holdLast = 0;
+  var holdTouch = null;       /* 長押し中の指 */
   var lastTouchAt = 0;   /* タッチの直後に来る「合成マウスイベント」を無視するため */
+  /* 実機で操作が効かないときの調べもの用のカウンタ（座標表示に出る） */
+  Game.ev = { ts: 0, tm: 0, te: 0, btn: 0, md: 0 };
   /* これより短く離せば「タップ（置く）」、押し続ければ「長押し（壊す）」。
      実機だと、置くつもりのタップでも 0.3 秒くらい指が触れていることが多く、
      短すぎると「置いたつもりが壊れる」「何も起きない」ことになるので長めにとる。 */
@@ -1046,6 +1114,7 @@
       if (tp && now - tp.t > TAP_MS && tp.dist < HOLD_SLOP) {
         holdAction = Game.settings.swapTap ? 'place' : 'dig';
         holdSource = 'touch';
+        holdTouch = pendingTap;
         holdLast = 0;
         pendingTap = null;
       }
@@ -1053,8 +1122,14 @@
     if (!holdAction) return;
     if (now - holdLast < (holdAction === 'dig' ? 190 : 260)) return;
     holdLast = now;
-    if (holdAction === 'dig') digBlock();
-    else placeBlock();
+    /* 長押し中は、指のある場所のブロックを相手にし続ける（なぞると続けて壊せる） */
+    var t = null;
+    if (holdSource === 'touch' && holdTouch !== null) {
+      var p = touchMap.get(holdTouch);
+      if (p) t = targetAtScreen(p.x, p.y);
+    }
+    if (holdAction === 'dig') digBlock(t);
+    else placeBlock(t);
   }
 
   function setupInput() {
@@ -1099,6 +1174,7 @@
          （ポインタロックがかかると指のドラッグと二重に視点が動いてしまう） */
       if (Game.touchUI && !Game.sawMouse) return;
       if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
+      Game.ev.md++;
       if (e.button === 0) { digBlock(); holdAction = 'dig'; holdSource = 'mouse'; holdLast = performance.now(); }
       else if (e.button === 2) { placeBlock(); holdAction = 'place'; holdSource = 'mouse'; holdLast = performance.now(); }
       else if (e.button === 1) { pickBlock(); }
@@ -1138,6 +1214,7 @@
       if (e.cancelable) e.preventDefault();
       lastTouchAt = performance.now();
       var now = (typeof e.timeStamp === 'number' && e.timeStamp > 0) ? e.timeStamp : performance.now();
+      Game.ev.ts++;
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         touchMap.set(t.identifier, {
@@ -1152,6 +1229,7 @@
     canvas.addEventListener('touchmove', function (e) {
       if (e.cancelable) e.preventDefault();
       lastTouchAt = performance.now();
+      Game.ev.tm++;
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         var p = touchMap.get(t.identifier);
@@ -1170,6 +1248,7 @@
     function endTouch(e) {
       /* 描画が重くて処理が遅れても正しく測れるよう、イベント自身の時刻を使う */
       var now = (typeof e.timeStamp === 'number' && e.timeStamp > 0) ? e.timeStamp : performance.now();
+      Game.ev.te++;
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         var p = touchMap.get(t.identifier);
@@ -1180,8 +1259,8 @@
           lookId = null;
           touchMap.forEach(function (v, k) { if (lookId === null) lookId = k; });
         }
-        if (holdAction && holdSource === 'touch') {
-          holdAction = null; holdSource = null; pendingTap = null;
+        if (holdAction && holdSource === 'touch' && (holdTouch === null || holdTouch === t.identifier)) {
+          holdAction = null; holdSource = null; holdTouch = null; pendingTap = null;
           continue;
         }
         if (pendingTap === t.identifier) {
@@ -1189,7 +1268,9 @@
           var isTap = p.dist < TAP_SLOP && held < TAP_MS;
           Game.lastTap = { held: Math.round(held), dist: Math.round(p.dist), tap: isTap };
           if (isTap) {
-            if (Game.settings.swapTap) digBlock(); else placeBlock();
+            /* 指で触った場所のブロックを相手にする（画面中央ではなく） */
+            var tt = targetAtScreen(p.x, p.y);
+            if (Game.settings.swapTap) digBlock(tt); else placeBlock(tt);
             Game.lastTap.result = Game.settings.swapTap ? Game.lastDig : Game.lastPlace;
           }
         }
@@ -1278,6 +1359,7 @@
       b.addEventListener('touchstart', function (e) {
         if (e.cancelable) e.preventDefault();
         lastTouchAt = performance.now();
+        Game.ev.btn++;
         down(e.changedTouches[0].identifier);
       }, { passive: false });
       function tEnd(e) {
@@ -1357,7 +1439,7 @@
         if (lookId === ghosts[j]) lookId = null;
         if (pendingTap === ghosts[j]) pendingTap = null;
       }
-      if (touchMap.size === 0 && holdSource === 'touch') { holdAction = null; holdSource = null; }
+      if (touchMap.size === 0 && holdSource === 'touch') { holdAction = null; holdSource = null; holdTouch = null; }
     }
     window.addEventListener('touchend', globalTouchEnd, true);
     window.addEventListener('touchcancel', globalTouchEnd, true);
@@ -1418,10 +1500,13 @@
 
   /* デバッグ・動作確認用に内部関数を少しだけ出しておく */
   /* 入力まわりの不具合を追うためのデバッグ窓口 */
+  /* 調べもの用：タップと長押しの境目を一時的に変える（実機での検証を安定させるため） */
+  Game.setTapThreshold = function (ms) { TAP_MS = ms; return TAP_MS; };
+
   Game.inputState = function () {
     return { holdAction: holdAction, holdSource: holdSource, pendingTap: pendingTap,
       lookId: lookId, stickId: stickId, touches: touchMap.size, sawMouse: !!Game.sawMouse,
-      fromTouch: fromTouch(), lastPlace: Game.lastPlace, lastDig: Game.lastDig };
+      fromTouch: fromTouch(), tapMs: TAP_MS, lastPlace: Game.lastPlace, lastDig: Game.lastDig };
   };
   Game.dig = digBlock;
   Game.refreshHotbar = refreshHotbar;

@@ -134,6 +134,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
 /* 右下：ジャンプ・上下・飛行 */
 #rightpad {
   position: absolute; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom));
+  pointer-events: auto;
   display: grid; grid-template-columns: 56px 68px; grid-template-rows: 56px 68px;
   gap: 10px; align-items: center; justify-items: center;
 }
@@ -146,6 +147,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
    ボタンがあるほうが確実（マイクラ統合版のタッチ操作に近い） */
 #actionpad {
   position: absolute; right: calc(20px + 150px); bottom: calc(28px + env(safe-area-inset-bottom));
+  pointer-events: auto;
   display: flex; flex-direction: column; gap: 12px;
 }
 .tbtn.act {
