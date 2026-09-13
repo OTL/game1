@@ -637,12 +637,22 @@
 
   function digBlock() {
     var t = Game.target;
-    if (!t) return;
+    Game.lastDig = t ? 'ok' : '狙っているブロックがない';
+    if (!t) { outOfReachHint(); return; }
     if (t.id === ID.BEDROCK && t.y === 0) { hint('岩盤は壊せません'); return; }
     spawnParticles(t.x, t.y, t.z, t.id);
     setBlock(t.x, t.y, t.z, 0);
     if (Game.settings.sound) Audio.dig(t.id);
     Game.swing = 0.001;
+  }
+
+  /* 手がとどく範囲に何もないとき（空を狙っているとき）に、そっと知らせる。
+     黙って無反応だと「壊せない・置けない」と見えてしまう。 */
+  function outOfReachHint() {
+    var now = performance.now();
+    if (now - (Game.lastReachHint || 0) < 1500) return;
+    Game.lastReachHint = now;
+    hint('とどく範囲にブロックがありません（' + REACH + 'マス以内をねらってください）', 2200);
   }
 
   function isReplaceable(id) {
@@ -652,18 +662,26 @@
   function placeBlock() {
     var t = Game.target;
     var id = Game.hotbar[Game.sel];
-    if (!t || !id) return;
+    Game.lastPlace = null;
+    if (!t) { Game.lastPlace = '狙っているブロックがない'; outOfReachHint(); return; }
+    if (!id) { Game.lastPlace = 'ホットバーが空'; return; }
     var x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
-    if (y < 0 || y >= G.WH) return;
+    if (y < 0 || y >= G.WH) { Game.lastPlace = '世界の外'; return; }
     var cur = Game.world.getBlock(x, y, z);
-    if (!isReplaceable(cur)) return;
+    if (!isReplaceable(cur)) { Game.lastPlace = 'すでにブロックがある:' + cur; return; }
     var def = B.get(id);
-    if (def.solid && Game.player.blocksSpace(x, y, z)) { hint('自分のいる場所には置けません'); return; }
+    if (def.solid && Game.player.blocksSpace(x, y, z)) {
+      Game.lastPlace = '自分のいる場所';
+      hint('自分のいる場所には置けません'); return;
+    }
     /* 草花は土や草の上だけ（マイクラと同じ） */
     if (def.render === 'cross' && id !== ID.TORCH) {
       var below = Game.world.getBlock(x, y - 1, z);
-      if (below !== ID.GRASS && below !== ID.DIRT && below !== ID.SAND) return;
+      if (below !== ID.GRASS && below !== ID.DIRT && below !== ID.SAND) {
+        Game.lastPlace = '草花は土・草・砂の上だけ'; return;
+      }
     }
+    Game.lastPlace = 'ok';
     if (setBlock(x, y, z, id)) {
       if (Game.settings.sound) Audio.place(id);
       Game.swing = 0.001;
@@ -980,12 +998,16 @@
   /* ================== 操作 ================== */
   Game.ctrl = { moveX: 0, moveZ: 0, jump: false, sneak: false };
   var keys = {};
-  var pointers = new Map();
-  var lookId = null;
-  var stickId = null;
-  var holdAction = null, holdSource = null, holdStart = 0, holdLast = 0, holdMoved = 0;
+  var touchMap = new Map();   /* 画面をなぞっている指: identifier -> 情報 */
+  var lookId = null;          /* 視点を動かしている指 */
+  var stickId = null;         /* スティックを持っている指 */
+  var pendingTap = null;      /* まだタップか長押しか決まっていない指 */
+  var holdAction = null, holdSource = null, holdLast = 0;
   var lastTouchAt = 0;   /* タッチの直後に来る「合成マウスイベント」を無視するため */
-  var TAP_MS = 350;      /* これより短ければ「タップ（置く）」、長ければ「長押し（壊す）」 */
+  /* これより短く離せば「タップ（置く）」、押し続ければ「長押し（壊す）」。
+     実機だと、置くつもりのタップでも 0.3 秒くらい指が触れていることが多く、
+     短すぎると「置いたつもりが壊れる」「何も起きない」ことになるので長めにとる。 */
+  var TAP_MS = 420;
   var TAP_SLOP = 24;     /* タップと認める、押しはじめからのずれ（px） */
   var HOLD_SLOP = 44;    /* 長押しと認める、押しはじめからのずれ（px） */
 
@@ -1014,6 +1036,20 @@
   }
 
   function handleHold(dt, now) {
+    /* タップが長押しに変わったかを、フレームの先頭で見る。
+       setInterval で見ていると、描画が重くて処理が遅れたときに
+       「指はもう離れているのに長押しと判定してしまう」ことがある
+       （ブラウザは入力をフレームの先頭で配るので、ここで見れば
+         離した通知のほうが先に届いている）。 */
+    if (!holdAction && pendingTap !== null) {
+      var tp = touchMap.get(pendingTap);
+      if (tp && now - tp.t > TAP_MS && tp.dist < HOLD_SLOP) {
+        holdAction = Game.settings.swapTap ? 'place' : 'dig';
+        holdSource = 'touch';
+        holdLast = 0;
+        pendingTap = null;
+      }
+    }
     if (!holdAction) return;
     if (now - holdLast < (holdAction === 'dig' ? 190 : 260)) return;
     holdLast = now;
@@ -1055,7 +1091,8 @@
       selectSlot(Game.sel + (e.deltaY > 0 ? 1 : -1));
     }, { passive: true });
 
-    /* ---- マウス（ポインタロック） ---- */
+    /* ---- マウス（ポインタロック）。タッチは下の touch イベントで扱うので、
+       ここは本物のマウス専用 ---- */
     canvas.addEventListener('mousedown', function (e) {
       if (Game.mode !== 'play' || fromTouch()) return;
       /* 本物のマウスを一度も見ていないタッチ端末では、マウス操作系をまるごと使わない
@@ -1079,140 +1116,186 @@
       if (document.pointerLockElement === canvas) { Game.lockTime = performance.now(); return; }
       if (Game.mode === 'play' && !isTouch()) pauseGame();
     });
+    /* 本物のマウスがつながっているかの判定だけ、ポインタイベントで拾う */
+    canvas.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') Game.sawMouse = true; });
+    canvas.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') Game.sawMouse = true; });
 
-    /* ---- タッチ ---- */
-    canvas.addEventListener('pointerdown', function (e) {
+    /* ================= タッチ操作 =================
+       ポインタイベントは端末やブラウザによって届き方の差が大きく、実機で
+       「タップしても置けない」「指を離しても入力が残る」ことがあったため、
+       タッチは touch イベントで直接扱う。touch イベントは
+       「最初に指を置いた要素」に必ず届く仕様なので、指が要素の外に出ても
+       取りこぼしが起きない。 */
+    function touchIds(list) {
+      var o = {};
+      for (var i = 0; i < list.length; i++) o[list[i].identifier] = true;
+      return o;
+    }
+
+    /* --- 画面：なぞって見まわす／タップで置く／長押しで壊す --- */
+    canvas.addEventListener('touchstart', function (e) {
       if (Game.mode !== 'play') return;
-      if (e.pointerType === 'mouse') { Game.sawMouse = true; return; }
-      /* 合成マウスイベントが飛んでこないようにする（二重入力の元） */
       if (e.cancelable) e.preventDefault();
       lastTouchAt = performance.now();
-      capture(canvas, e.pointerId);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: 0, dist: 0 });
-      if (lookId === null) lookId = e.pointerId;
-      holdStart = performance.now();
-      holdMoved = 0;
-      Game.pendingTap = e.pointerId;
-    });
-    canvas.addEventListener('pointermove', function (e) {
-      if (e.pointerType === 'mouse') Game.sawMouse = true;
-      var p = pointers.get(e.pointerId);
-      if (!p) return;
+      var now = (typeof e.timeStamp === 'number' && e.timeStamp > 0) ? e.timeStamp : performance.now();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        touchMap.set(t.identifier, {
+          x: t.clientX, y: t.clientY, sx: t.clientX, sy: t.clientY,
+          t: now, dist: 0
+        });
+        if (lookId === null) lookId = t.identifier;
+        pendingTap = t.identifier;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', function (e) {
+      if (e.cancelable) e.preventDefault();
       lastTouchAt = performance.now();
-      var dx = e.clientX - p.x, dy = e.clientY - p.y;
-      p.x = e.clientX; p.y = e.clientY;
-      p.moved += Math.abs(dx) + Math.abs(dy);
-      /* 「動いたか」は押しはじめからの距離で見る。移動量の足し算だと、
-         指のわずかなブレが積み上がって、ふつうのタップまで無効になってしまう。 */
-      var ox = e.clientX - p.sx, oy = e.clientY - p.sy;
-      p.dist = Math.sqrt(ox * ox + oy * oy);
-      if (e.pointerId === lookId) look(dx * 1.35, dy * 1.35);
-      if (p.dist > TAP_SLOP) {
-        holdMoved = 1;
-        if (Game.pendingTap === e.pointerId && !holdAction) Game.pendingTap = null;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var p = touchMap.get(t.identifier);
+        if (!p) continue;
+        var dx = t.clientX - p.x, dy = t.clientY - p.y;
+        p.x = t.clientX; p.y = t.clientY;
+        /* 「動いたか」は押しはじめからの距離で見る（移動量の足し算だと
+           指のわずかなブレが積み上がって、ふつうのタップまで無効になる） */
+        var ox = t.clientX - p.sx, oy = t.clientY - p.sy;
+        p.dist = Math.sqrt(ox * ox + oy * oy);
+        if (t.identifier === lookId) look(dx * 1.35, dy * 1.35);
+        if (p.dist > TAP_SLOP && pendingTap === t.identifier && !holdAction) pendingTap = null;
       }
-      /* 長押し中に指を動かしても壊し続ける（Bedrock 版と同じ感じ） */
-    });
-    function endPointer(e) {
-      var p = pointers.get(e.pointerId);
-      if (!p) return;
-      pointers.delete(e.pointerId);
-      var held = performance.now() - p.t;
-      if (e.pointerId === lookId) lookId = pointers.size ? pointers.keys().next().value : null;
-      if (holdAction && holdSource === 'touch') { holdAction = null; holdSource = null; return; }
-      if (Game.pendingTap === e.pointerId && p.dist < TAP_SLOP && held < TAP_MS) {
-        /* 短いタップ */
-        if (Game.settings.swapTap) digBlock(); else placeBlock();
+    }, { passive: false });
+
+    function endTouch(e) {
+      /* 描画が重くて処理が遅れても正しく測れるよう、イベント自身の時刻を使う */
+      var now = (typeof e.timeStamp === 'number' && e.timeStamp > 0) ? e.timeStamp : performance.now();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var p = touchMap.get(t.identifier);
+        if (!p) continue;
+        touchMap.delete(t.identifier);
+        var held = now - p.t;
+        if (t.identifier === lookId) {
+          lookId = null;
+          touchMap.forEach(function (v, k) { if (lookId === null) lookId = k; });
+        }
+        if (holdAction && holdSource === 'touch') {
+          holdAction = null; holdSource = null; pendingTap = null;
+          continue;
+        }
+        if (pendingTap === t.identifier) {
+          pendingTap = null;
+          var isTap = p.dist < TAP_SLOP && held < TAP_MS;
+          Game.lastTap = { held: Math.round(held), dist: Math.round(p.dist), tap: isTap };
+          if (isTap) {
+            if (Game.settings.swapTap) digBlock(); else placeBlock();
+            Game.lastTap.result = Game.settings.swapTap ? Game.lastDig : Game.lastPlace;
+          }
+        }
       }
-      Game.pendingTap = null;
     }
-    canvas.addEventListener('pointerup', endPointer);
-    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('touchend', endTouch);
+    canvas.addEventListener('touchcancel', endTouch);
 
-    /* タップを長押しに切り替える監視 */
-    setInterval(function () {
-      if (Game.mode !== 'play' || holdAction) return;
-      if (Game.pendingTap === null || Game.pendingTap === undefined) return;
-      var p = pointers.get(Game.pendingTap);
-      if (!p) return;
-      if (performance.now() - p.t > TAP_MS && p.dist < HOLD_SLOP) {
-        holdAction = Game.settings.swapTap ? 'place' : 'dig';
-        holdSource = 'touch';
-        holdLast = 0;
-        Game.pendingTap = null;
-      }
-    }, 40);
-
-    /* ---- バーチャルスティック ---- */
+    /* --- 左下のバーチャルスティック --- */
     var stick = el.stick, knob = el.knob;
     var DEAD = 0.14;          /* 中心付近の遊び。指を置いただけで動き出さないように */
-    function stickMove(e) {
+    function stickSet(cx0, cy0) {
       var r = stick.getBoundingClientRect();
       var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      var dx = e.clientX - cx, dy = e.clientY - cy;
+      var dx = cx0 - cx, dy = cy0 - cy;
       var max = r.width / 2 - 12;
       var d = Math.sqrt(dx * dx + dy * dy) || 0.0001;
       if (d > max) { dx = dx / d * max; dy = dy / d * max; d = max; }
       knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-      var t = d / max;
-      if (t < DEAD) {
+      var f = d / max;
+      if (f < DEAD) {
         Game.ctrl.moveX = 0; Game.ctrl.moveZ = 0;
         Game.stickFull = false;
         return;
       }
-      var scale = ((t - DEAD) / (1 - DEAD)) / t;   /* 遊びのぶんを引いて再スケール */
+      var scale = ((f - DEAD) / (1 - DEAD)) / f;   /* 遊びのぶんを引いて再スケール */
       Game.ctrl.moveX = (dx / max) * scale;
       Game.ctrl.moveZ = (dy / max) * scale;
-      /* ダッシュは、はっきり外周まで倒したときだけ（戻すときのしきい値は低くしてバタつかせない） */
-      Game.stickFull = Game.stickFull ? t > 0.82 : t > 0.95;
+      /* ダッシュは、はっきり外周まで倒したときだけ（戻すしきい値は低くしてバタつかせない） */
+      Game.stickFull = Game.stickFull ? f > 0.82 : f > 0.95;
     }
-    stick.addEventListener('pointerdown', function (e) {
-      e.preventDefault();
-      if (stickId !== null) return;      /* すでに別の指がスティックを持っているなら奪わない */
-      lastTouchAt = performance.now();
-      capture(stick, e.pointerId);
-      stickId = e.pointerId;
-      stickMove(e);
-    });
-    stick.addEventListener('pointermove', function (e) {
-      if (stickId !== e.pointerId) return;
-      if (e.pointerType !== 'mouse') lastTouchAt = performance.now();
-      stickMove(e);
-    });
-    function stickEnd(e) {
-      if (e && stickId !== e.pointerId) return;
+    function stickEnd() {
       stickId = null;
       knob.style.transform = 'translate(0,0)';
       Game.ctrl.moveX = 0; Game.ctrl.moveZ = 0;
       Game.stickFull = false;
     }
-    stick.addEventListener('pointerup', stickEnd);
-    stick.addEventListener('pointercancel', stickEnd);
-    stick.addEventListener('lostpointercapture', stickEnd);
+    stick.addEventListener('touchstart', function (e) {
+      if (e.cancelable) e.preventDefault();
+      lastTouchAt = performance.now();
+      if (stickId !== null) return;   /* すでに別の指が持っているなら奪わない */
+      var t = e.changedTouches[0];
+      stickId = t.identifier;
+      stickSet(t.clientX, t.clientY);
+    }, { passive: false });
+    stick.addEventListener('touchmove', function (e) {
+      if (e.cancelable) e.preventDefault();
+      lastTouchAt = performance.now();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier === stickId) stickSet(t.clientX, t.clientY);
+      }
+    }, { passive: false });
+    function stickTouchEnd(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === stickId) stickEnd();
+      }
+    }
+    stick.addEventListener('touchend', stickTouchEnd);
+    stick.addEventListener('touchcancel', stickTouchEnd);
+    /* マウスでもつまめるように（タッチのない端末で HUD を出したとき用） */
+    stick.addEventListener('mousedown', function (e) {
+      if (fromTouch()) return;
+      e.preventDefault(); stickId = 'mouse'; stickSet(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', function (e) { if (stickId === 'mouse') stickSet(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', function () { if (stickId === 'mouse') stickEnd(); });
 
-    /* ---- 右下のボタン ---- */
-    var btnUps = [];      /* 取りこぼしたときに、まとめて離すため */
+    /* --- 右下のボタン（ジャンプ・上下・飛行・こわす・おく） --- */
+    var btnReleases = [];
     function holdBtn(id, onDown, onUp) {
       var b = el[id];
-      var heldId = null;
-      b.addEventListener('pointerdown', function (e) {
-        e.preventDefault();
-        if (e.pointerType !== 'mouse') lastTouchAt = performance.now();
-        heldId = e.pointerId;
-        capture(b, e.pointerId);
+      var activeId = null;
+      function down(idv) {
+        if (activeId !== null) return;
+        activeId = idv;
         b.classList.add('on');
         onDown();
-      });
-      function up(e) {
-        if (e && heldId !== null && e.pointerId !== heldId) return;
-        heldId = null;
+      }
+      function up() {
+        if (activeId === null) return;
+        activeId = null;
         b.classList.remove('on');
         onUp && onUp();
       }
-      b.addEventListener('pointerup', up);
-      b.addEventListener('pointercancel', up);
-      b.addEventListener('lostpointercapture', up);
-      btnUps.push(up);
+      b.addEventListener('touchstart', function (e) {
+        if (e.cancelable) e.preventDefault();
+        lastTouchAt = performance.now();
+        down(e.changedTouches[0].identifier);
+      }, { passive: false });
+      function tEnd(e) {
+        for (var i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === activeId) up();
+        }
+      }
+      b.addEventListener('touchend', tEnd);
+      b.addEventListener('touchcancel', tEnd);
+      b.addEventListener('mousedown', function (e) {
+        if (fromTouch()) return;
+        e.preventDefault(); down('mouse');
+      });
+      b.addEventListener('mouseup', function () { if (activeId === 'mouse') up(); });
+      b.addEventListener('mouseleave', function () { if (activeId === 'mouse') up(); });
+      btnReleases.push(function (alive) {
+        if (activeId !== null && activeId !== 'mouse' && !alive[activeId]) up();
+      });
     }
     holdBtn('btn-jump', function () {
       Game.btnJump = true; Game.ctrl.jump = true;
@@ -1237,29 +1320,47 @@
     });
     el['btn-fly'].addEventListener('click', function (e) { e.preventDefault(); toggleFly(); });
 
-    /* ---- ホットバー（タップで選ぶ・長押しでインベントリ） ---- */
+    /* --- ホットバー（タップで選ぶ・長押しでインベントリ） --- */
     var hbTimer = null;
-    el.hotbar.addEventListener('pointerdown', function (e) {
-      var slot = e.target.closest ? e.target.closest('.slot') : null;
-      if (!slot) return;
-      e.preventDefault();
-      var i = parseInt(slot.dataset.i, 10);
-      selectSlot(i);
-      hbTimer = setTimeout(openInventory, 420);
-    });
-    el.hotbar.addEventListener('pointerup', function () { clearTimeout(hbTimer); });
-    el.hotbar.addEventListener('pointercancel', function () { clearTimeout(hbTimer); });
-
-    /* ---- 保険：ボタンやスティックの上で指が離れなかった場合でも必ず戻す ----
-       （pointerup を要素が取りこぼすと「押されっぱなし」になり、
-         勝手に歩き続ける・飛び続けるという症状になる） */
-    function globalRelease(e) {
-      if (stickId === e.pointerId) stickEnd(e);
-      for (var i = 0; i < btnUps.length; i++) btnUps[i](e);
-      if (pointers.has(e.pointerId)) endPointer(e);
+    function hbPick(target) {
+      var slot = (target && target.closest) ? target.closest('.slot') : null;
+      if (!slot) return false;
+      selectSlot(parseInt(slot.dataset.i, 10));
+      clearTimeout(hbTimer);
+      hbTimer = setTimeout(openInventory, 450);
+      return true;
     }
-    window.addEventListener('pointerup', globalRelease, true);
-    window.addEventListener('pointercancel', globalRelease, true);
+    el.hotbar.addEventListener('touchstart', function (e) {
+      lastTouchAt = performance.now();
+      if (hbPick(e.target) && e.cancelable) e.preventDefault();
+    }, { passive: false });
+    el.hotbar.addEventListener('touchend', function () { clearTimeout(hbTimer); });
+    el.hotbar.addEventListener('touchcancel', function () { clearTimeout(hbTimer); });
+    el.hotbar.addEventListener('mousedown', function (e) {
+      if (fromTouch()) return;
+      if (hbPick(e.target)) e.preventDefault();
+    });
+    window.addEventListener('mouseup', function () { clearTimeout(hbTimer); });
+
+    /* --- 保険：どこで指が離れても、押されっぱなしにならないようにする --- */
+    function globalTouchEnd(e) {
+      var alive = touchIds(e.touches);
+      for (var i = 0; i < btnReleases.length; i++) btnReleases[i](alive);
+      if (stickId !== null && stickId !== 'mouse' && !alive[stickId]) stickEnd();
+      /* 終了通知が来なかった指（幽霊）を掃除する。いま終わった指は
+         それぞれの要素側で処理されるので、ここでは触らない。 */
+      var changed = touchIds(e.changedTouches);
+      var ghosts = [];
+      touchMap.forEach(function (v, k) { if (!alive[k] && !changed[k]) ghosts.push(k); });
+      for (var j = 0; j < ghosts.length; j++) {
+        touchMap.delete(ghosts[j]);
+        if (lookId === ghosts[j]) lookId = null;
+        if (pendingTap === ghosts[j]) pendingTap = null;
+      }
+      if (touchMap.size === 0 && holdSource === 'touch') { holdAction = null; holdSource = null; }
+    }
+    window.addEventListener('touchend', globalTouchEnd, true);
+    window.addEventListener('touchcancel', globalTouchEnd, true);
 
     /* ---- 離脱時にセーブ ---- */
     window.addEventListener('visibilitychange', function () {
@@ -1271,14 +1372,9 @@
       Game.ctrl.jump = false; Game.ctrl.sneak = false;
       Game.ctrl.moveX = 0; Game.ctrl.moveZ = 0;
       Game.btnJump = Game.btnUp = Game.btnDown = false;
-      stickEnd(null);
+      stickEnd();
       holdAction = null; holdSource = null;
     });
-  }
-
-  /* setPointerCapture は環境によって例外を投げることがあるので包む */
-  function capture(elm, id) {
-    try { elm.setPointerCapture(id); } catch (e) { /* 使えなくても操作は続けられる */ }
   }
 
   function look(dx, dy) {
@@ -1323,9 +1419,9 @@
   /* デバッグ・動作確認用に内部関数を少しだけ出しておく */
   /* 入力まわりの不具合を追うためのデバッグ窓口 */
   Game.inputState = function () {
-    return { holdAction: holdAction, holdSource: holdSource, pendingTap: Game.pendingTap,
-      lookId: lookId, stickId: stickId, pointers: pointers.size, sawMouse: !!Game.sawMouse,
-      fromTouch: fromTouch() };
+    return { holdAction: holdAction, holdSource: holdSource, pendingTap: pendingTap,
+      lookId: lookId, stickId: stickId, touches: touchMap.size, sawMouse: !!Game.sawMouse,
+      fromTouch: fromTouch(), lastPlace: Game.lastPlace, lastDig: Game.lastDig };
   };
   Game.dig = digBlock;
   Game.refreshHotbar = refreshHotbar;
