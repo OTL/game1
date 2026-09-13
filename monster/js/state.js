@@ -1,79 +1,201 @@
-// せかいの状態。
+// せかいの状態 ―― といっても、ここにあるのは「いま あなたが育てている 1 匹」だけ。
 //
-// ■ みんなで同じコを育てる仕組み
-//   1. 時計はみんな共通。EPOCH からの経過時間で「シーズン番号」が決まり、
-//      シーズン番号がそのままタマゴのシードになる。だから世界じゅうのブラウザで
-//      まったく同じ種族・色・名前・進化先のモンスターが生まれる。
-//   2. 経験値は時間でも自然に増える。誰も来なくても育つし、
-//      いつアクセスしても「みんなが育てた結果」に追いつく。
-//   3. おせわ・バトルの記録は共有ストレージ（Sync）があればそこに、
-//      なければブラウザの localStorage に貯まる。
+// ■ 設計の背骨
+//   1. データは 100% このブラウザ（localStorage）。サーバも共有もない。
+//   2. 時間は実時間。タブを閉じているあいだも、そのコは生きている。
+//   3. 死ぬ。ただし死因は「時間」ではなく「呼ばれたのに応えなかった回数（ケアミス）」。
+//      メーター直結で殺すと、8 時間ねただけで詰む。本家たまごっちが偉いのはここ。
+//   4. 救済が 2 枚：夜（22〜7 時）はモンスターも寝るのでコールが出ない。
+//      おでかけ中もコールが出ない。放置したいときは、送り出してから閉じる。
+//   5. 旅立ったら図鑑に残り、とっくんと見ための一部を次のタマゴに遺す。
 (function (global) {
   'use strict';
 
-  const KEY = 'monster.world.v1';
-  const ME_KEY = 'monster.me.v1';
-  const WORLD_EPOCH = Date.UTC(2026, 0, 1, 0, 0, 0);
-  const SEASON_MS = 7 * 24 * 60 * 60 * 1000;   // 1 シーズン = 7 日
-  const HATCH_EXP = 30;                        // タマゴがかえるのに必要な経験値
+  const PET_KEY = 'monster.pet.v2';
+  const CLOCK_KEY = 'monster.clock.v2';
+
+  const MIN = 60e3;
+  const HOUR = 3600e3;
+
+  const LIFESPAN = 168 * HOUR;      // 天寿 ＝ 7 日
+  const MISS_DEATH = 30;            // ケアミスが これに達すると 衰弱して旅立つ
+  const MISS_WEAK = 20;             // これを超えると「よわり」状態
+  const CALL_AT = 25;               // メーターが これを切ると コールが出る
+  const MISS_IV_ONLINE = 30 * MIN;  // 見ているのに 無視しつづけた場合の間隔
+  const MISS_IV_OFFLINE = 3 * HOUR; // 留守のあいだの間隔
+  const MISS_ABSENCE_BASE = 4;      // 12 時間までの留守で増えるケアミスの上限
+  const MISS_ABSENCE_MAX = 14;      // どれだけ長い留守でも これ以上は増えない
+  const NIGHT_FROM = 22, NIGHT_TO = 7;
+  const NIGHT_RATE = 1 / 3;         // 夜・おでかけ中の 減りかた
+  const HATCH_EXP = 30;
   const MAX_LEVEL = 60;
+  const MEND_COOL = HOUR;           // 「かいふく」で ケアミスを 1 減らせる間隔
+  const EXP_MS = 120000;            // 2 分で 1 経験値
+  const AWAY_MS = 3 * MIN;          // これ以上あいたら「留守だった」とみなす
 
-  // おせわパラメータが 100 → 0 になるまでの時間（ミリ秒）
-  const TIME_FLOOR = 20;
-  const DECAY = { food: 8 * 3600e3, mood: 10 * 3600e3, energy: 13 * 3600e3, clean: 15 * 3600e3 };
-
-  function now() { return Date.now(); }
-  function seasonOf(t) { return Math.floor((t - WORLD_EPOCH) / SEASON_MS); }
-  function seasonStart(s) { return WORLD_EPOCH + s * SEASON_MS; }
+  // おせわパラメータが 100 → 0 になるまでの時間
+  const DECAY = { food: 8 * HOUR, mood: 10 * HOUR, energy: 13 * HOUR, clean: 15 * HOUR };
+  const CARE_KEYS = ['food', 'mood', 'energy', 'clean'];
+  const CARE_LABEL = { food: 'まんぷく', mood: 'きげん', energy: 'げんき', clean: 'せいけつ' };
+  const CALL_LABEL = { food: 'おなかが すいた', mood: 'さびしい', energy: 'ねむい', clean: 'よごれちゃった' };
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-  function freshState(season) {
+  // ---- 単調時計 ---------------------------------------------------------
+  // 端末の時計を戻されても ケアミスがチャラにならないように、
+  // 「これまでに見たいちばん新しい時刻」より前には戻らない now() を使う。
+  let clockFloor = 0;
+  let clockSavedAt = 0;
+  try { clockFloor = Number(localStorage.getItem(CLOCK_KEY)) || 0; } catch (e) { clockFloor = 0; }
+
+  function now() {
+    const t = Date.now();
+    if (t < clockFloor) return clockFloor;
+    clockFloor = t;
+    if (t - clockSavedAt > 30e3) {
+      clockSavedAt = t;
+      try { localStorage.setItem(CLOCK_KEY, String(t)); } catch (e) { /* 無視 */ }
+    }
+    return t;
+  }
+
+  // 1 回の留守で増やしていい ケアミスの上限。
+  // ひと晩（〜12 時間）は 4 で頭打ち ＝ 寝ているあいだに死なない。
+  // そこから先は 3 時間ごとに 1 ずつ増える ＝ 何日も放りっぱなしにすると ちゃんと死ぬ。
+  function absenceCap(ms) {
+    if (ms <= 12 * HOUR) return MISS_ABSENCE_BASE;
+    return Math.min(MISS_ABSENCE_MAX,
+      MISS_ABSENCE_BASE + Math.floor((ms - 12 * HOUR) / (3 * HOUR)));
+  }
+
+  function isNight(t) {
+    const h = new Date(t).getHours();
+    return h >= NIGHT_FROM || h < NIGHT_TO;
+  }
+
+  // ---- タマゴを作る -----------------------------------------------------
+
+  function freshPet(opts) {
+    opts = opts || {};
+    const t = opts.bornAt || now();
+    const gift = opts.gift || { hp: 0, atk: 0, def: 0, spd: 0 };
     return {
-      season: season,
+      v: 2,
+      seed: opts.seed || ('egg:' + t + ':' + Math.floor(Math.random() * 1e9)),
+      lineage: opts.lineage || null,
+      gen: opts.gen || 1,
+      gift: gift,
+      bornAt: t,
+      careAt: t,
+      seenAt: t,
       exp: 0,
-      care: { food: 80, mood: 80, energy: 90, clean: 90 },
-      careAt: seasonStart(season),
-      train: { hp: 0, atk: 0, def: 0, spd: 0 },
-      actions: { feed: 0, play: 0, bath: 0, sleep: 0, train: 0, pet: 0 },
-      battles: { win: 0, lose: 0 },
-      bossDay: 0,
-      caretakers: {},
+      care: { food: 85, mood: 85, energy: 95, clean: 95 },
+      train: { hp: gift.hp, atk: gift.atk, def: gift.def, spd: gift.spd },
+      actions: { feed: 0, play: 0, bath: 0, sleep: 0, train: 0, pet: 0, outing: 0 },
+      battles: { win: 0, lose: 0, ghost: 0 },
+      careMiss: 0,
+      missAccum: 0,
+      comfortMs: 0,
+      lastMend: 0,
+      outing: null,
+      keepsakes: [],      // おでかけで拾った「おもいで」
       log: [],
-      rev: 0
+      dead: null
     };
   }
 
-  function normalize(s, season) {
-    const f = freshState(season);
-    if (!s || s.season !== season) return f;
-    s.care = Object.assign({}, f.care, s.care || {});
-    s.train = Object.assign({}, f.train, s.train || {});
-    s.actions = Object.assign({}, f.actions, s.actions || {});
-    s.battles = Object.assign({}, f.battles, s.battles || {});
-    s.bossDay = Number(s.bossDay) || 0;
-    s.caretakers = s.caretakers || {};
-    s.log = Array.isArray(s.log) ? s.log.slice(-40) : [];
-    s.exp = Math.max(0, Number(s.exp) || 0);
-    s.careAt = Number(s.careAt) || f.careAt;
-    s.rev = Number(s.rev) || 0;
-    return s;
+  function normalize(p) {
+    if (!p || p.v !== 2 || !p.seed) return null;
+    const f = freshPet({ bornAt: p.bornAt || now() });
+    p.care = Object.assign({}, f.care, p.care || {});
+    p.train = Object.assign({}, f.train, p.train || {});
+    p.actions = Object.assign({}, f.actions, p.actions || {});
+    p.battles = Object.assign({}, f.battles, p.battles || {});
+    p.gift = Object.assign({}, f.gift, p.gift || {});
+    p.exp = Math.max(0, Number(p.exp) || 0);
+    p.gen = Number(p.gen) || 1;
+    p.careAt = Number(p.careAt) || p.bornAt;
+    p.seenAt = Number(p.seenAt) || p.careAt;
+    p.careMiss = Math.max(0, Number(p.careMiss) || 0);
+    p.missAccum = Math.max(0, Number(p.missAccum) || 0);
+    p.comfortMs = Math.max(0, Number(p.comfortMs) || 0);
+    p.lastMend = Number(p.lastMend) || 0;
+    p.keepsakes = Array.isArray(p.keepsakes) ? p.keepsakes.slice(-12) : [];
+    p.log = Array.isArray(p.log) ? p.log.slice(-40) : [];
+    if (p.outing && !(p.outing.endsAt > 0)) p.outing = null;
+    return p;
   }
 
-  // 時間の経過ぶんだけ、おせわパラメータを減らす＆経験値を足す
-  function applyTime(s, t) {
-    const dt = Math.max(0, t - s.careAt);
-    if (dt <= 0) return s;
-    // 時間による自然減。ただし「誰かが最低限は見てくれていた」ことにして
-    // 20 より下には落とさない（久しぶりに来た人がいきなり詰まないように）。
-    Object.keys(DECAY).forEach((k) => {
-      const floor = Math.min(s.care[k], TIME_FLOOR);
-      s.care[k] = clamp(Math.max(floor, s.care[k] - (dt / DECAY[k]) * 100), 0, 100);
-    });
-    s.exp += dt / 120000;                   // 2 分で 1 経験値（世界共通のペース）
-    s.careAt = t;
-    return s;
+  // ---- 時間を進める -----------------------------------------------------
+  //
+  // 5 分きざみで、そのときの状況（夜／おでかけ中／ふつう）を見ながら進める。
+  // 返り値は「そのあいだに起きたこと」＝ るすばん日記のタネ。
+  function advance(p, target, offline, cap) {
+    const events = [];
+    if (p.dead) return events;
+    let t = p.careAt;
+    if (target <= t) { p.careAt = Math.max(t, target); return events; }
+
+    const STEP = 5 * MIN;
+    const iv = offline ? MISS_IV_OFFLINE : MISS_IV_ONLINE;
+    const limit = offline ? (cap === undefined ? MISS_ABSENCE_BASE : cap) : Infinity;
+    let absenceMiss = 0;
+    let guard = 0;
+    let wasOuting = !!(p.outing && t < p.outing.endsAt);
+
+    while (t < target && guard++ < 40000) {
+      const next = Math.min(target, t + STEP);
+      const dt = next - t;
+      const mid = t + dt / 2;
+
+      const outing = !!(p.outing && mid < p.outing.endsAt);
+      if (wasOuting && !outing) events.push({ t: p.outing.endsAt, kind: 'home' });
+      wasOuting = outing;
+
+      const night = isNight(mid);
+      const egg = p.exp < HATCH_EXP;
+      const rate = (outing || night) ? NIGHT_RATE : 1;
+
+      CARE_KEYS.forEach((k) => {
+        p.care[k] = clamp(p.care[k] - (dt / DECAY[k]) * 100 * rate, 0, 100);
+      });
+
+      // おでかけ中は 自然な経験値が入らない（安全だが のびない）
+      if (!outing) p.exp += (dt / EXP_MS) * (night ? 0.6 : 1);
+
+      // コール判定。タマゴ・夜・おでかけ中は 呼ばない ＝ ケアミスも出ない
+      const awake = !night && !outing && !egg;
+      let worst = null, worstV = 999;
+      if (awake) {
+        CARE_KEYS.forEach((k) => {
+          if (p.care[k] < CALL_AT && p.care[k] < worstV) { worst = k; worstV = p.care[k]; }
+        });
+      }
+      if (worst) {
+        p.missAccum += dt;
+        while (p.missAccum >= iv) {
+          p.missAccum -= iv;
+          if (absenceMiss >= limit) { p.missAccum = 0; break; }
+          p.careMiss++;
+          absenceMiss++;
+          events.push({ t: next, kind: 'miss', key: worst });
+          if (p.careMiss >= MISS_DEATH) break;
+        }
+      } else {
+        p.missAccum = 0;   // 応えた／呼んでいない あいだは たまらない
+      }
+
+      const avg = (p.care.food + p.care.mood + p.care.energy + p.care.clean) / 4;
+      if (avg >= 80) p.comfortMs += dt;
+
+      t = next;
+      if (p.careMiss >= MISS_DEATH) break;
+    }
+    p.careAt = t;
+    return events;
   }
+
+  // ---- 成長 -------------------------------------------------------------
 
   function expToReach(level) {
     if (level <= 1) return 0;
@@ -90,34 +212,33 @@
     const a = expToReach(l), b = expToReach(l + 1);
     return { level: l, cur: Math.floor(exp - a), need: b - a, ratio: clamp((exp - a) / (b - a), 0, 1) };
   }
-
-  function stageOf(s) {
-    if (s.exp < HATCH_EXP) return 0;
-    const l = levelOf(s.exp);
+  function stageOf(p) {
+    if (p.exp < HATCH_EXP) return 0;
+    const l = levelOf(p.exp);
     if (l < 10) return 1;
     if (l < 26) return 2;
     return 3;
   }
-
-  function branchOf(s) {
-    const t = s.train;
+  function branchOf(p) {
+    const t = p.train;
     let best = 'atk', bv = -1;
     ['hp', 'atk', 'def', 'spd'].forEach((k) => { if (t[k] > bv) { bv = t[k]; best = k; } });
     if (bv === 0) best = 'atk';
     return best;
   }
 
-  // コンディション：おせわが行き届いているほど 1.0 に近づく
-  function condition(s) {
-    const c = s.care;
+  function condition(p) {
+    const c = p.care;
     const avg = (c.food + c.mood + c.energy + c.clean) / 4;
-    return clamp(0.72 + (avg / 100) * 0.28, 0.72, 1.0);
+    let v = 0.72 + (avg / 100) * 0.28;
+    if (p.careMiss >= MISS_WEAK) v *= 0.55;    // よわり：ステータスがごっそり落ちる
+    return clamp(v, 0.2, 1.0);
   }
 
-  function statsOf(genome, s) {
-    const lv = levelOf(s.exp);
-    const b = genome.base, t = s.train;
-    const cond = condition(s);
+  function statsOf(genome, p) {
+    const lv = levelOf(p.exp);
+    const b = genome.base, t = p.train;
+    const cond = condition(p);
     const st = {
       level: lv,
       hp:  Math.floor((b.hp * 2 + t.hp) * lv / 100) + lv + 10,
@@ -129,134 +250,183 @@
     return st;
   }
 
-  // ---- 保存まわり -------------------------------------------------------
+  // ---- 保存 -------------------------------------------------------------
 
-  function readLocal() {
-    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+  function readPet() {
+    try { return normalize(JSON.parse(localStorage.getItem(PET_KEY) || 'null')); } catch (e) { return null; }
   }
-  function writeLocal(s) {
-    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* 容量オーバーは無視 */ }
-  }
-
-  function me() {
-    let m = null;
-    try { m = JSON.parse(localStorage.getItem(ME_KEY) || 'null'); } catch (e) { m = null; }
-    if (!m || !m.name) {
-      m = { name: '', id: Math.random().toString(36).slice(2, 8) };
-      writeMe(m);
-    }
-    return m;
-  }
-  function writeMe(m) {
-    try { localStorage.setItem(ME_KEY, JSON.stringify(m)); } catch (e) { /* 無視 */ }
-  }
-  function displayName() {
-    const m = me();
-    return m.name || ('ななしさん#' + m.id);
+  function writePet(p) {
+    try { localStorage.setItem(PET_KEY, JSON.stringify(p)); } catch (e) { /* 無視 */ }
   }
 
-  // 2 つの状態をぶつからないようにマージする。
-  // 累計系は大きいほう、おせわパラメータは新しいほうを採用。
-  function merge(a, b) {
-    if (!a) return b;
-    if (!b) return a;
-    if (a.season !== b.season) return a.season > b.season ? a : b;
-    const out = JSON.parse(JSON.stringify(a.careAt >= b.careAt ? a : b));
-    out.exp = Math.max(a.exp, b.exp);
-    ['hp', 'atk', 'def', 'spd'].forEach((k) => { out.train[k] = Math.max(a.train[k], b.train[k]); });
-    Object.keys(out.actions).forEach((k) => { out.actions[k] = Math.max(a.actions[k] || 0, b.actions[k] || 0); });
-    out.battles.win = Math.max(a.battles.win, b.battles.win);
-    out.battles.lose = Math.max(a.battles.lose, b.battles.lose);
-    out.bossDay = Math.max(a.bossDay || 0, b.bossDay || 0);
-    out.caretakers = Object.assign({}, b.caretakers, a.caretakers);
-    Object.keys(b.caretakers || {}).forEach((k) => {
-      out.caretakers[k] = Math.max(a.caretakers[k] || 0, b.caretakers[k] || 0);
-    });
-    const seen = {};
-    out.log = (a.log || []).concat(b.log || [])
-      .filter((e) => { const k = e.t + '|' + e.text; if (seen[k]) return false; seen[k] = true; return true; })
-      .sort((x, y) => x.t - y.t).slice(-40);
-    out.rev = Math.max(a.rev, b.rev) + 1;
-    return out;
+  function durText(ms) {
+    ms = Math.max(0, ms);
+    const h = Math.floor(ms / HOUR);
+    const d = Math.floor(h / 24);
+    if (d > 0) return d + '日' + (h % 24) + '時間';
+    if (h > 0) return h + '時間' + Math.floor((ms % HOUR) / MIN) + '分';
+    return Math.floor(ms / MIN) + '分';
   }
+
+  // ---- 公開 -------------------------------------------------------------
 
   const World = {
-    SEASON_MS, HATCH_EXP, MAX_LEVEL, WORLD_EPOCH,
-    now, seasonOf, seasonStart, levelOf, levelProgress, expToReach,
-    stageOf, branchOf, statsOf, condition, applyTime, merge,
-    me, writeMe, displayName,
+    LIFESPAN, MISS_DEATH, MISS_WEAK, CALL_AT, HATCH_EXP, MAX_LEVEL,
+    CARE_KEYS, CARE_LABEL, CALL_LABEL, DECAY, MEND_COOL, AWAY_MS,
+    now, isNight, durText, clamp, absenceCap,
+    levelOf, levelProgress, expToReach, stageOf, branchOf, statsOf, condition,
 
-    season: null,
-    genome: null,
     state: null,
+    genome: null,
+    awayMs: 0,          // 直前の留守時間（0 なら 留守ではなかった）
+    awayEvents: [],     // そのあいだに起きたこと
 
     init: function () {
+      let p = readPet();
+      if (!p) p = freshPet({});
+      this.state = p;
+      this.genome = Species.makeGenome(p.seed, p.lineage);
+
       const t = now();
-      this.season = seasonOf(t);
-      this.genome = Species.makeGenome(this.season);
-      this.state = normalize(readLocal(), this.season);
-      applyTime(this.state, t);
-      writeLocal(this.state);
+      const gap = t - p.seenAt;
+      this.awayMs = gap > AWAY_MS ? gap : 0;
+      this.awayEvents = advance(p, t, this.awayMs > 0, absenceCap(gap));
+      this.checkDeath();
+      p.seenAt = t;
+      writePet(p);
       return this;
     },
 
-    // 外（共有ストレージ）から来た状態を取りこむ
-    adopt: function (remote) {
-      if (!remote) return false;
-      const r = normalize(remote, this.season);
-      applyTime(r, now());
-      this.state = merge(this.state, r);
-      writeLocal(this.state);
-      return true;
-    },
-
     tick: function () {
-      applyTime(this.state, now());
+      const p = this.state;
+      if (p.dead) return;
+      advance(p, now(), false);
+      p.seenAt = now();
+      this.checkDeath();
     },
 
     save: function () {
-      this.state.rev++;
-      writeLocal(this.state);
-      if (global.Sync) global.Sync.push(this.state);
+      writePet(this.state);
     },
 
     addLog: function (text) {
-      this.state.log.push({ t: now(), name: displayName(), text: text });
+      this.state.log.push({ t: now(), text: text });
       if (this.state.log.length > 40) this.state.log = this.state.log.slice(-40);
-      const n = displayName();
-      this.state.caretakers[n] = (this.state.caretakers[n] || 0) + 1;
     },
 
-    ageText: function () {
-      const ms = now() - seasonStart(this.season);
-      const h = Math.floor(ms / 3600e3);
-      const d = Math.floor(h / 24);
-      return d > 0 ? (d + '日' + (h % 24) + '時間') : (h + '時間' + Math.floor((ms % 3600e3) / 60000) + '分');
+    // ---- 生と死 ----------------------------------------------------------
+
+    isWeak: function () { return !this.state.dead && this.state.careMiss >= MISS_WEAK; },
+    isOuting: function () { return !!(this.state.outing && now() < this.state.outing.endsAt); },
+    isDead: function () { return !!this.state.dead; },
+
+    // いま鳴いているメーター（つよい順）
+    callKeys: function () {
+      const p = this.state;
+      if (p.dead || this.isOuting() || isNight(now()) || stageOf(p) === 0) return [];
+      return CARE_KEYS.filter((k) => p.care[k] < CALL_AT)
+        .sort((a, b) => p.care[a] - p.care[b]);
     },
 
-    seasonLeftText: function () {
-      const ms = seasonStart(this.season + 1) - now();
-      const h = Math.floor(ms / 3600e3);
-      const d = Math.floor(h / 24);
-      return d > 0 ? (d + '日' + (h % 24) + '時間') : (h + '時間' + Math.floor((ms % 3600e3) / 60000) + '分');
+    ageMs: function () { return now() - this.state.bornAt; },
+    lifeLeftMs: function () { return Math.max(0, this.state.bornAt + LIFESPAN - now()); },
+    lifeRatio: function () { return clamp((now() - this.state.bornAt) / LIFESPAN, 0, 1); },
+
+    checkDeath: function () {
+      const p = this.state;
+      if (p.dead) return p.dead;
+      if (stageOf(p) === 0 && p.careMiss < MISS_DEATH) {
+        // タマゴは死なない（コールも出ないので、ここには来ないはず）
+      }
+      if (p.careMiss >= MISS_DEATH) {
+        p.dead = { at: now(), cause: 'weak' };
+      } else if (now() - p.bornAt >= LIFESPAN) {
+        p.dead = { at: p.bornAt + LIFESPAN, cause: 'age' };
+      }
+      if (p.dead) writePet(p);
+      return p.dead;
     },
 
-    totalActions: function () {
-      const a = this.state.actions;
-      return Object.keys(a).reduce((s, k) => s + a[k], 0);
+    // ケアミスをひとつ返上する（全メーター 90 以上のときだけ、1 時間に 1 回）
+    tryMend: function () {
+      const p = this.state;
+      if (p.dead || p.careMiss <= 0) return false;
+      if (now() - p.lastMend < MEND_COOL) return false;
+      const ok = CARE_KEYS.every((k) => p.care[k] >= 90);
+      if (!ok) return false;
+      p.careMiss = Math.max(0, p.careMiss - 1);
+      p.lastMend = now();
+      return true;
     },
+
+    // 旅立ち → 図鑑に記録して、次のタマゴを迎える。おくりものを返す。
+    nextGeneration: function () {
+      const p = this.state;
+      const dead = p.dead || { at: now(), cause: 'weak' };
+      const record = Dex.record(p, this.genome, dead);
+      Dex.add(record);
+
+      const rng = Rng.makeRng('heir:' + p.seed + ':' + dead.at);
+      // おくりものは「七日 生きたか」ではなく「どう生きたか」で決まる。
+      // 一度も来ないまま七日たっても、それは天寿とは呼ばない。
+      const ratio = Dex.giftRatio(record);
+      const gift = {};
+      ['hp', 'atk', 'def', 'spd'].forEach((k) => {
+        gift[k] = Math.min(48, Math.floor(p.train[k] * ratio));
+      });
+      const trait = Species.pickTrait(this.genome, rng);
+      const blessed = Dex.blessedNext();
+
+      const child = freshPet({
+        seed: 'egg:' + dead.at + ':' + rng.int(0, 1e9),
+        gift: gift,
+        gen: p.gen + 1,
+        bornAt: now(),
+        lineage: {
+          parentSeed: p.seed,
+          parentName: record.name,
+          traits: (function () { const o = {}; o[trait.key] = trait.value; return o; })(),
+          depth: (p.lineage && p.lineage.depth ? p.lineage.depth : 0) + 1,
+          blessed: blessed
+        }
+      });
+      this.state = child;
+      this.genome = Species.makeGenome(child.seed, child.lineage);
+      this.awayMs = 0;
+      this.awayEvents = [];
+      writePet(child);
+      return { record: record, gift: gift, trait: trait, blessed: blessed };
+    },
+
+    // 図鑑を空にして 1 代目からやり直す
+    resetAll: function () {
+      Dex.clear();
+      const p = freshPet({});
+      this.state = p;
+      this.genome = Species.makeGenome(p.seed, null);
+      this.awayMs = 0;
+      this.awayEvents = [];
+      writePet(p);
+    },
+
+    // ---- 見えかた --------------------------------------------------------
+
+    ageText: function () { return durText(this.ageMs()); },
+    lifeLeftText: function () { return durText(this.lifeLeftMs()); },
 
     name: function () {
       return Species.nameFor(this.genome, stageOf(this.state), branchOf(this.state));
     },
     look: function () {
-      return Species.lookFor(this.genome, stageOf(this.state), branchOf(this.state));
+      const sad = this.callKeys().length > 0;
+      return Species.lookFor(this.genome, stageOf(this.state), branchOf(this.state),
+        { sad: sad, weak: this.isWeak() });
     },
-    stats: function () {
-      return statsOf(this.genome, this.state);
-    },
-    moves: function () {
-      return Species.movesFor(this.genome, levelOf(this.state.exp));
+    stats: function () { return statsOf(this.genome, this.state); },
+    moves: function () { return Species.movesFor(this.genome, levelOf(this.state.exp)); },
+    totalActions: function () {
+      const a = this.state.actions;
+      return Object.keys(a).reduce((s, k) => s + (a[k] || 0), 0);
     }
   };
 

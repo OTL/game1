@@ -1,5 +1,6 @@
 // 種族データ：タイプ、相性、わざ、名前、そして「ゲノム」からの種族生成。
-// ゲノムはシード 1 個から決まるので、同じシーズンなら誰が見ても同じモンスターになる。
+// ゲノムはシード 1 個から決まる。親から受けついだ特徴（lineage）があれば、
+// 生成したあとに上書きして「おもかげ」を残す。
 (function (global) {
   'use strict';
 
@@ -127,8 +128,29 @@
     { id: 'hp',  name: 'たいりょくがた', label: 'たいりょく', suffix: 'ドン' }
   ];
 
-  // ゲノム：1 つのシードから、そのモンスターの一生ぶんの設計図を作る
-  function makeGenome(seed) {
+  // 性格。るすばん日記の文体と、ちょっとした好みが変わる
+  const PERSONALITIES = [
+    { id: 'amae',     name: 'あまえんぼ' },
+    { id: 'yancha',   name: 'やんちゃ' },
+    { id: 'nonbiri',  name: 'のんびり' },
+    { id: 'shikkari', name: 'しっかりもの' },
+    { id: 'sabishi',  name: 'さびしがり' },
+    { id: 'kuishin',  name: 'くいしんぼう' }
+  ];
+  const PERSONALITY_BY_ID = {};
+  PERSONALITIES.forEach((p) => { PERSONALITY_BY_ID[p.id] = p; });
+
+  // 親から子へ遺伝しうる「見ための特徴」
+  const TRAIT_KEYS = ['hue', 'hue2', 'earType', 'tailType', 'eyeType', 'spots', 'wing', 'cheek', 'plan'];
+  const TRAIT_LABEL = {
+    hue: 'からだの いろ', hue2: 'もようの いろ', earType: 'みみ・つの', tailType: 'しっぽ',
+    eyeType: 'めの かたち', spots: 'もよう', wing: 'つばさ', cheek: 'ほっぺ', plan: 'たいけい'
+  };
+
+  // ゲノム：1 つのシードから、そのモンスターの一生ぶんの設計図を作る。
+  // lineage = { traits: {...}, depth: n, blessed: bool } があれば親の面影を継ぐ。
+  function makeGenome(seed, lineage) {
+    lineage = lineage || null;
     const rng = Rng.makeRng('genome:' + seed);
     const t1 = rng.pick(TYPES);
     let t2 = null;
@@ -148,6 +170,15 @@
       def: Math.round(14 + (weights[2] / sum) * total),
       spd: Math.round(14 + (weights[3] / sum) * total)
     };
+
+    // 3 代つづけて天寿をまっとうした家系は「でんせつ」の血をひく
+    const blessed = !!(lineage && lineage.blessed);
+    if (blessed) {
+      base.hp = Math.round(base.hp * 1.12);
+      base.atk = Math.round(base.atk * 1.12);
+      base.def = Math.round(base.def * 1.12);
+      base.spd = Math.round(base.spd * 1.12);
+    }
 
     // 見ため（スプライト）用のパラメータ
     const look = {
@@ -169,6 +200,18 @@
       eggHue: rng.int(0, 359)
     };
 
+    // 親のおもかげを上書きする
+    const inherited = [];
+    if (lineage && lineage.traits) {
+      Object.keys(lineage.traits).forEach((k) => {
+        if (TRAIT_KEYS.indexOf(k) < 0) return;
+        look[k] = lineage.traits[k];
+        inherited.push(k);
+      });
+    }
+    if (blessed) { look.aura = 1; look.sat = Math.min(94, look.sat + 14); }
+    const bodyPlan = look.plan;
+
     const names = [
       null,
       makeName(Rng.makeRng('n1:' + seed), 1),
@@ -188,9 +231,20 @@
       look: look,
       names: names,
       finalNames: finalNames,
-      category: rng.pick(CATEGORIES[plan]),
+      category: (blessed ? 'でんせつの ' : '') + rng.pick(CATEGORIES[bodyPlan]),
+      personality: rng.pick(PERSONALITIES).id,
+      blessed: blessed,
+      inherited: inherited,
+      depth: lineage && lineage.depth ? lineage.depth : 0,
       shiny: Rng.makeRng('shiny:' + seed)() < 0.05
     };
+  }
+
+  // このコの見ための特徴を、子に渡せる形で 1 つ抜き出す
+  function pickTrait(genome, rng) {
+    const cands = TRAIT_KEYS.filter((k) => genome.look[k] !== undefined);
+    const k = rng.pick(cands);
+    return { key: k, value: genome.look[k], label: TRAIT_LABEL[k] };
   }
 
   // ステージと分岐から、いまの姿の名前を返す
@@ -202,10 +256,12 @@
   }
 
   // ステージ・分岐に応じて見ためを少しずつ変える
-  function lookFor(genome, stage, branchId) {
+  function lookFor(genome, stage, branchId, mood) {
     const l = Object.assign({}, genome.look);
     l.stage = stage;
     l.branch = branchId;
+    if (mood && mood.sad) l.sad = 1;
+    if (mood && mood.weak) { l.weak = 1; l.sad = 1; l.sat = Math.max(10, l.sat - 30); l.light = Math.max(30, l.light - 8); }
     if (stage >= 3) {
       if (branchId === 'atk') { l.horn = 1; l.chubby *= 1.05; }
       if (branchId === 'def') { l.armor = 1; l.chubby *= 1.2; }
@@ -241,7 +297,12 @@
 
   global.Species = {
     TYPES, TYPE_BY_ID, MOVES, BRANCHES,
+    PERSONALITIES, PERSONALITY_BY_ID, TRAIT_KEYS, TRAIT_LABEL,
     typeMultiplier, effectivenessText,
-    makeGenome, nameFor, lookFor, movesFor, makeName
+    makeGenome, nameFor, lookFor, movesFor, makeName, pickTrait,
+    personalityName: function (genome) {
+      const p = PERSONALITY_BY_ID[genome.personality];
+      return p ? p.name : 'ふつう';
+    }
   };
 })(window);

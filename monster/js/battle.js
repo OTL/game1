@@ -6,7 +6,7 @@
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-  // 野生のモンスターをシードから作る（同じシードなら誰でも同じ相手に会う）
+  // 野生のモンスターをシードから作る
   function makeFoe(seed, level, opts) {
     opts = opts || {};
     const genome = Species.makeGenome('wild:' + seed);
@@ -35,22 +35,36 @@
     };
   }
 
-  function dayNumber(t) {
-    return Math.floor((t || Date.now()) / 86400000);
-  }
-
-  // きょうのぬし：日付から決まるので、その日は世界じゅうで同じ相手
-  function todaysBoss(playerLevel) {
-    const d = dayNumber();
-    return makeFoe('boss:' + d, Math.max(6, playerLevel + 5), { boost: 1.18, title: 'ぬしの ' });
-  }
-
-  function wildFor(playerLevel, count) {
-    const d = dayNumber();
-    const seed = d + ':' + count;
+  function wildFor(playerLevel, seedBase) {
+    const seed = String(seedBase);
     const rng = Rng.makeRng('lvoff:' + seed);
     const off = rng.int(-2, 3);
     return makeFoe(seed, Math.max(2, playerLevel + off), {});
+  }
+
+  // せんだい（図鑑の記録）を そのままの強さで呼び出す。
+  // コンディション補正はかけない ＝ いちばん元気だったころの姿で立ちはだかる。
+  function ancestorFoe(rec) {
+    const genome = Dex.genomeOf(rec);
+    const lv = Math.max(2, rec.level);
+    const b = genome.base, t = rec.train || { hp: 0, atk: 0, def: 0, spd: 0 };
+    const stats = {
+      level: lv,
+      hp:  Math.max(12, Math.floor((b.hp * 2 + (t.hp || 0)) * lv / 100) + lv + 10),
+      atk: Math.floor((b.atk * 2 + (t.atk || 0)) * lv / 100 + 5),
+      def: Math.floor((b.def * 2 + (t.def || 0)) * lv / 100 + 5),
+      spd: Math.floor((b.spd * 2 + (t.spd || 0)) * lv / 100 + 5)
+    };
+    return {
+      genome: genome,
+      name: rec.gen + 'だいめ ' + rec.name,
+      look: Dex.lookOf(rec),
+      types: genome.types,
+      stats: stats,
+      moves: Species.movesFor(genome, lv),
+      ancestor: true,
+      rec: rec
+    };
   }
 
   function damage(attacker, defender, move, rng) {
@@ -126,7 +140,7 @@
         b.cheers++;
         b.you.boostAtk = Math.min(1.6, b.you.boostAtk + 0.15);
         b.you.hp = Math.min(b.you.maxHp, b.you.hp + Math.floor(b.you.maxHp * 0.06));
-        events.push({ type: 'msg', text: 'みんなの おうえん！ ' + b.you.name + ' の こうげきが あがった！' });
+        events.push({ type: 'msg', text: 'はげました！ ' + b.you.name + ' の こうげきが あがった！' });
         events.push({ type: 'cheer' });
       } else {
         const move = b.you.moves[action.index];
@@ -167,9 +181,10 @@
   }
 
   // 勝ったときの経験値
-  function rewardExp(foe, boss) {
-    return Math.round(foe.stats.level * (boss ? 9 : 4.5) + 12);
+  function rewardExp(foe, kind) {
+    const k = kind === 'ancestor' ? 9 : 4.5;
+    return Math.round(foe.stats.level * k + 12);
   }
 
-  global.Battle = { create, makeFoe, wildFor, todaysBoss, rewardExp, dayNumber };
+  global.Battle = { create, makeFoe, wildFor, ancestorFoe, rewardExp };
 })(window);
