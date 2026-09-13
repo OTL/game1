@@ -117,6 +117,11 @@
     for (const s of [-1, 1]) {
       const ex = hx + s * dx;
       ellipse(g, ex, ey, rx, ry, EYE_W);
+      if (look.sad) {              // しょんぼり：まぶたを 内がわに さげる
+        for (let i = -Math.round(rx); i <= Math.round(rx); i++) {
+          put(g, ex + i, ey - ry + Math.round((s > 0 ? -i : i) * 0.45) + 1, LINE);
+        }
+      }
       // 黒目は少し下＆内寄り
       ellipse(g, ex - s * rx * 0.12, ey + ry * 0.18, rx * 0.62, ry * 0.62, PUPIL);
       // ハイライト
@@ -132,8 +137,11 @@
   function drawMouth(g, hx, hy, hr, look) {
     const my = hy + hr * 0.48;
     const w = Math.max(1, Math.round(hr * 0.18));
+    // しょんぼりしていると 口が への字になる
+    const curve = look.sad ? -0.55 : 0.55;
+    const off = look.sad ? w : 0;
     for (let i = -w; i <= w; i++) {
-      put(g, hx + i, my + Math.round(Math.abs(i) * 0.55), MOUTH);
+      put(g, hx + i, my + off + Math.round(Math.abs(i) * curve), MOUTH);
     }
     if (look.stage >= 3 && look.branch === 'atk') {  // きば
       put(g, hx - w - 1, my + 1, HORN);

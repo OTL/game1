@@ -46,8 +46,6 @@ a { color: #9fc7ff; }
   padding: 5px 12px; cursor: pointer;
 }
 .chip:hover { background: rgba(255,255,255,.12); }
-.chip.status { cursor: default; color: var(--muted); }
-.chip.status.on { color: #0e1526; background: var(--green); border-color: var(--green); font-weight: 700; }
 
 /* ── レイアウト ── */
 .layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
@@ -62,12 +60,35 @@ a { color: #9fc7ff; }
 .panel h3 { margin: 0 0 10px; font-size: 15px; color: var(--accent); letter-spacing: .04em; }
 .panel h4 { margin: 16px 0 6px; font-size: 12.5px; color: var(--muted); letter-spacing: .06em; }
 
-/* ── ステージ ── */
-.season {
+/* ── いのち ── */
+.lifeline { margin-bottom: 10px; }
+.liferow {
   display: flex; justify-content: space-between; gap: 8px;
-  font-size: 12px; color: var(--muted); margin-bottom: 8px;
+  font-size: 12px; color: var(--muted);
 }
-.season b { color: var(--text); }
+.liferow b { color: var(--text); }
+.lifebar {
+  height: 7px; margin: 5px 0 6px; background: #0d1428;
+  border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
+}
+.lifebar i {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, #5fd07a, #ffcc4d);
+  transition: width .6s;
+}
+.missrow { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--muted); }
+.missdots { display: flex; gap: 3px; }
+.missdots .dot {
+  width: 9px; height: 9px; border-radius: 3px;
+  background: #22305a; border: 1px solid #33447a;
+}
+.missdots .dot.on { background: var(--accent); border-color: var(--accent); }
+.missdots .dot.bad { background: var(--red); border-color: var(--red); }
+.misstext b { color: var(--text); }
+.lifeline.weak .misstext b { color: var(--red); }
+.lifeline.weak .lifebar i { background: linear-gradient(90deg, #8a3b3b, #ff6b6b); }
+
+/* ── ステージ ── */
 .stage-wrap { position: relative; }
 #stage {
   display: block; width: 100%; height: auto; aspect-ratio: 4 / 3;
@@ -176,9 +197,6 @@ a { color: #9fc7ff; }
 }
 .counter b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
 .counter span { font-size: 10.5px; color: var(--muted); }
-.rank { margin: 0; padding-left: 20px; font-size: 12.5px; }
-.rank li { margin: 2px 0; }
-.rank b { color: var(--accent); }
 .log { list-style: none; margin: 0; padding: 0; font-size: 12px; max-height: 190px; overflow-y: auto; }
 .log li { padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,.07); color: var(--muted); }
 .log li b { color: var(--text); }
@@ -234,12 +252,7 @@ a { color: #9fc7ff; }
 .sheet ul { padding-left: 20px; }
 .sheet li { margin: 5px 0; }
 .sheet code { background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-.syncrow { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.syncrow input {
-  flex: 1 1 220px; font: inherit; font-size: 12.5px; color: var(--text);
-  background: #0d1428; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
-}
-.syncrow button, .sheet .close {
+.sheet .close {
   font: inherit; font-size: 13px; cursor: pointer; color: #12182b;
   background: var(--accent); border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 700;
 }
@@ -247,4 +260,141 @@ a { color: #9fc7ff; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+
+/* ── コール／夜 ── */
+.callout {
+  position: absolute; left: 10px; top: 10px;
+  background: rgba(255,107,107,.92); color: #1a0b0b;
+  font-weight: 800; font-size: 13px; padding: 6px 12px; border-radius: 999px;
+  animation: nag 1.1s ease-in-out infinite;
+}
+@keyframes nag { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.nightmark {
+  position: absolute; right: 10px; top: 10px;
+  background: rgba(10,16,40,.8); border: 1px solid var(--line);
+  color: #cfe0ff; font-size: 11.5px; padding: 5px 11px; border-radius: 999px;
+}
+.lineage { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
+.lineage b { color: #cfe0ff; }
+.lineage b.bless { color: var(--accent); }
+
+/* ── おでかけ ── */
+.outcourses { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 620px) { .outcourses { grid-template-columns: repeat(3, 1fr); } }
+.oc {
+  font: inherit; font-size: 12px; cursor: pointer; color: var(--text); text-align: left;
+  background: #1b2b3f; border: 1px solid #2f4a66; border-radius: 10px; padding: 8px 10px;
+}
+.oc b { display: block; font-size: 13.5px; }
+.oc small { color: var(--muted); font-size: 10.5px; }
+.oc:hover:not(:disabled) { background: #23394f; }
+.oc:disabled { opacity: .4; cursor: not-allowed; }
+
+.outbox {
+  margin-top: 14px; background: rgba(77,208,255,.08);
+  border: 1px solid #2f4a66; border-radius: 14px; padding: 14px;
+}
+.outhead { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.outhead span { color: var(--muted); font-size: 12px; }
+.outbar {
+  height: 10px; margin: 10px 0; background: #0d1428;
+  border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
+}
+.outbar i { display: block; height: 100%; background: linear-gradient(90deg, #4dd0ff, #6affc0); transition: width .6s; }
+.outbtns { display: grid; gap: 8px; }
+.outbtns .big { width: 100%; }
+.ghostbtn {
+  font: inherit; font-size: 12px; cursor: pointer; color: var(--muted);
+  background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 8px;
+}
+.ghostbtn:hover { color: var(--text); background: rgba(255,255,255,.05); }
+
+/* ── おもいで ── */
+.keeps { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.keeps li {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,.07);
+}
+.keeps time { color: #5f6d97; font-size: 11px; }
+
+/* ── るすばん日記 ── */
+.diaryspan { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.diary { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.diary li {
+  display: flex; gap: 10px; padding: 7px 0;
+  border-bottom: 1px dashed rgba(255,255,255,.08);
+}
+.diary li time { color: #5f6d97; font-variant-numeric: tabular-nums; flex: none; }
+.diary li.miss { color: #ffb8b8; }
+.diary li.home { color: #6affc0; }
+.diary li.road { color: #9fd8ff; }
+.diarysum { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+.diarysum .bad { color: var(--red); }
+.diarysum .good { color: var(--green); }
+
+/* ── おみやげ ── */
+.sheet.narrow { width: min(420px, 100%); }
+.giftbody { display: grid; gap: 8px; }
+.giftrow {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+  border-radius: 10px; padding: 10px 12px;
+}
+.giftrow b { font-size: 16px; color: var(--accent); }
+.giftrow span { font-size: 11.5px; color: var(--muted); }
+.giftrow.keep b { color: var(--cyan); font-size: 14px; }
+
+/* ── おわかれ ── */
+.sheet.bye { text-align: center; }
+.sheet.bye canvas {
+  width: 160px; height: 160px; image-rendering: pixelated;
+  filter: grayscale(.35) brightness(.9);
+}
+.byebody h3 { margin: 4px 0 0; font-size: 20px; }
+.byetitle { margin: 2px 0 14px; color: var(--accent); font-size: 14px; }
+.byestats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+@media (min-width: 520px) { .byestats { grid-template-columns: repeat(4, 1fr); } }
+.byestats div {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px; padding: 8px 6px;
+}
+.byestats b { display: block; font-size: 15px; }
+.byestats span { font-size: 10.5px; color: var(--muted); }
+.byenote { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); text-align: left; }
+.byenote b { color: var(--accent); }
+
+/* ── ずかん ── */
+.sheet.wide { width: min(720px, 100%); }
+.dexsum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.dexhint { grid-column: 1 / -1; margin: 0; font-size: 11.5px; color: var(--accent); }
+.dexlist { display: grid; gap: 8px; max-height: 52vh; overflow-y: auto; }
+.dexcard {
+  display: flex; gap: 10px; align-items: center;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09);
+  border-left: 3px solid var(--muted); border-radius: 10px; padding: 8px 10px;
+}
+.dexcard.age { border-left-color: var(--accent); }
+.dexcard.weak { border-left-color: #6b4a6b; }
+.dexcard img { image-rendering: pixelated; flex: none; }
+.dexinfo { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.dexinfo b { font-size: 13.5px; }
+.dextitle { font-size: 12px; color: var(--accent); }
+.dexmeta { font-size: 11px; color: var(--muted); }
+.dexmeta.keeps { color: var(--cyan); }
+.dexgo {
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; flex: none;
+  color: #12182b; background: var(--cyan); border: 0; border-radius: 8px; padding: 8px 12px;
+}
+.dexfoot { margin-top: 14px; text-align: center; }
+.danger {
+  font: inherit; font-size: 11.5px; cursor: pointer; color: #ffb8b8;
+  background: transparent; border: 1px solid #6b3a3a; border-radius: 8px; padding: 6px 12px;
+}
+.danger:hover { background: rgba(255,107,107,.12); }
+
+.sheet .tip {
+  background: rgba(255,204,77,.1); border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0; padding: 8px 12px; font-size: 12.5px;
 }
