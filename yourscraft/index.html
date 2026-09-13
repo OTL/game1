@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8ec5f2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>YoursCraft — ブロックでつくる世界（クリエイティブ）</title>
+<meta name="description" content="ブラウザで遊べるマイクラ風のブロック建築ゲーム。クリエイティブモード専用・タブレットのタッチ操作対応・自動セーブ。インストール不要、依存ライブラリなし。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="YoursCraft — ブロックでつくる世界">
+<meta property="og:description" content="タブレットで遊べるマイクラ風クリエイティブ。飛んで、掘って、建てるだけ。自動セーブ付き。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%238a6240'/><rect width='32' height='12' fill='%237cb342'/><rect x='0' y='10' width='32' height='3' fill='%23689f38'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div id="water-tint"></div>
+<div id="lava-tint"></div>
+<div id="vignette"></div>
+
+<!-- ================= HUD ================= -->
+<div id="hud" hidden>
+  <div id="crosshair"></div>
+  <div id="debug" hidden></div>
+  <div id="toast"></div>
+  <div id="hint"></div>
+
+  <div id="topright">
+    <div class="tbtn" id="btn-inv" aria-label="インベントリ">⊞</div>
+    <div class="tbtn" id="btn-pause" aria-label="メニュー">‖</div>
+  </div>
+
+  <div id="itemname"></div>
+  <div id="hotbar"></div>
+
+  <div id="stick"><div id="knob"></div></div>
+  <div id="rightpad">
+    <div class="tbtn" id="btn-fly" aria-label="飛行切りかえ">✈</div>
+    <div class="tbtn" id="btn-up" aria-label="上へ">▲</div>
+    <div class="tbtn" id="btn-down" aria-label="下へ／しゃがむ">▼</div>
+    <div class="tbtn big" id="btn-jump" aria-label="ジャンプ">⤒</div>
+  </div>
+</div>
+
+<!-- ================= 読み込み中 ================= -->
+<div id="loading" class="screen" hidden>
+  <div class="loading-text shadow" id="loading-text">地形をつくっています…</div>
+  <div class="bar"><div id="bar-fill"></div></div>
+  <div class="inv-note">ワールドは seed から作られます。あなたの手で変えたところだけが保存されます。</div>
+</div>
+
+<!-- ================= タイトル ================= -->
+<div id="title" class="screen pano" hidden>
+  <h1 class="logo-wrap"><img id="logo" alt="YoursCraft"></h1>
+  <div class="tagline shadow">クリエイティブモード — こわす・つくる・飛ぶ</div>
+  <button class="btn" id="btn-continue" hidden>つづきから</button>
+  <button class="btn" id="btn-newworld">新しい世界をつくる</button>
+  <div class="btnrow">
+    <button class="btn small" id="btn-settings">設定</button>
+    <button class="btn small" id="btn-help">操作説明</button>
+  </div>
+  <div class="credit">自動セーブ：遊んだ内容はこのブラウザに保存されます</div>
+  <div class="version" id="sv"></div>
+</div>
+
+<!-- ================= 新しい世界 ================= -->
+<div id="newworld" class="screen dim" hidden>
+  <div class="panel">
+    <h2>新しい世界をつくる</h2>
+    <div class="row">
+      <label for="seed-input">シード値</label>
+      <input type="text" id="seed-input" placeholder="空ならランダム（文字もOK）" autocomplete="off">
+    </div>
+    <p class="inv-note">同じシード値なら、いつでも同じ地形が生まれます。<br>
+      <strong>いまの世界は消えます。</strong>つくり直す前に、残したいものがないか確認してください。</p>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn small" id="nw-create">この世界をつくる</button>
+      <button class="btn small" id="nw-cancel">やめる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ポーズ ================= -->
+<div id="pause" class="screen dim" hidden>
+  <h2 class="shadow" style="font-size:24px;margin:0 0 10px">ひとやすみ</h2>
+  <button class="btn" id="btn-resume">ゲームに戻る</button>
+  <div class="btnrow">
+    <button class="btn small" id="btn-pause-settings">設定</button>
+    <button class="btn small" id="btn-pause-help">操作説明</button>
+  </div>
+  <button class="btn" id="btn-title">セーブしてタイトルへ</button>
+  <div class="credit">自動セーブ中：数十秒ごとに保存されます</div>
+</div>
+
+<!-- ================= 設定 ================= -->
+<div id="settings" class="screen dim" hidden>
+  <div class="panel">
+    <h2>設定</h2>
+    <div id="settings-body"></div>
+    <div class="btnrow" style="margin-top:16px">
+      <button class="btn small" id="settings-close">とじる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 操作説明 ================= -->
+<div id="help" class="screen dim" hidden>
+  <div class="panel">
+    <h2>あそびかた</h2>
+    <h3>タブレット / スマホ</h3>
+    <table class="help-table">
+      <tr><td>見まわす</td><td>画面を指でなぞる</td></tr>
+      <tr><td>歩く</td><td>左下のスティック（いっぱいに倒すとダッシュ）</td></tr>
+      <tr><td>ブロックを置く</td><td>画面を<strong>タップ</strong></td></tr>
+      <tr><td>ブロックを壊す</td><td>画面を<strong>長押し</strong>（押したままなぞると続けて壊せる）</td></tr>
+      <tr><td>ジャンプ</td><td>右下の ⤒（2 回つづけて押すと飛行に切りかえ）</td></tr>
+      <tr><td>飛ぶ</td><td>✈ で切りかえ → ▲ で上昇 / ▼ で下降</td></tr>
+      <tr><td>ブロックを選ぶ</td><td>下のホットバーをタップ（長押しでインベントリ）</td></tr>
+      <tr><td>インベントリ</td><td>右上の ⊞</td></tr>
+    </table>
+    <h3>パソコン</h3>
+    <table class="help-table">
+      <tr><td>視点</td><td>画面をクリックしてマウス移動（Esc で解除）</td></tr>
+      <tr><td>移動</td><td><code>W A S D</code> ／ ダッシュは <code>Ctrl</code></td></tr>
+      <tr><td>ジャンプ・上昇</td><td><code>Space</code>（2 回押しで飛行切りかえ、<code>F</code> でも可）</td></tr>
+      <tr><td>下降・しゃがむ</td><td><code>Shift</code></td></tr>
+      <tr><td>壊す / 置く</td><td>左クリック / 右クリック（中クリックでブロックをコピー）</td></tr>
+      <tr><td>ブロック選択</td><td><code>1</code>〜<code>9</code> ／ マウスホイール</td></tr>
+      <tr><td>インベントリ</td><td><code>E</code></td></tr>
+      <tr><td>座標表示</td><td><code>F3</code></td></tr>
+    </table>
+    <h3>クリエイティブのきまり</h3>
+    <p class="inv-note" style="text-align:left">
+      体力も空腹もありません。落ちても死にません。ブロックは 1 回で壊れて、いくらでも置けます。<br>
+      岩盤（いちばん下の層）だけは壊せません。花や草は土・草・砂の上にだけ置けます。<br>
+      夜は 20 分で 1 日。設定で昼に固定することもできます。
+    </p>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn small" id="help-close">とじる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= インベントリ ================= -->
+<div id="inventory" class="screen" hidden>
+  <div class="panel inv-panel">
+    <h2>ブロックをえらぶ</h2>
+    <div class="tabs" id="inv-tabs"></div>
+    <div class="inv-grid" id="inv-grid"></div>
+    <div class="inv-hotbar" id="inv-hotbar"></div>
+    <div class="inv-note">ブロックをタップすると、選んでいるホットバーの枠に入ります。<br>下の枠をタップすると入れる場所を変えられます。</div>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn small" id="inv-close">とじる</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/noise.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/worldgen.js"></script>
+<script src="js/world.js"></script>
+<script src="js/render.js"></script>
+<script src="js/player.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
