@@ -1412,7 +1412,7 @@
       if (!slot) return false;
       selectSlot(parseInt(slot.dataset.i, 10));
       clearTimeout(hbTimer);
-      hbTimer = setTimeout(openInventory, 450);
+      hbTimer = setTimeout(openInventory, 650);
       return true;
     }
     el.hotbar.addEventListener('touchstart', function (e) {
