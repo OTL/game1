@@ -38,6 +38,7 @@
   function boot() {
     ['gl', 'hud', 'crosshair', 'hotbar', 'itemname', 'debug', 'toast', 'hint', 'stick', 'knob',
       'rightpad', 'btn-jump', 'btn-up', 'btn-down', 'btn-fly', 'btn-inv', 'btn-pause', 'topright',
+      'actionpad', 'btn-break', 'btn-place',
       'title', 'pause', 'settings', 'help', 'inventory', 'loading', 'newworld',
       'water-tint', 'lava-tint', 'logo', 'bar-fill', 'loading-text', 'btn-continue', 'btn-newworld',
       'inv-grid', 'inv-tabs', 'inv-hotbar', 'seed-input', 'sv'].forEach(function (id) { el[id] = $(id); });
@@ -341,7 +342,7 @@
     Audio.resume();
     if (!Game.hintShown) {
       Game.hintShown = true;
-      hint(isTouch() ? '画面をタップで置く / 長押しで壊す。左下で移動、右下でジャンプ' :
+      hint(isTouch() ? '⛏ こわす / ▣ おく ボタン（画面のタップで置く・長押しで壊すこともできます）' :
         'クリックで画面をつかむ → 左クリックで壊す / 右クリックで置く', 6000);
     }
   }
@@ -985,6 +986,8 @@
   var holdAction = null, holdSource = null, holdStart = 0, holdLast = 0, holdMoved = 0;
   var lastTouchAt = 0;   /* タッチの直後に来る「合成マウスイベント」を無視するため */
   var TAP_MS = 350;      /* これより短ければ「タップ（置く）」、長ければ「長押し（壊す）」 */
+  var TAP_SLOP = 24;     /* タップと認める、押しはじめからのずれ（px） */
+  var HOLD_SLOP = 44;    /* 長押しと認める、押しはじめからのずれ（px） */
 
   /* タッチ端末では、指の操作のあとにブラウザが mousedown/mouseup/mousemove を
      追加で投げてくる（互換のための合成イベント）。これを本物のマウスとして扱うと
@@ -1085,7 +1088,7 @@
       if (e.cancelable) e.preventDefault();
       lastTouchAt = performance.now();
       capture(canvas, e.pointerId);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: 0 });
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: 0, dist: 0 });
       if (lookId === null) lookId = e.pointerId;
       holdStart = performance.now();
       holdMoved = 0;
@@ -1099,8 +1102,12 @@
       var dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
       p.moved += Math.abs(dx) + Math.abs(dy);
+      /* 「動いたか」は押しはじめからの距離で見る。移動量の足し算だと、
+         指のわずかなブレが積み上がって、ふつうのタップまで無効になってしまう。 */
+      var ox = e.clientX - p.sx, oy = e.clientY - p.sy;
+      p.dist = Math.sqrt(ox * ox + oy * oy);
       if (e.pointerId === lookId) look(dx * 1.35, dy * 1.35);
-      if (p.moved > 16) {
+      if (p.dist > TAP_SLOP) {
         holdMoved = 1;
         if (Game.pendingTap === e.pointerId && !holdAction) Game.pendingTap = null;
       }
@@ -1113,7 +1120,7 @@
       var held = performance.now() - p.t;
       if (e.pointerId === lookId) lookId = pointers.size ? pointers.keys().next().value : null;
       if (holdAction && holdSource === 'touch') { holdAction = null; holdSource = null; return; }
-      if (Game.pendingTap === e.pointerId && p.moved < 16 && held < TAP_MS) {
+      if (Game.pendingTap === e.pointerId && p.dist < TAP_SLOP && held < TAP_MS) {
         /* 短いタップ */
         if (Game.settings.swapTap) digBlock(); else placeBlock();
       }
@@ -1128,7 +1135,7 @@
       if (Game.pendingTap === null || Game.pendingTap === undefined) return;
       var p = pointers.get(Game.pendingTap);
       if (!p) return;
-      if (performance.now() - p.t > TAP_MS && p.moved < 26) {
+      if (performance.now() - p.t > TAP_MS && p.dist < HOLD_SLOP) {
         holdAction = Game.settings.swapTap ? 'place' : 'dig';
         holdSource = 'touch';
         holdLast = 0;
@@ -1215,6 +1222,19 @@
     }, function () { Game.btnJump = false; Game.ctrl.jump = false; });
     holdBtn('btn-up', function () { Game.btnUp = true; Game.ctrl.jump = true; }, function () { Game.btnUp = false; Game.ctrl.jump = false; });
     holdBtn('btn-down', function () { Game.btnDown = true; Game.ctrl.sneak = true; }, function () { Game.btnDown = false; Game.ctrl.sneak = false; });
+    /* 壊す／置くのボタン。押しっぱなしで連続して効く（画面の長押しと同じ） */
+    holdBtn('btn-break', function () {
+      digBlock();
+      holdAction = 'dig'; holdSource = 'button'; holdLast = performance.now();
+    }, function () {
+      if (holdSource === 'button') { holdAction = null; holdSource = null; }
+    });
+    holdBtn('btn-place', function () {
+      placeBlock();
+      holdAction = 'place'; holdSource = 'button'; holdLast = performance.now();
+    }, function () {
+      if (holdSource === 'button') { holdAction = null; holdSource = null; }
+    });
     el['btn-fly'].addEventListener('click', function (e) { e.preventDefault(); toggleFly(); });
 
     /* ---- ホットバー（タップで選ぶ・長押しでインベントリ） ---- */
