@@ -12,7 +12,7 @@
   }
 
   Audio2.prototype.init = function () {
-    if (this.ctx) return;
+    if (this.ctx || !this.enabled) return;
     var AC = global.AudioContext || global.webkitAudioContext;
     if (!AC) { this.enabled = false; return; }
     try { this.ctx = new AC(); } catch (e) { this.enabled = false; return; }
@@ -28,15 +28,22 @@
   };
 
   Audio2.prototype.resume = function () {
-    this.init();
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    try {
+      this.init();
+      if (this.ctx && this.ctx.state === 'suspended') {
+        var pr = this.ctx.resume();
+        /* Safari は Promise を返さずに例外を投げることがある */
+        if (pr && pr.catch) pr.catch(function () { /* 音が出なくても遊べる */ });
+      }
+    } catch (e) { this.enabled = false; }
   };
 
   /* ノイズを帯域で切って短く鳴らす = 掘る音・足音の素 */
   Audio2.prototype._burst = function (o) {
     if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
+    try { this.init(); } catch (e) { this.enabled = false; return; }
+    if (!this.ctx || !this.noise) return;
+    try {
     var ctx = this.ctx, t = ctx.currentTime;
     var src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -57,12 +64,14 @@
     src.connect(filt); filt.connect(g); g.connect(this.master);
     src.start(t, Math.random() * 0.5);
     src.stop(t + o.dur + 0.02);
+    } catch (e) { /* 音が出せなくてもゲームは続ける */ }
   };
 
   Audio2.prototype._tone = function (freq, dur, gain, type, slide) {
     if (!this.enabled) return;
-    this.init();
+    try { this.init(); } catch (e) { this.enabled = false; return; }
     if (!this.ctx) return;
+    try {
     var ctx = this.ctx, t = ctx.currentTime;
     var osc = ctx.createOscillator();
     osc.type = type || 'sine';
@@ -74,6 +83,7 @@
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     osc.connect(g); g.connect(this.master);
     osc.start(t); osc.stop(t + dur + 0.02);
+    } catch (e) { /* 同上 */ }
   };
 
   var MAT = {

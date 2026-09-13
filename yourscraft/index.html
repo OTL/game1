@@ -13,7 +13,7 @@
 <meta property="og:title" content="YoursCraft — ブロックでつくる世界">
 <meta property="og:description" content="タブレットで遊べるマイクラ風クリエイティブ。飛んで、掘って、建てるだけ。自動セーブ付き。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%238a6240'/><rect width='32' height='12' fill='%237cb342'/><rect x='0' y='10' width='32' height='3' fill='%23689f38'/></svg>">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=1.1">
 </head>
 <body>
 
@@ -25,6 +25,7 @@
 <!-- ================= HUD ================= -->
 <div id="hud" hidden>
   <div id="crosshair"></div>
+  <div id="ripples"></div>
   <div id="debug" hidden></div>
   <div id="toast"></div>
   <div id="hint"></div>
@@ -98,6 +99,7 @@
   </div>
   <button class="btn" id="btn-title">セーブしてタイトルへ</button>
   <div class="credit">自動セーブ中：数十秒ごとに保存されます</div>
+  <div class="version" id="pause-version"></div>
 </div>
 
 <!-- ================= 設定 ================= -->
@@ -163,15 +165,15 @@
   </div>
 </div>
 
-<script src="js/noise.js"></script>
-<script src="js/blocks.js"></script>
-<script src="js/worldgen.js"></script>
-<script src="js/world.js"></script>
-<script src="js/render.js"></script>
-<script src="js/player.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/save.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/main.js"></script>
+<script src="js/noise.js?v=1.1"></script>
+<script src="js/blocks.js?v=1.1"></script>
+<script src="js/worldgen.js?v=1.1"></script>
+<script src="js/world.js?v=1.1"></script>
+<script src="js/render.js?v=1.1"></script>
+<script src="js/player.js?v=1.1"></script>
+<script src="js/audio.js?v=1.1"></script>
+<script src="js/save.js?v=1.1"></script>
+<script src="js/ui.js?v=1.1"></script>
+<script src="js/main.js?v=1.1"></script>
 </body>
 </html>
