@@ -23,6 +23,16 @@
       早く答えるほど点は高い。
     </p>
     <p id="loading" class="loading">シルエットを準備中…</p>
+
+    <div id="modeBtns" class="modes" hidden role="group" aria-label="モード">
+      <button type="button" data-mode="solo" class="on">
+        <b>ひとりで</b><small>ライフ制・ハイスコア</small>
+      </button>
+      <button type="button" data-mode="versus">
+        <b>ふたり対戦</b><small>早押し・1台で対戦</small>
+      </button>
+    </div>
+
     <div id="levelBtns" class="levels" hidden>
       <button type="button" data-level="normal">
         <b>ふつう</b><small>12秒／回転すこし／ズーム1.7倍</small><span class="best"></span>
@@ -34,17 +44,23 @@
         <b>鬼</b><small>7秒／変形つき／ズーム4.2倍／選択肢6・ライフ2</small><span class="best"></span>
       </button>
     </div>
-    <ul class="tips">
+    <ul class="tips" id="tipsSolo">
       <li>選択肢は<strong>わざと似たものが並びます</strong>（ネコの問題にはイヌ・キツネ・オオカミ）。</li>
       <li><b>ヒント</b>を押すと即座に全体が見えますが、得点は半分。</li>
       <li>キーボードの <kbd>1</kbd>〜<kbd>6</kbd> で回答、<kbd>H</kbd> でヒント。</li>
+    </ul>
+    <ul class="tips" id="tipsVersus" hidden>
+      <li><strong>1台の画面で早押し対戦。</strong>同じ影を見て、先に正解した方が得点。</li>
+      <li>上が <b class="p2ink">2P</b>、下が <b class="p1ink">1P</b> の回答ボタン。タップでも回答できます。</li>
+      <li>キーボードは <b class="p1ink">1P</b>＝<kbd>1</kbd>〜<kbd>6</kbd>、<b class="p2ink">2P</b>＝<kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd><kbd>Y</kbd>。</li>
+      <li><strong>お手つき注意。</strong>まちがえるとその問題は答えられなくなり、相手だけが答えられます。</li>
     </ul>
     <p class="home"><a href="../">← ゲーム一覧へ</a></p>
   </section>
 
   <!-- ゲーム -->
   <section id="gameView" class="view game" hidden>
-    <div class="hud">
+    <div class="hud" id="hudSolo">
       <div class="stat"><span class="k">スコア</span><span class="v" id="score">0</span></div>
       <div class="stat"><span class="k">コンボ</span><span class="v" id="combo">—</span></div>
       <div class="stat"><span class="k">ライフ</span><span class="v hearts" id="lives"></span></div>
@@ -52,7 +68,17 @@
       <button type="button" id="quitBtn" class="ghost">やめる</button>
     </div>
 
+    <div class="hud vsHud" id="hudVersus" hidden>
+      <div class="stat p1"><span class="k">1P（下）</span><span class="v" id="score1">0</span></div>
+      <div class="stat vs"><span class="k">&nbsp;</span><span class="v">vs</span></div>
+      <div class="stat p2"><span class="k">2P（上）</span><span class="v" id="score2">0</span></div>
+      <div class="stat"><span class="k">問題</span><span class="v" id="progressVs">1 / 7</span></div>
+      <button type="button" id="quitBtn2" class="ghost">やめる</button>
+    </div>
+
     <div class="timeTrack"><div class="timeBar" id="timeBar"></div></div>
+
+    <div class="choices side p2side" id="choices2" hidden></div>
 
     <div class="stageWrap">
       <canvas id="stage" width="460" height="460" aria-label="シルエット"></canvas>
@@ -60,17 +86,30 @@
     </div>
 
     <div class="choices" id="choices"></div>
+    <p class="vsNote" id="vsNote" hidden><span class="p2ink">2P</span> は上のボタン（<kbd>Q</kbd>〜<kbd>Y</kbd>）／<span class="p1ink">1P</span> は下のボタン（<kbd>1</kbd>〜<kbd>6</kbd>）</p>
     <button type="button" id="hintBtn" class="hint">ヒント：全体を見る（得点半分）</button>
   </section>
 
   <!-- リザルト -->
   <section id="resultView" class="view result" hidden>
     <h2>リザルト</h2>
-    <p id="newBest" class="newBest" hidden>★ ハイスコア更新！</p>
-    <p class="bigScore"><span id="resultScore">0</span><small>点</small></p>
-    <p class="best2">ベスト <span id="resultBest">0</span></p>
+
+    <div id="soloResult">
+      <p id="newBest" class="newBest" hidden>★ ハイスコア更新！</p>
+      <p class="bigScore"><span id="resultScore">0</span><small>点</small></p>
+      <p class="best2">ベスト <span id="resultBest">0</span></p>
+    </div>
+
+    <div id="versusResult" hidden>
+      <p class="winner" id="winnerText">—</p>
+      <div class="vsBoard">
+        <div class="vsCol p1"><span class="who">1P</span><span class="pt" id="finalScore1">0</span><span class="sub" id="finalSub1"></span></div>
+        <div class="vsCol p2"><span class="who">2P</span><span class="pt" id="finalScore2">0</span><span class="sub" id="finalSub2"></span></div>
+      </div>
+    </div>
+
     <p class="detail" id="resultDetail"></p>
-    <h3>まちがえた問題</h3>
+    <h3 id="missTitle">まちがえた問題</h3>
     <ul class="missList" id="missList"></ul>
     <div class="resultBtns">
       <button type="button" id="retryBtn" class="primary">もう一度</button>
