@@ -360,6 +360,9 @@
       : '<li class="empty">できごとは まだない</li>';
 
     $('dex-count').textContent = Dex.count();
+    $('bag-count').textContent = Items.countUsable();
+    $('coll-count').textContent = Items.foundCount();
+    if (!$('bag-overlay').hidden) renderBag();
 
     // ── おでかけ
     const box = $('outbox');
@@ -474,6 +477,8 @@
 
     burst(def.emoji, key === 'pet' ? 3 : 7, 130);
     anim = { kind: def.anim, until: performance.now() + 600, dur: 600 };
+    // おせわの ついでに、ものおきや にわで 何かを 見つけることがある
+    findQuietly('care:' + key, key === 'pet' ? 0.02 : 0.05);
     refresh();
   }
 
@@ -521,9 +526,29 @@
     refresh();
   });
 
+  const OUT_FIND = {
+    short: { c: 0.50, u: 0.30 },
+    mid:   { c: 0.75, u: 0.50 },
+    long:  { c: 0.95, u: 0.75 }
+  };
+
   function claimOuting(early) {
+    const kind = World.state.outing ? World.state.outing.kind : 'mid';
+    const cond = World.state.outing ? World.state.outing.cond : 0.8;
     const r = Outing.claim(World, early);
     if (!r) return;
+    const w = OUT_FIND[kind] || OUT_FIND.mid;
+    const ratio = r.early ? 0.5 : 1;
+    r.finds = (r.exp > 0 || !r.early)
+      ? Items.roll({
+          seed: World.state.seed + ':out:' + Date.now(),
+          collectChance: w.c * ratio + (r.charm ? 0.5 : 0),
+          usableChance: w.u * ratio,
+          luck: (r.rare ? 1 : 0) + (r.charm ? 0.6 : 0) + Math.max(0, cond - 0.75) * 3,
+          lens: true
+        })
+      : [];
+    logFinds(r.finds);
     showGift(r);
     refresh();
   }
@@ -533,12 +558,61 @@
     claimOuting(true);
   });
 
+  // ── アイテムを 見つける ──────────────────────────────
+  function findRow(f) {
+    if (f.kind === 'usable') {
+      return '<div class="giftrow item"><b>' + f.item.emoji + ' ' + esc(f.item.name) + '</b>' +
+        '<span>どうぐに くわわった</span></div>';
+    }
+    const rar = Items.RARITY[f.item.rarity];
+    return '<div class="giftrow item"><b><img class="ficon" src="' + Items.iconDataURL(f.item, 48) +
+      '" alt="" width="34" height="34">' + esc(f.item.name) + '</b>' +
+      '<span style="color:' + rar.color + '">' + rar.name +
+      (f.isNew ? ' / はじめて！' : ' / もっている') + '</span></div>';
+  }
+
+  function logFinds(finds) {
+    finds.forEach((f) => {
+      if (f.kind === 'usable') {
+        World.addLog(f.item.emoji + ' ' + f.item.name + ' を ひろった');
+      } else {
+        World.addLog('🧺 ' + f.item.name + ' を ひろった' + (f.isNew ? '（はじめて！）' : ''));
+      }
+      if (f.bonus) World.addLog('🎁 コレクション ' + Items.foundCount() + ' 種の ごほうび: ' + f.bonus.name);
+    });
+    if (finds.length) World.save();
+  }
+
+  // おせわの ついでに 見つかることがある（ちいさく、しずかに）
+  function findQuietly(tag, chance) {
+    const finds = Items.roll({
+      seed: World.state.seed + ':' + tag + ':' + Date.now(),
+      collectChance: chance, usableChance: chance * 0.7, luck: 0
+    });
+    if (!finds.length) return;
+    logFinds(finds);
+    const f = finds[0];
+    burst(f.kind === 'usable' ? f.item.emoji : '🧺', 5, 130);
+    flash(f.kind === 'usable'
+      ? f.item.emoji + ' ' + f.item.name + ' を ひろった！'
+      : '🧺 ' + f.item.name + (f.isNew ? ' を はじめて ひろった！' : ' を ひろった'),
+      f.kind === 'usable' ? '#6affc0' : '#4dd0ff');
+  }
+
+  function showFindSheet(title, finds) {
+    $('gift-title').textContent = title;
+    $('gift-body').innerHTML = finds.map(findRow).join('');
+    $('gift-overlay').hidden = false;
+  }
+
   function showGift(r) {
     $('gift-title').textContent = r.early ? 'よびもどした' : (r.rare ? '🌟 すごい おみやげ！' : 'おかえり！');
     const rows = [];
     if (r.exp > 0) rows.push('<div class="giftrow"><b>+' + r.exp + '</b><span>けいけんち</span></div>');
     if (r.stat) rows.push('<div class="giftrow"><b>' + r.statLabel + ' +' + r.gain + '</b><span>とっくんの おみやげ</span></div>');
     if (r.keepsake) rows.push('<div class="giftrow keep"><b>' + esc(r.keepsake) + '</b><span>おもいでに くわわった</span></div>');
+    (r.finds || []).forEach((f) => rows.push(findRow(f)));
+    if (r.charm) rows.push('<div class="giftrow"><b>🍀 1.5 ばい</b><span>おまもりが きいた</span></div>');
     if (!rows.length) rows.push('<div class="giftrow"><b>なにも なかった</b><span>すぐ もどってきたから…</span></div>');
     $('gift-body').innerHTML = rows.join('');
     $('gift-overlay').hidden = false;
@@ -697,6 +771,7 @@
   const bctx = bcv.getContext('2d');
   const BW = bcv.width, BH = bcv.height;
   let battle = null, bBusy = false, bShake = 0, bFaint = { you: 0, foe: 0 };
+  let pendingFinds = [];
   let hpShown = { you: 0, foe: 0 };
   let skipWait = false;
 
@@ -808,8 +883,17 @@
         s.keepsakes.push({ t: World.now(), text: '🕯️ ' + battle.rec.name +' を こえた しるし' });
         if (s.keepsakes.length > 12) s.keepsakes = s.keepsakes.slice(-12);
       }
+      pendingFinds = Items.roll({
+        seed: s.seed + ':win:' + Date.now(),
+        collectChance: anc ? 1 : 0.40,
+        usableChance: anc ? 0.5 : 0.25,
+        luck: (anc ? 1 : 0) + battle.foe.stats.level / 45,
+        lens: true
+      });
+      logFinds(pendingFinds);
       World.addLog(battle.foe.name + ' に かった（+' + gain + ' EXP）');
-      setMsg('かった！ けいけんち ' + gain + ' を てにいれた！');
+      setMsg('かった！ けいけんち ' + gain + ' を てにいれた！' +
+        (pendingFinds.length ? ' おとしものも ひろった。' : ''));
     } else if (result === 'lose') {
       s.battles.lose++;
       s.care.mood = clamp(s.care.mood - 14, 0, 100);
@@ -827,6 +911,11 @@
   function closeBattle() {
     bOverlay.hidden = true;
     battle = null;
+    if (pendingFinds.length) {
+      const f = pendingFinds;
+      pendingFinds = [];
+      showFindSheet('⚔️ たたかいの おとしもの', f);
+    }
     refresh();
   }
 
@@ -908,10 +997,120 @@
     renderDex('pick');
   });
 
+  // ── どうぐ ───────────────────────────────────────────
+  function renderBag() {
+    const bag = Items.bag();
+    const owned = Items.USABLE.filter((u) => bag.usable[u.id] > 0);
+    const buffs = [];
+    if (Items.hasCharm()) buffs.push('🍀 おまもりが きいている（つぎの おでかけ 1.5 倍）');
+    if (Items.lensLeft() > 0) buffs.push('🔍 レンズが きいている（あと ' + Items.lensLeft() + ' 回）');
+    $('bag-note').innerHTML = (buffs.length ? '<b class="bagbuff">' + buffs.join(' ／ ') + '</b><br>' : '') +
+      'おでかけ・バトル・おせわの ついでに ひろえます。' +
+      (World.isOuting() ? '<b class="bagwarn"> いまは おでかけ中なので つかえません。</b>' : '');
+
+    $('bag-list').innerHTML = owned.length ? owned.map((u) => {
+      const rar = Items.RARITY[u.rarity];
+      return '<div class="bagcard">' +
+        '<span class="bagemoji">' + u.emoji + '</span>' +
+        '<div class="baginfo"><b>' + esc(u.name) + ' <i class="bagn">×' + bag.usable[u.id] + '</i></b>' +
+        '<span>' + esc(u.desc) + '</span>' +
+        '<span class="bagrar" style="color:' + rar.color + '">' + rar.name + 'の どうぐ</span></div>' +
+        '<button class="bagbtn" data-use="' + u.id + '">つかう</button>' +
+        '</div>';
+    }).join('') : '<p class="empty">どうぐは まだ ひとつも ない。おでかけに 送り出すのが いちばんの ちかみち。</p>';
+  }
+
+  $('btn-bag').addEventListener('click', () => { renderBag(); $('bag-overlay').hidden = false; });
+  $('bag-close').addEventListener('click', () => { $('bag-overlay').hidden = true; });
+  $('bag-list').addEventListener('click', (e) => {
+    const b = e.target.closest('.bagbtn');
+    if (!b) return;
+    World.tick();
+    if (World.isDead()) { $('bag-overlay').hidden = true; showBye(); return; }
+    const r = Items.use(World, b.dataset.use);
+    if (r.error) { renderBag(); flash(r.error, '#ff9f9f'); return; }
+    if (World.tryMend()) {
+      World.addLog('ごきげんが かんぺきに なった（ケアミス −1）');
+      burst('💗', 8, 150);
+    }
+    burst(r.burst, 8, 150);
+    anim = { kind: 'hop', until: performance.now() + 600, dur: 600 };
+    flash(r.text, '#6affc0');
+    renderBag();
+    refresh();
+  });
+
+  // ── コレクション ─────────────────────────────────────
+  let collCat = Items.CATS[0].key;
+  let collPick = null;
+
+  function renderColl() {
+    const total = Items.TOTAL;
+    const found = Items.foundCount();
+    const rp = Items.rarityProgress();
+    $('coll-sum').innerHTML =
+      '<div class="counter"><b>' + found + ' / ' + total + '</b><span>あつめた</span></div>' +
+      rp.map((r, i) =>
+        '<div class="counter"><b style="color:' + Items.RARITY[i].color + '">' + r.found + ' / ' + r.total +
+        '</b><span>' + Items.RARITY[i].name + '</span></div>').join('') +
+      '<div class="collbar"><i style="width:' + (found / total * 100) + '%"></i></div>';
+
+    $('coll-tabs').innerHTML = Items.CATS.map((c) => {
+      const p = Items.catProgress(c.key);
+      return '<button class="colltab' + (c.key === collCat ? ' on' : '') + '" data-cat="' + c.key + '">' +
+        c.emoji + ' ' + c.name + '<small>' + p.found + '/' + p.total + '</small></button>';
+    }).join('');
+
+    $('coll-grid').innerHTML = Items.BY_CAT[collCat].map((it) => {
+      const got = Items.foundEntry(it.id);
+      const rar = Items.RARITY[it.rarity];
+      if (!got) {
+        return '<button class="collcell miss" data-item="' + it.id + '" title="まだ みつけていない">' +
+          '<span class="qmark" style="color:' + rar.color + '55">？</span></button>';
+      }
+      return '<button class="collcell r' + it.rarity + '" data-item="' + it.id + '">' +
+        '<img src="' + Items.iconDataURL(it, 96) + '" alt="" width="48" height="48">' +
+        (got.n > 1 ? '<i class="cn">×' + got.n + '</i>' : '') + '</button>';
+    }).join('');
+
+    const it = collPick ? Items.COLLECT_BY_ID[collPick] : null;
+    if (!it) {
+      $('coll-info').innerHTML = '<span class="empty">マスを えらぶと 名前が でます。' +
+        '20 種 あつめるごとに どうぐが 1 つ もらえます。</span>';
+    } else {
+      const got = Items.foundEntry(it.id);
+      const rar = Items.RARITY[it.rarity];
+      $('coll-info').innerHTML = got
+        ? '<img src="' + Items.iconDataURL(it, 96) + '" alt="" width="44" height="44">' +
+          '<div><b>' + esc(it.name) + '</b><span style="color:' + rar.color + '">' + rar.name +
+          ' / ' + it.catEmoji + ' ' + it.catName + ' / ' + got.n + ' こ</span>' +
+          '<span class="collwhen">はじめて みつけた: ' + ymd(got.t) + '</span></div>'
+        : '<div><b>？？？</b><span style="color:' + rar.color + '">' + rar.name +
+          ' / ' + it.catEmoji + ' ' + it.catName + '</span>' +
+          '<span class="collwhen">まだ みつけていない</span></div>';
+    }
+  }
+
+  $('btn-coll').addEventListener('click', () => { renderColl(); $('coll-overlay').hidden = false; });
+  $('coll-close').addEventListener('click', () => { $('coll-overlay').hidden = true; });
+  $('coll-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('.colltab');
+    if (!b) return;
+    collCat = b.dataset.cat; collPick = null;
+    renderColl();
+  });
+  $('coll-grid').addEventListener('click', (e) => {
+    const b = e.target.closest('.collcell');
+    if (!b) return;
+    collPick = b.dataset.item;
+    renderColl();
+  });
+
   // ── ダイアログ ───────────────────────────────────────
   $('btn-help').addEventListener('click', () => { $('help-overlay').hidden = false; });
   $('help-close').addEventListener('click', () => { $('help-overlay').hidden = true; });
-  [['help-overlay'], ['diary-overlay'], ['gift-overlay'], ['dex-overlay']].forEach((a) => {
+  [['help-overlay'], ['diary-overlay'], ['gift-overlay'], ['dex-overlay'],
+   ['bag-overlay'], ['coll-overlay']].forEach((a) => {
     const el = $(a[0]);
     el.addEventListener('click', (e) => { if (e.target === el) el.hidden = true; });
   });

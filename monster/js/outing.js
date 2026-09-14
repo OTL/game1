@@ -90,7 +90,9 @@
     const durH = (c.ms / HOUR) * ratio;
     const condF = 0.45 + o.cond * 0.75;
     const rare = rng.chance(0.1);
-    const mult = rare ? 2 : 1;
+    // しあわせの おまもりを 持たせていれば おみやげが 1.5 倍（1 回で なくなる）
+    const charm = (global.Items && Items.takeOutingBoost) ? Items.takeOutingBoost() : 1;
+    const mult = (rare ? 2 : 1) * charm;
 
     const exp = Math.round(durH * 7 * condF * mult);
     const statKey = rng.pick(['hp', 'atk', 'def', 'spd']);
@@ -116,7 +118,7 @@
     world.save();
 
     return {
-      course: c, early: !!early, rare: rare,
+      course: c, early: !!early, rare: rare, charm: charm > 1,
       exp: exp, stat: statKey, statLabel: label, gain: gain, keepsake: keepsake
     };
   }
