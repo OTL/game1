@@ -401,6 +401,7 @@
     // 図鑑を空にして 1 代目からやり直す
     resetAll: function () {
       Dex.clear();
+      if (global.Items) Items.clear();
       const p = freshPet({});
       this.state = p;
       this.genome = Species.makeGenome(p.seed, null);

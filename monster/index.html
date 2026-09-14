@@ -22,6 +22,8 @@
     </div>
     <div class="topright">
       <button class="chip" id="btn-dex" type="button">📖 ずかん <b id="dex-count">0</b></button>
+      <button class="chip" id="btn-bag" type="button">🎒 どうぐ <b id="bag-count">0</b></button>
+      <button class="chip" id="btn-coll" type="button">🧺 コレクション <b id="coll-count">0</b>/500</button>
       <button class="chip" id="btn-diary" type="button">📓 るすばん日記</button>
       <button class="chip" id="btn-help" type="button">？ あそびかた</button>
     </div>
@@ -197,6 +199,28 @@
   </div>
 </div>
 
+<!-- ── どうぐ ──────────────────────────────────────── -->
+<div class="overlay" id="bag-overlay" hidden>
+  <div class="sheet">
+    <h2>🎒 どうぐ</h2>
+    <p class="bagnote" id="bag-note"></p>
+    <div class="baglist" id="bag-list"></div>
+    <button class="close" id="bag-close" type="button">とじる</button>
+  </div>
+</div>
+
+<!-- ── コレクション ────────────────────────────────── -->
+<div class="overlay" id="coll-overlay" hidden>
+  <div class="sheet wide">
+    <h2>🧺 コレクション</h2>
+    <div class="collsum" id="coll-sum"></div>
+    <div class="colltabs" id="coll-tabs"></div>
+    <div class="collgrid" id="coll-grid"></div>
+    <div class="collinfo" id="coll-info"></div>
+    <button class="close" id="coll-close" type="button">とじる</button>
+  </div>
+</div>
+
 <!-- ── あそびかた ──────────────────────────────────── -->
 <div class="overlay" id="help-overlay" hidden>
   <div class="sheet">
@@ -237,6 +261,18 @@
           いちばん元気だったころの姿で 立ちはだかります。</li>
     </ul>
 
+    <h3>アイテム</h3>
+    <ul>
+      <li><b>どうぐ</b> — おでかけ・バトル・おせわの ついでに ひろいます。
+          まんぷくを 45 もどす ごちそう、げんきを 100 にする まくら、
+          めったに 出ない <b>ケアミスを 返上する くすり</b> など 13 種類。</li>
+      <li><b>コレクション</b> — <b>500 種類</b>。強さには 1 ミリも 効きません。ただ あつまります。
+          いし・はっぱ・はな・きのみ・うみ・はね・そら・おもちゃ・むかしのもの・ふしぎ の 10 カテゴリ ×
+          50 種。ふつう／めずらしい／レア／でんせつ の 4 段階。</li>
+      <li><b>20 種 あつめるごとに</b> どうぐが 1 つ もらえます。</li>
+      <li>おでかけは いちばん よく ひろいます。とおくへ 行くほど、コンディションが 良いほど 良いものを。</li>
+    </ul>
+
     <h3>世代と ずかん</h3>
     <ul>
       <li>旅立ったコは <b>ずかん</b> に残ります。生きた時間・ケアミス・死因・称号 ぜんぶ。</li>
@@ -255,6 +291,7 @@
 <script src="js/species.js"></script>
 <script src="js/sprite.js"></script>
 <script src="js/dex.js"></script>
+<script src="js/items.js"></script>
 <script src="js/state.js"></script>
 <script src="js/diary.js"></script>
 <script src="js/outing.js"></script>
