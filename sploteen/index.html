@@ -507,7 +507,7 @@ var WEAPONS = {
     damage:35,            // 1発ダメージ (3発で撃破。第4ラウンドで27→35、射程短縮でチャージャー等に近づく間に被弾する分を、詰めきった後の火力で相殺)
     inkPerShot:6,         // 1発の消費インク(ボット用。人間用は human.inkPerShot)
     human:{ inkPerShot:2 }, // 第6ラウンド: 人間専用のインクコスト
-    paintRadius:2.0,      // 着弾の塗り半径(セル)(第4ラウンドで1.5→1.9→2.05。第9ラウンドの実験計画法で2.05→2.0。塗り半径はシューター勝率への最大の梃子で、主効果は0.4セルあたり約18pt)
+    paintRadius:2.1,      // 着弾の塗り半径(セル)(第4ラウンドで1.5→1.9→2.05。第9ラウンドの実験計画法で2.05→2.0。第11ラウンドのサブ強化で、インクを食う武器ほどサブに回す余裕がなく不利になったぶんを 2.0→2.1 で戻した。塗り半径はシューター勝率への最大の梃子で、主効果は0.4セルあたり約18pt)
     spread:6*Math.PI/180, // 弾のばらつき角(片側)
     moveSpeedMul:1.14,    // 移動速度倍率(第4ラウンド追加調整で1.0→1.14。機動力のある近距離万能武器として、詰める/離脱するまでの被弾時間を短縮)
   },
@@ -555,7 +555,7 @@ var WEAPONS = {
     name:'フデ', emoji:'🖌', desc:'かるくて はやい。れんぞくで ふりはらう', defaultSub:'quickbomb', defaultSpecial:'manta',
     moveSpeedMul:1.45,       // 実機フィードバックでローラーとの差別化のため1.35→1.45(最速をさらに強調)
     enemyInkMul:0.75,        // フデだけ相手インク上の減速を緩める(他武器のENEMY_INK_MUL 0.55の代わりに0.75)
-    trailWidth:2.81,         // 移動時に塗る幅(セル。実機フィードバックで2.3→2.0。第9ラウンドの実験計画法で2.0→2.81、主効果は1セルあたり約23pt)
+    trailWidth:2.55,         // 移動時に塗る幅(セル。実機フィードバックで2.3→2.0。第9ラウンドの実験計画法で2.0→2.81。第11ラウンドのサブ強化で、インクを使わず塗れるフデだけがサブの強化をまるごと得して勝ちすぎたため 2.81→2.55。主効果は1セルあたり約23pt)
     swingCount:4, swingBulletSpeed:820, swingRange:150, swingDamage:12, swingPaintRadius:0.8, // swingDamageは第9ラウンドの実験計画法で10→12
     swingInkCost:6, swingCooldown:0.22, // ふりはらい: エイムパッドを押している間0.22秒ごとに自動連続(タップ単発から変更)。飛沫4発・1発18ダメージ・射程150px、1振りインク6
     human:{ brushCostPerCell:0.06 }, // 第6ラウンド: 人間専用(走り塗りは新規セル1つにつきこのインクを消費。自陣の上は新規扱いされないので無料)
@@ -598,28 +598,43 @@ for (var spk in SPECIALS) SPECIALS[spk].key = spk;
 var SUBS = {
   splashbomb:{
     name:'スプラッシュボム', emoji:'💣', desc:'なげて じばくはつ。ひろく ぬれる',
-    throwDist:200, fuse:1.0, radius:4.5, dmgCenter:100, dmgEdge:40, inkCost:45, // バランス調整で55→45(コスト±10の範囲内。撃ち続ける武器での使用回数確保のため)
+    // 第11ラウンド:「メインだけ vs サブだけ」の実測でサブの塗り力がメインの4.7%しかなかったため強化。
+    // radius 4.5→4.9(1発の塗り面積が約1.2倍)、inkCost 45→30(インクの重さがいちばん効いた。
+    // 安くすると、撃つのにインクを使うシューター/バケツほど得をする)
+    throwDist:200, fuse:1.0, radius:4.9, dmgCenter:100, dmgEdge:40, inkCost:30,
+    // ボットの再投げ待ち(秒)。第11ラウンドで既定の 5+0〜5 から短縮
+    botThrowGap:2.5, botThrowGapSpan:2.5,
+    // botPaintThrow: 相手を狙えないときに「塗るために」自分色でない面の多い方向へ投げる(第11ラウンド)。
+    // botPaintGap/Span=投げ直しの間隔(秒)、botPaintMinCells=着弾点で塗り直せるセル数の下限、
+    // botPaintInkMargin=inkCostに上乗せして要求するインク(これ未満なら塗り目的では投げない)
+    botPaintThrow:true, botPaintGap:5.0, botPaintGapSpan:3.0, botPaintMinCells:20, botPaintInkMargin:30,
   },
   quickbomb:{
     name:'クイックボム', emoji:'⚡', desc:'あたると すぐ ばくはつ。れんとうできる',
-    throwDist:160, fuse:0, radius:3.3, dmgCenter:35, dmgEdge:15, inkCost:28, // バランス調整でdmgCenter50→35, dmgEdge25→15(対スプリンクラー等の勝率調整)。radiusは第9ラウンドで2.5→3.3
+    // 第11ラウンド: radius 3.3→3.8 / inkCost 28→20(1発は軽いが手数で塗る、という役割をはっきりさせる)
+    throwDist:160, fuse:0, radius:3.8, dmgCenter:35, dmgEdge:15, inkCost:20, // dmgCenter50→35, dmgEdge25→15 は第8ラウンドの勝率調整
     // botThrowGap/Span: ボットの再投げ待ち(秒)。既定の 5+0〜5 秒のままだと、「れんとうできる」はずのクイックボムが
     // スプラッシュボムと同じ頻度(1試合4.4回)しか投げられていなかったので、連投できる値にした(1試合6.9回)
     botThrowGap:1.2, botThrowGapSpan:1.5,
+    botPaintThrow:true, botPaintGap:3.5, botPaintGapSpan:2.5, botPaintMinCells:16, botPaintInkMargin:30,
   },
   sprinkler:{
     name:'スプリンクラー', emoji:'🌀', desc:'おいとくと じどうで ぬってくれる',
-    throwDist:150, duration:8, radius:5, hp:30, inkCost:40, rate:4.5, splashR:0.9, // rate/splashRはバランス調整値。コストは50→40(±10の範囲内)。rateは第9ラウンドで3.0→4.5
-    botMinUnpainted:9, // ボットが設置に踏み切る未塗りセル数のしきい値(既定4。置く場所を選ばせるため第9ラウンドで9に)
+    // 第11ラウンド: duration 8→12.5・rate 4.5→6.5・radius 5→5.8・splashR 0.9→1.3・hp 30→50・inkCost 40→28。
+    // 「置いておくだけで塗れる」役割に見合う塗り総量になるよう、寿命と散布量をまとめて上げた
+    throwDist:150, duration:12.5, radius:5.8, hp:50, inkCost:28, rate:6.5, splashR:1.3,
+    botMinUnpainted:6, // ボットが設置に踏み切る「自分色でないセル」の数のしきい値(第11ラウンドで9→6)
     // (対ボム系サブの勝率調整は主にボム側のダメージで行う。スプリンクラー自身は無傷での塗り面積確保が役割)
   },
   shield:{
     name:'スプラッシュシールド', emoji:'🛡', desc:'かべを つくって まもる',
-    standoff:3, width:6, thickness:0.9, duration:5, inkCost:50, // バランス調整で60→50(コスト±10の範囲内)
+    // 第11ラウンド: width 6→8・thickness 0.9→1.0・duration 5→8・inkCost 50→35。
+    // paintWidth: 壁の下を塗る帯の半径(セル)。従来は壁の厚みぶん(約1セル)しか塗れず、1試合で0.7%しか塗れていなかった
+    standoff:3, width:8, thickness:1.0, duration:8, inkCost:35, paintWidth:3.6,
     // botProactiveCells: ボットが「まだ撃たれていなくても相手がこのセル数まで近づいたら先置きする」距離。
     // 第8ラウンドまでボットは被弾直後にしか張らず、1試合0.9回しか使えていなかった(持っても勝率+2.5ptで実質無意味)。
     // 先置き判断を入れたことで1試合5.8回・対サブなし勝率+6.7ptとなり、主効果+11.7ptで全サブ因子中の最大の梃子になった
-    botProactiveCells:10,
+    botProactiveCells:13, // 第11ラウンドで10→13
   },
 };
 for (var sk in SUBS) SUBS[sk].key = sk;
@@ -1219,11 +1234,12 @@ function placeShield(g, idx, p, sub){
   var halfLen=sub.width*CELL/2;
   var sh={ ownerIdx:idx, cx:cx, cy:cy, dx:dx, dy:dy, halfLen:halfLen, thickness:sub.thickness*CELL, timer:sub.duration };
   g.shields.push(sh);
-  // 壁の下を自分色に塗る
+  // 壁の下を自分色に塗る。paintWidth(セル)を指定すると、壁の厚みより広い帯を塗る(第11ラウンド)
+  var paintR = (sub.paintWidth!=null ? sub.paintWidth*CELL : sub.thickness*CELL*0.75+CELL*0.3);
   var steps=Math.ceil(halfLen*2/(CELL*0.8));
   for (var s=0;s<=steps;s++){
     var t=-halfLen+ (2*halfLen)*(s/steps);
-    paintCircle(g, cx+dx*t, cy+dy*t, sub.thickness*CELL*0.75+CELL*0.3, idx+1);
+    paintCircle(g, cx+dx*t, cy+dy*t, paintR, idx+1);
   }
   // 張った瞬間に壁の線が光り、中心から輪が広がる(どこに壁ができたか分かるように)
   spawnStreak(g, cx-dx*halfLen, cy-dy*halfLen, cx+dx*halfLen, cy+dy*halfLen, idx, 0.35, sub.thickness*CELL*2.2, true);
@@ -2140,7 +2156,11 @@ function botDecide(g, idx){
 
   if (isBombSub && p.subCooldown<=0 && bombAttemptReady){
     var canAffordBomb = p.ink >= subDef.inkCost+5;
-    var inThrowRange = oppTargetable && distToOpp<=subDef.throwDist+40 && distToOpp>=CELL*1.0;
+    // 第11ラウンド: メインでそのまま狙える相手にわざわざ投げると、撃つのをやめるぶんだけ損になる
+    // (相性行列で、シューターはボムを持つと「サブなし」より弱くなっていた)。
+    // 壁越し・射程外など「メインでは届かない相手」にだけ投げる
+    var mainCanHitOpp = oppTargetable && (!needsLOS || los) && distToOpp <= engageDist*0.95;
+    var inThrowRange = oppTargetable && !mainCanHitOpp && distToOpp<=subDef.throwDist+40 && distToOpp>=CELL*1.0;
     if (canAffordBomb && inThrowRange){
       mem.subReserveActive=false;
       input.fire=false;
@@ -2152,6 +2172,22 @@ function botDecide(g, idx){
       var throwGap = subDef.botThrowGap!=null ? subDef.botThrowGap : 5;
       var throwSpan = subDef.botThrowGapSpan!=null ? subDef.botThrowGapSpan : 5;
       mem.nextBombAttempt = g.time + throwGap + g.rng()*throwSpan;
+    }
+  }
+  // 塗り目的の投げ(第11ラウンド): 相手を狙えない/対人の再投げ待ち中でも、未塗り・相手色の多い方向へ投げて塗る。
+  // 第10ラウンドまでのボットは「相手が飛距離内にいるとき」しかボムを投げず、
+  // 「メインだけ vs サブだけ」の実測でサブの塗りがメインの4〜5%しか出ていなかった原因になっていた
+  if (isBombSub && subDef.botPaintThrow && p.subCooldown<=0 && !input.sub &&
+      p.ink >= subDef.inkCost+(subDef.botPaintInkMargin!=null?subDef.botPaintInkMargin:10) &&
+      (!mem.nextPaintThrow || g.time>=mem.nextPaintThrow)){
+    var paintDir = pickSubThrowDir(g, idx, p, subDef.throwDist, Math.round(subDef.radius));
+    if (paintDir && paintDir.cells >= (subDef.botPaintMinCells!=null ? subDef.botPaintMinCells : 10)){
+      mem.subReserveActive=false;
+      input.fire=false;
+      input.sub=true;
+      input.aim={x:paintDir.x, y:paintDir.y};
+      mem.nextPaintThrow = g.time + (subDef.botPaintGap!=null?subDef.botPaintGap:2.2)
+                                  + g.rng()*(subDef.botPaintGapSpan!=null?subDef.botPaintGapSpan:1.6);
     }
   }
   if ((isBombSub || isShieldSub || (isSprinklerSub && !hasOwnSprinkler)) && p.subCooldown<=0 && !input.sub){
@@ -2188,10 +2224,11 @@ function botDecideSub(g, idx, p, opp, weapon, distToOpp, oppTargetable, input){
     var already=false;
     for (var i=0;i<g.sprinklers.length;i++) if (g.sprinklers[i].ownerIdx===idx){ already=true; break; }
     if (already) return false;
-    var unpaintedNear = countUnpaintedNear(g, p.x, p.y, 6);
-    if (unpaintedNear < (sub.botMinUnpainted!=null ? sub.botMinUnpainted : 4)) return false;
-    // 未塗り・相手色が多い方向へ向いてから置く
-    var sprinklerDir = pickCoverageDir(g, idx, p, false, false);
+    // 第11ラウンド: 置き先(飛距離ぶん先)の「自分色でないセル」の多さで判断する。
+    // 従来は自分の足元の未塗りセル数だけを見ていたので、相手色の上には置きに行けなかった
+    var sprinklerDir = pickSubThrowDir(g, idx, p, sub.throwDist, Math.round(sub.radius));
+    if (!sprinklerDir) return false;
+    if (sprinklerDir.cells < (sub.botMinUnpainted!=null ? sub.botMinUnpainted : 4)) return false;
     if (input) input.aim = {x:sprinklerDir.x, y:sprinklerDir.y};
     return true;
   } else if (sub.key==='shield'){
@@ -2211,18 +2248,38 @@ function botDecideSub(g, idx, p, opp, weapon, distToOpp, oppTargetable, input){
   return false;
 }
 
-function countUnpaintedNear(g, x, y, radiusCells){
+// (x,y)のまわりで「自分色でないセル」(未塗り+相手色。壁は除く)を数える。サブを塗りに使う判断に使用(第11ラウンド)
+function countRepaintableNear(g, x, y, radiusCells, idx){
   var cx=Math.floor(x/CELL), cy=Math.floor(y/CELL);
-  var cnt=0;
-  for (var oy=-radiusCells; oy<=radiusCells; oy+=2){
-    for (var ox=-radiusCells; ox<=radiusCells; ox+=2){
+  var mine=idx+1, cnt=0;
+  for (var oy=-radiusCells; oy<=radiusCells; oy++){
+    for (var ox=-radiusCells; ox<=radiusCells; ox++){
+      if (ox*ox+oy*oy > radiusCells*radiusCells) continue;
       var gx=cx+ox, gy=cy+oy;
       if (gx<0||gx>=GRID_W||gy<0||gy>=GRID_H) continue;
-      if (g.grid[gy*GRID_W+gx]===0) cnt++;
+      var c=g.grid[gy*GRID_W+gx];
+      if (c!==9 && c!==mine) cnt++;
     }
   }
   return cnt;
 }
+
+// サブを「塗るため」に使うときの向き。飛距離ぶん先の着弾点で、自分色でないセルがいちばん多い方向を選ぶ。
+// 返り値は {x,y,cells}(cells=その着弾点で塗り直せるセル数)
+function pickSubThrowDir(g, idx, p, distPx, radiusCells){
+  var best=null, bestCells=-1;
+  for (var i=0;i<BOT_DIRS.length;i++){
+    var d=BOT_DIRS[i];
+    var tx=clamp(p.x+d.x*distPx, CELL, WORLD_W-CELL), ty=clamp(p.y+d.y*distPx, CELL, WORLD_H-CELL);
+    if (isWallAt(g,tx,ty)) continue;
+    var c=countRepaintableNear(g, tx, ty, radiusCells, idx);
+    c += (g.rng()-0.5)*6*(1-CONFIG.BOT_SKILL); // ボットの強さに応じたゆらぎ(他の判断と同じ扱い)
+    if (c>bestCells){ bestCells=c; best=d; }
+  }
+  if (!best) return null;
+  return {x:best.x, y:best.y, cells:bestCells};
+}
+
 
 /* ==================== 8. 入力(タッチ / キーボード・マウス フォールバック) ==================== */
 var touchState = {};       // pointerId -> {player,kind,anchorX,anchorY,curX,curY}
