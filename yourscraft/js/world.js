@@ -404,12 +404,15 @@
           var isLiquid = def.render === 'liquid';
           var buf = (id === ID.WATER || id === ID.ICE) ? bs.trans : (def.opaque ? bs.opaque : bs.cutout);
           var topCut = isLiquid && blockAt(x, y + 1, z) !== id ? 0.875 : 1;
+          /* ベッドのような背の低いブロック。上面と側面はとなりに何があっても隠れない */
+          var bh = def.height;
+          var low = bh < 1;
 
           for (d = 0; d < 6; d++) {
             var f = FACES[d];
             var nxl = x + f.n[0], nyl = y + f.n[1], nzl = z + f.n[2];
             var other = blockAt(nxl, nyl, nzl);
-            if (!faceVisible(id, other)) continue;
+            if (!(low && d !== 3) && !faceVisible(id, other)) continue;
             if (isLiquid && d === 3 && other !== 0 && !B.isCross(other)) continue;
 
             var tile = def.faces[d];
@@ -443,7 +446,13 @@
               var py = y + f.o[1] + f.u[1] * cu + f.v[1] * cv;
               var pz = oz + z + f.o[2] + f.u[2] * cu + f.v[2] * cv;
               if (isLiquid && topCut < 1 && py > y + 0.5) py = y + topCut;
-              buf.vert(px, py, pz, tile, cu, 1 - cv, skyL, blkL, shade, isWater);
+              var tv = 1 - cv;
+              if (low) {
+                py = y + (py - y) * bh;
+                /* 側面はテクスチャの上のほうだけを使う（引きのばさない） */
+                if (d !== 2 && d !== 3) tv = (1 - cv) * bh;
+              }
+              buf.vert(px, py, pz, tile, cu, tv, skyL, blkL, shade, isWater);
             }
             buf.quad(baseIdx, ao[0] + ao[2] > ao[1] + ao[3]);
           }

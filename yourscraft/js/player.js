@@ -41,7 +41,11 @@
     for (var yy = y0; yy <= y1; yy++) {
       for (var zz = z0; zz <= z1; zz++) {
         for (var xx = x0; xx <= x1; xx++) {
-          if (B.isSolid(this.world.getBlock(xx, yy, zz))) return true;
+          var id = this.world.getBlock(xx, yy, zz);
+          if (!B.isSolid(id)) continue;
+          /* ベッドのような背の低いブロックは、その高さまでしかぶつからない */
+          var bh = B.heightOf(id);
+          if (bh >= 1 || y < yy + bh) return true;
         }
       }
     }

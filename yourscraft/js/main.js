@@ -8,7 +8,10 @@
   var B = YC.Blocks, ID = B.ID, G = YC.Gen, UI = YC.UI, Save = YC.Save, Audio = YC.Audio;
   var DAY_LENGTH = 1200;        /* 1 日 20 分（マイクラと同じ） */
   var REACH = 5.0;              /* 手の届く距離 */
-  var VERSION = '1.2';
+  var MORNING = 0.02;           /* timeOfDay=0 が朝 6 時。すこし進めて明るい朝にする */
+  var DUSK_START = 0.48;        /* これを過ぎると日がかたむきはじめる */
+  var NIGHT_START = 0.52, NIGHT_END = 0.98;   /* この間が「夜」（ねむれる時間） */
+  var VERSION = '1.3';
 
   var Game = {
     mode: 'boot',
@@ -40,7 +43,7 @@
       'rightpad', 'btn-jump', 'btn-up', 'btn-down', 'btn-fly', 'btn-inv', 'btn-pause', 'topright',
       'actionpad', 'btn-break', 'btn-place', 'ripples',
       'title', 'pause', 'settings', 'help', 'inventory', 'loading', 'newworld',
-      'water-tint', 'lava-tint', 'logo', 'bar-fill', 'loading-text', 'btn-continue', 'btn-newworld',
+      'water-tint', 'lava-tint', 'sleep-fade', 'logo', 'bar-fill', 'loading-text', 'btn-continue', 'btn-newworld',
       'inv-grid', 'inv-tabs', 'inv-hotbar', 'seed-input', 'sv'].forEach(function (id) { el[id] = $(id); });
 
     Game.touchUI = isTouch();
@@ -596,17 +599,25 @@
     toggle('効果音', 'sound', 'オン', 'オフ', function () { Audio.enabled = Game.settings.sound; });
     var tf = document.createElement('div');
     tf.className = 'toggle on';
-    var names = { cycle: '流れる', day: '昼で固定', night: '夜で固定' };
-    tf.textContent = names[Game.settings.timeFlow];
+    var names = { cycle: '流れる', nonight: '夜にしない', day: '昼で固定', night: '夜で固定' };
+    tf.textContent = names[Game.settings.timeFlow] || names.cycle;
     tf.addEventListener('click', function () {
-      var order = ['cycle', 'day', 'night'];
-      var i = (order.indexOf(Game.settings.timeFlow) + 1) % 3;
+      var order = ['cycle', 'nonight', 'day', 'night'];
+      var i = (order.indexOf(Game.settings.timeFlow) + 1) % order.length;
       Game.settings.timeFlow = order[i];
       tf.textContent = names[order[i]];
       if (order[i] === 'day') Game.timeOfDay = 0.22;
       if (order[i] === 'night') Game.timeOfDay = 0.72;
+      /* 夜のさいちゅうに「夜にしない」を選んだら、その場で朝にする */
+      if (order[i] === 'nonight' && Game.timeOfDay >= DUSK_START) Game.timeOfDay = MORNING;
     });
     row('時間', tf);
+    var tfNote = document.createElement('p');
+    tfNote.className = 'inv-note';
+    tfNote.style.textAlign = 'left';
+    tfNote.style.margin = '2px 0 0';
+    tfNote.textContent = '「夜にしない」にすると、日がしずむ手前でつぎの朝にもどります。ベッドで寝る必要もありません。';
+    box.appendChild(tfNote);
 
     var reset = document.createElement('div');
     reset.className = 'toggle';
@@ -682,6 +693,7 @@
   }
 
   function digBlock(t) {
+    if (Game.sleeping) return;
     if (!t) t = Game.target;
     Game.lastDig = t ? 'ok' : '狙っているブロックがない';
     if (!t) { outOfReachHint(); return; }
@@ -710,10 +722,18 @@
   }
 
   function placeBlock(t) {
+    if (Game.sleeping) return;
     if (!t) t = Game.target;
     var id = Game.hotbar[Game.sel];
     Game.lastPlace = null;
     if (!t) { Game.lastPlace = '狙っているブロックがない'; outOfReachHint(); return; }
+    /* ベッドをねらったときは「置く」ではなく「ねる」。
+       しゃがみながらなら、いつもどおりベッドの上にも置ける（マイクラと同じ） */
+    if (t.id === ID.BED && !(Game.ctrl && Game.ctrl.sneak)) {
+      Game.lastPlace = 'ベッドでねる';
+      sleepInBed();
+      return;
+    }
     if (!id) { Game.lastPlace = 'ホットバーが空'; return; }
     var x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
     if (y < 0 || y >= G.WH) { Game.lastPlace = '世界の外'; return; }
@@ -741,6 +761,50 @@
       if (Game.settings.sound) Audio.place(id);
       Game.swing = 0.001;
     }
+  }
+
+  /* ================== ベッドで寝る ================== */
+  /* はじめてベッドをねらったとき、使いかたを 1 回だけ知らせる */
+  function bedHint() {
+    if (Game.bedHintShown || Game.sleeping) return;
+    var t = Game.target || Game.touchTarget;
+    if (!t || t.id !== ID.BED) return;
+    Game.bedHintShown = true;
+    hint(Game.touchUI ? 'ベッドをタップすると ねむれます（夜だけ）' : 'ベッドを右クリックすると ねむれます（夜だけ）', 4200);
+  }
+
+  function isNightNow() {
+    return Game.timeOfDay >= NIGHT_START && Game.timeOfDay < NIGHT_END;
+  }
+
+  function sleepInBed() {
+    if (Game.sleeping) return;
+    if (Game.settings.timeFlow === 'night') {
+      failHint('設定が「夜で固定」になっています。朝にするには設定を変えてください');
+      return;
+    }
+    if (Game.settings.timeFlow === 'day') {
+      failHint('設定が「昼で固定」なので、ずっと昼のままです');
+      return;
+    }
+    if (!isNightNow()) {
+      failHint('ねむれるのは夜だけです（暗くなってから使ってください）');
+      return;
+    }
+    Game.sleeping = true;
+    Game.swing = 0.001;
+    if (Game.settings.sound) Audio.sleep();
+    el['sleep-fade'].classList.add('on');
+    setTimeout(function () {
+      /* 画面がまっ暗なうちに朝へ進める */
+      Game.timeOfDay = MORNING;
+      Game.day++;
+      Game.movedSinceSave = true;
+      toast('おはよう — ' + (Game.day + 1) + '日目の朝');
+      if (Game.settings.sound) Audio.wake();
+      el['sleep-fade'].classList.remove('on');
+      setTimeout(function () { Game.sleeping = false; }, 900);
+    }, 900);
   }
 
   /* ================== 破片パーティクル ================== */
@@ -939,9 +1003,12 @@
 
     var playing = Game.mode === 'play';
     /* 時間の流れ */
-    if (Game.settings.timeFlow === 'cycle' && (playing || Game.mode === 'title')) {
+    var flow = Game.settings.timeFlow;
+    if ((flow === 'cycle' || flow === 'nonight') && (playing || Game.mode === 'title')) {
       Game.timeOfDay += dt / DAY_LENGTH;
       while (Game.timeOfDay >= 1) { Game.timeOfDay -= 1; Game.day++; }
+      /* 「夜にしない」：日がしずみはじめる手前で、そのまま次の朝へ送る */
+      if (flow === 'nonight' && Game.timeOfDay >= DUSK_START) { Game.timeOfDay = MORNING; Game.day++; }
     }
 
     /* チャンクの読み込み（読み込み中は多めに時間を使う） */
@@ -962,6 +1029,7 @@
       });
       Game.target = targetBlock();
       Game.touchTarget = activeTouchTarget();
+      bedHint();
       handleHold(dt, now);
       if (Game.swing > 0) { Game.swing += dt; if (Game.swing > 0.26) Game.swing = 0; }
       var p = Game.player;

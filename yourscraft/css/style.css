@@ -313,3 +313,15 @@ input[type=text] {
 }
 .bar > div { height: 100%; width: 0%; background: #7ec87e; transition: width 0.2s; }
 .loading-text { font-size: 15px; }
+
+/* ねむるときの暗転（ベッド） */
+#sleep-fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .85s ease;
+  z-index: 60;
+}
+#sleep-fade.on { opacity: 1; }
