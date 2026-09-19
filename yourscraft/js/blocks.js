@@ -531,6 +531,36 @@
     px.set(7, 5, 255, 240, 180, 255); px.set(8, 5, 255, 240, 180, 255);
     px.blend(6, 6, 255, 200, 80, 0.5); px.blend(9, 6, 255, 200, 80, 0.5);
   });
+  /* ベッド。高さ 9/16 のブロックなので、側面は上から 9 ドットぶんだけが見える。
+     見えるところに「まくら → マットレス → 木わく」が並ぶように描く。 */
+  def('bed_top', function (px, rnd) {
+    grain(px, '#a32b2b', 12, rnd);
+    speck(px, '#8e2222', 40, rnd);
+    speck(px, '#b83a3a', 30, rnd);
+    /* まくら（手前 5 ドット） */
+    rect(px, 1, 1, 14, 5, '#e6e2d8', 10, rnd);
+    for (var x = 1; x < 15; x++) px.blend(x, 5, 60, 55, 50, 0.35);
+    for (var y2 = 1; y2 < 6; y2++) { px.blend(1, y2, 60, 55, 50, 0.3); px.blend(14, y2, 60, 55, 50, 0.3); }
+    /* 掛けぶとんの折り返し */
+    rect(px, 1, 7, 14, 1, '#c14646', 8, rnd);
+    /* 木わくのふち */
+    for (var i = 0; i < TS; i++) {
+      px.set(i, 0, 107, 74, 43, 255); px.set(i, TS - 1, 96, 66, 38, 255);
+      px.set(0, i, 107, 74, 43, 255); px.set(TS - 1, i, 96, 66, 38, 255);
+    }
+  });
+  def('bed_side', function (px, rnd) {
+    grain(px, '#8a6240', 10, rnd);
+    /* 上 4 ドット = マットレス、その下 5 ドット = 木わく、残りは脚 */
+    rect(px, 0, 0, TS, 4, '#a32b2b', 14, rnd);
+    for (var x = 0; x < TS; x++) px.blend(x, 0, 255, 220, 220, 0.25);
+    rect(px, 0, 4, TS, 1, '#7a2020', 6, rnd);
+    rect(px, 0, 5, TS, 4, '#9a6c46', 12, rnd);
+    for (var x2 = 0; x2 < TS; x2++) px.blend(x2, 8, 60, 40, 24, 0.45);
+    /* 脚（見えないことが多いが、壊れかけの見た目にならないように描いておく） */
+    rect(px, 0, 9, 3, 7, '#6b4a2b', 10, rnd);
+    rect(px, 13, 9, 3, 7, '#6b4a2b', 10, rnd);
+  });
   def('skin', function (px, rnd) {
     grain(px, '#c98a55', 8, rnd);
     speck(px, '#b87c4a', 20, rnd);
@@ -577,6 +607,7 @@
       light: opts.light || 0,
       sound: opts.sound || 'stone',
       tint: opts.tint || null,
+      height: opts.height === undefined ? 1 : opts.height,
       /* 面ごとのテクスチャ [+X,-X,+Y,-Y,+Z,-Z] */
       faces: null,
       tex: t
@@ -601,7 +632,8 @@
     GOLD_BLOCK: 43, IRON_BLOCK: 44, DIAMOND_BLOCK: 45,
     POPPY: 46, DANDELION: 47, TALL_GRASS: 48, SAPLING: 49, TORCH: 50
   };
-  var WOOL_START = 51;
+  var WOOL_START = 51;   /* 51〜66 が羊毛 16 色。あとから足すブロックは 67 番から */
+  var BED_ID = 67;
 
   block(ID.GRASS, '草ブロック', { tex: 'grass_side', top: 'grass_top', bottom: 'dirt', side: 'grass_side', sound: 'grass' });
   block(ID.DIRT, '土', { tex: 'dirt', sound: 'gravel' });
@@ -668,6 +700,13 @@
     woolIds.push(id);
   });
 
+  /* ベッド。高さ 9/16 の低いブロックで、寝ると朝になる（main.js が面倒をみる） */
+  ID.BED = BED_ID;
+  block(ID.BED, 'ベッド', {
+    tex: 'bed_side', top: 'bed_top', bottom: 'oak_planks', side: 'bed_side',
+    opaque: false, height: 0.5625, sound: 'wool'
+  });
+
   for (var i = 0; i < BLOCKS.length; i++) if (!BLOCKS[i]) BLOCKS[i] = null;
 
   function isAir(id) { return id === 0; }
@@ -677,6 +716,8 @@
   function isLiquid(id) { var b = BLOCKS[id]; return !!(b && b.render === 'liquid'); }
   function isCross(id) { var b = BLOCKS[id]; return !!(b && b.render === 'cross'); }
   function lightOf(id) { var b = BLOCKS[id]; return b ? b.light : 0; }
+  /* 高さ 1 未満のブロック（ベッドなど）。当たり判定とメッシュで使う */
+  function heightOf(id) { var b = BLOCKS[id]; return b ? b.height : 1; }
 
   /* クリエイティブのインベントリ分類（マイクラのタブ構成をまねる） */
   var TABS = [
@@ -697,7 +738,7 @@
     },
     {
       name: '装飾', icon: ID.TORCH, items: [
-        ID.TORCH, ID.GLOWSTONE, ID.SEA_LANTERN, ID.CRAFTING_TABLE, ID.BOOKSHELF, ID.TNT,
+        ID.TORCH, ID.GLOWSTONE, ID.SEA_LANTERN, ID.BED, ID.CRAFTING_TABLE, ID.BOOKSHELF, ID.TNT,
         ID.POPPY, ID.DANDELION, ID.TALL_GRASS, ID.SAPLING,
         ID.GOLD_BLOCK, ID.IRON_BLOCK, ID.DIAMOND_BLOCK
       ]
@@ -716,6 +757,7 @@
     isLiquid: isLiquid,
     isCross: isCross,
     lightOf: lightOf,
+    heightOf: heightOf,
     texNames: texNames,
     texIndex: texIndex,
     buildTextures: buildTextures,

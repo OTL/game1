@@ -668,6 +668,9 @@
     if (s.selection) {
       gl.useProgram(this.progLine);
       M4.translate(this.model, s.selection.x, s.selection.y, s.selection.z);
+      /* ベッドのような背の低いブロックは、わくもその高さに合わせる */
+      var selH = B.heightOf(s.selection.id);
+      if (selH < 1) this.model[5] = selH;
       gl.uniformMatrix4fv(this.ul.uVP, false, this.vp);
       gl.uniformMatrix4fv(this.ul.uModel, false, this.model);
       gl.uniform4f(this.ul.uColor, 0, 0, 0, 0.62);
