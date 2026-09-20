@@ -561,6 +561,97 @@
     rect(px, 0, 9, 3, 7, '#6b4a2b', 10, rnd);
     rect(px, 13, 9, 3, 7, '#6b4a2b', 10, rnd);
   });
+  /* ---- ベッドは 2 マス（足もと + 頭）なので、向きのぶんだけ絵を作っておく ----
+     上面は「そのマスの外側の端」が画像の上（-Z 側）に来る向きで描いてから、
+     90 度ずつ回して 4 方向ぶんを用意する。側面は外側の端が画像の左に来る向きで
+     描き、反対の面には左右を入れかえたものを貼る。 */
+  function rotCW(src) {
+    var dst = new Px();
+    for (var y = 0; y < TS; y++) for (var x = 0; x < TS; x++) {
+      var c = src.get(y, TS - 1 - x);
+      dst.set(x, y, c[0], c[1], c[2], c[3]);
+    }
+    return dst;
+  }
+  function flipX(src) {
+    var dst = new Px();
+    for (var y = 0; y < TS; y++) for (var x = 0; x < TS; x++) {
+      var c = src.get(TS - 1 - x, y);
+      dst.set(x, y, c[0], c[1], c[2], c[3]);
+    }
+    return dst;
+  }
+  function copyInto(px, src) { px.d.set(src.d); }
+
+  var WOOD_A = '#7a5535', WOOD_B = '#9a6c46';
+
+  /* 上面：外側の端が上（行 0）。頭側はまくら、足側は掛けぶとん */
+  function bedTopBase(half, rnd) {
+    var px = new Px();
+    grain(px, '#a32b2b', 12, rnd);
+    speck(px, '#8e2222', 40, rnd);
+    speck(px, '#b83a3a', 30, rnd);
+    if (half === 'head') {
+      rect(px, 1, 2, 14, 6, '#e6e2d8', 10, rnd);          /* まくら */
+      for (var x = 1; x < 15; x++) px.blend(x, 7, 60, 55, 50, 0.4);
+      for (var y = 2; y < 8; y++) { px.blend(1, y, 60, 55, 50, 0.3); px.blend(14, y, 60, 55, 50, 0.3); }
+    } else {
+      rect(px, 1, 2, 14, 2, '#8e2222', 8, rnd);           /* 足もとがわの折り返し */
+      for (var x2 = 1; x2 < 15; x2++) px.blend(x2, 4, 255, 210, 210, 0.18);
+    }
+    /* 木わく。外側の端（行 0）と左右だけ。内側（行 15）はとなりのマスとつながる */
+    for (var i = 0; i < TS; i++) {
+      px.set(i, 0, 122, 85, 50, 255);
+      px.set(0, i, 112, 78, 45, 255);
+      px.set(TS - 1, i, 100, 69, 40, 255);
+    }
+    return px;
+  }
+
+  /* 側面：外側の端が左（列 0）。上 4 ドットがマットレス、その下が木わくと脚 */
+  function bedSideBase(half, rnd) {
+    var px = new Px();
+    grain(px, WOOD_B, 10, rnd);
+    rect(px, 0, 0, TS, 4, '#a32b2b', 14, rnd);
+    if (half === 'head') rect(px, 1, 0, 6, 3, '#e6e2d8', 10, rnd);   /* まくらのはみ出し */
+    for (var x = 0; x < TS; x++) px.blend(x, 0, 255, 220, 220, 0.22);
+    rect(px, 0, 4, TS, 1, '#7a2020', 6, rnd);
+    rect(px, 0, 5, TS, 4, WOOD_B, 12, rnd);
+    for (var x2 = 0; x2 < TS; x2++) px.blend(x2, 8, 60, 40, 24, 0.45);
+    rect(px, 0, 9, 3, 7, '#6b4a2b', 10, rnd);                        /* 外側の端の脚 */
+    return px;
+  }
+
+  /* 外側の端の面（頭側は板、足側は少し低い板） */
+  function bedEndBase(half, rnd) {
+    var px = new Px();
+    grain(px, WOOD_B, 10, rnd);
+    rect(px, 0, 0, TS, 4, '#a32b2b', 14, rnd);
+    if (half === 'head') rect(px, 2, 0, 12, 3, '#e6e2d8', 10, rnd);
+    rect(px, 0, 4, TS, 1, '#7a2020', 6, rnd);
+    rect(px, 0, 5, TS, 4, WOOD_A, 12, rnd);
+    for (var x = 0; x < TS; x++) px.blend(x, 8, 60, 40, 24, 0.45);
+    rect(px, 0, 9, 3, 7, '#6b4a2b', 10, rnd);
+    rect(px, 13, 9, 3, 7, '#6b4a2b', 10, rnd);
+    return px;
+  }
+
+  ['head', 'foot'].forEach(function (half) {
+    /* 上面 4 方向。rot 0=外側が -Z、1=+X、2=+Z、3=-X */
+    for (var r = 0; r < 4; r++) {
+      (function (half2, r2) {
+        def('bed_' + half2 + '_top_' + r2, function (px, rnd) {
+          var b = bedTopBase(half2, rnd);
+          for (var i = 0; i < r2; i++) b = rotCW(b);
+          copyInto(px, b);
+        });
+      })(half, r);
+    }
+    def('bed_' + half + '_side', function (px, rnd) { copyInto(px, bedSideBase(half, rnd)); });
+    def('bed_' + half + '_side_r', function (px, rnd) { copyInto(px, flipX(bedSideBase(half, rnd))); });
+    def('bed_' + half + '_end', function (px, rnd) { copyInto(px, bedEndBase(half, rnd)); });
+  });
+
   def('skin', function (px, rnd) {
     grain(px, '#c98a55', 8, rnd);
     speck(px, '#b87c4a', 20, rnd);
@@ -613,8 +704,10 @@
       tex: t
     };
     var top = opts.top || t, bottom = opts.bottom || opts.top || t, side = opts.side || t;
-    def2.faces = [side, side, top, bottom, side, side].map(function (n) { return texIndex[n]; });
+    var names = opts.faces || [side, side, top, bottom, side, side];
+    def2.faces = names.map(function (n) { return texIndex[n]; });
     def2.iconTex = { top: texIndex[top], side: texIndex[side] };
+    def2.bed = opts.bed || null;
     BLOCKS[id] = def2;
     return def2;
   }
@@ -700,12 +793,64 @@
     woolIds.push(id);
   });
 
-  /* ベッド。高さ 9/16 の低いブロックで、寝ると朝になる（main.js が面倒をみる） */
+  /* ---------- ベッド（マイクラと同じで 2 マスつかう） ----------
+     ID 67 は「持ちもの・アイコン」と、1 マスだったころのセーブ用。
+     実際に世界へ置かれるのは 68〜75 の「足もと／頭 × 4 方向」。 */
   ID.BED = BED_ID;
   block(ID.BED, 'ベッド', {
     tex: 'bed_side', top: 'bed_top', bottom: 'oak_planks', side: 'bed_side',
     opaque: false, height: 0.5625, sound: 'wool'
   });
+
+  /* 向き。face = その向きの面の番号、rot = 外側の端がその向きのときの上面の回転 */
+  var BED_DIRS = [
+    { k: 'N', dx: 0, dz: -1, face: 5, rot: 0 },
+    { k: 'E', dx: 1, dz: 0, face: 0, rot: 1 },
+    { k: 'S', dx: 0, dz: 1, face: 4, rot: 2 },
+    { k: 'W', dx: -1, dz: 0, face: 1, rot: 3 }
+  ];
+  /* 側面のテクスチャは、画像の左端がどの向きに当たるかで貼りかえる */
+  var SIDE_LEFT_DIR = { 0: 'S', 1: 'N', 4: 'W', 5: 'E' };
+  function bedOpposite(i) { return (i + 2) & 3; }
+
+  var BED_FOOT_START = BED_ID + 1, BED_HEAD_START = BED_ID + 5;
+  var bedIds = { foot: [], head: [] };
+
+  BED_DIRS.forEach(function (F, i) {
+    ['foot', 'head'].forEach(function (half) {
+      var id = (half === 'foot' ? BED_FOOT_START : BED_HEAD_START) + i;
+      var outer = BED_DIRS[half === 'foot' ? bedOpposite(i) : i];   /* 外側の端の向き */
+      var partnerFace = BED_DIRS[half === 'foot' ? i : bedOpposite(i)].face;
+      var faces = [];
+      faces[2] = 'bed_' + half + '_top_' + outer.rot;
+      faces[3] = 'oak_planks';
+      faces[outer.face] = 'bed_' + half + '_end';
+      faces[partnerFace] = 'bed_' + half + '_end';   /* ふだんは相方にかくれて見えない面 */
+      [0, 1, 4, 5].forEach(function (d) {
+        if (faces[d]) return;
+        faces[d] = 'bed_' + half + '_side' + (SIDE_LEFT_DIR[d] === outer.k ? '' : '_r');
+      });
+      block(id, 'ベッド', {
+        tex: 'bed_' + half + '_side', top: faces[2], side: 'bed_' + half + '_side',
+        faces: faces, opaque: false, height: 0.5625, sound: 'wool',
+        bed: {
+          half: half, facing: F.k, dx: F.dx, dz: F.dz,
+          partnerFace: partnerFace, partner: (half === 'foot' ? BED_HEAD_START : BED_FOOT_START) + i
+        }
+      });
+      ID['BED_' + half.toUpperCase() + '_' + F.k] = id;
+      bedIds[half].push(id);
+    });
+  });
+
+  /* 向き（'N'/'E'/'S'/'W'）から、足もと・頭のブロック ID と頭がのびる向きを返す */
+  function bedPair(facing) {
+    var i = 0;
+    for (var j = 0; j < BED_DIRS.length; j++) if (BED_DIRS[j].k === facing) i = j;
+    return { foot: BED_FOOT_START + i, head: BED_HEAD_START + i, dx: BED_DIRS[i].dx, dz: BED_DIRS[i].dz };
+  }
+  function bedOf(id) { var b = BLOCKS[id]; return (b && b.bed) || null; }
+  function isBed(id) { return id === BED_ID || !!bedOf(id); }
 
   for (var i = 0; i < BLOCKS.length; i++) if (!BLOCKS[i]) BLOCKS[i] = null;
 
@@ -758,6 +903,10 @@
     isCross: isCross,
     lightOf: lightOf,
     heightOf: heightOf,
+    bedPair: bedPair,
+    bedOf: bedOf,
+    isBed: isBed,
+    bedIds: bedIds,
     texNames: texNames,
     texIndex: texIndex,
     buildTextures: buildTextures,

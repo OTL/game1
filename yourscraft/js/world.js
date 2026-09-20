@@ -407,11 +407,13 @@
           /* ベッドのような背の低いブロック。上面と側面はとなりに何があっても隠れない */
           var bh = def.height;
           var low = bh < 1;
+          var bed = def.bed;   /* 2 マスのベッドなら、相方とくっつく面は描かない */
 
           for (d = 0; d < 6; d++) {
             var f = FACES[d];
             var nxl = x + f.n[0], nyl = y + f.n[1], nzl = z + f.n[2];
             var other = blockAt(nxl, nyl, nzl);
+            if (bed && d === bed.partnerFace && other === bed.partner) continue;
             if (!(low && d !== 3) && !faceVisible(id, other)) continue;
             if (isLiquid && d === 3 && other !== 0 && !B.isCross(other)) continue;
 
