@@ -11,7 +11,7 @@
   var MORNING = 0.02;           /* timeOfDay=0 が朝 6 時。すこし進めて明るい朝にする */
   var DUSK_START = 0.48;        /* これを過ぎると日がかたむきはじめる */
   var NIGHT_START = 0.52, NIGHT_END = 0.98;   /* この間が「夜」（ねむれる時間） */
-  var VERSION = '1.3';
+  var VERSION = '1.4';
 
   var Game = {
     mode: 'boot',
@@ -698,6 +698,16 @@
     Game.lastDig = t ? 'ok' : '狙っているブロックがない';
     if (!t) { outOfReachHint(); return; }
     if (t.id === ID.BEDROCK && t.y === 0) { hint('岩盤は壊せません'); return; }
+    /* ベッドは 2 マスで 1 つ。かた方を壊したら、もうかた方も消す（マイクラと同じ） */
+    var bed = B.bedOf(t.id);
+    if (bed) {
+      var sx = bed.half === 'foot' ? bed.dx : -bed.dx;
+      var sz = bed.half === 'foot' ? bed.dz : -bed.dz;
+      if (Game.world.getBlock(t.x + sx, t.y, t.z + sz) === bed.partner) {
+        spawnParticles(t.x + sx, t.y, t.z + sz, bed.partner);
+        setBlock(t.x + sx, t.y, t.z + sz, 0);
+      }
+    }
     spawnParticles(t.x, t.y, t.z, t.id);
     setBlock(t.x, t.y, t.z, 0);
     if (Game.settings.sound) Audio.dig(t.id);
@@ -729,7 +739,7 @@
     if (!t) { Game.lastPlace = '狙っているブロックがない'; outOfReachHint(); return; }
     /* ベッドをねらったときは「置く」ではなく「ねる」。
        しゃがみながらなら、いつもどおりベッドの上にも置ける（マイクラと同じ） */
-    if (t.id === ID.BED && !(Game.ctrl && Game.ctrl.sneak)) {
+    if (B.isBed(t.id) && !(Game.ctrl && Game.ctrl.sneak)) {
       Game.lastPlace = 'ベッドでねる';
       sleepInBed();
       return;
@@ -748,6 +758,7 @@
       Game.lastPlace = '自分のいる場所';
       failHint('自分のいる場所には置けません'); return;
     }
+    if (B.isBed(id)) { placeBed(x, y, z); return; }
     /* 草花は土や草の上だけ（マイクラと同じ） */
     if (def.render === 'cross' && id !== ID.TORCH) {
       var below = Game.world.getBlock(x, y - 1, z);
@@ -763,12 +774,39 @@
     }
   }
 
+  /* ================== ベッドを置く（2 マスつかう） ================== */
+  /* 頭は、置いた人が向いているほうへのびる（マイクラと同じ） */
+  function facingFromView() {
+    var d = Game.player.lookDir();
+    if (Math.abs(d[0]) > Math.abs(d[2])) return d[0] > 0 ? 'E' : 'W';
+    return d[2] > 0 ? 'S' : 'N';
+  }
+
+  function placeBed(x, y, z) {
+    var pair = B.bedPair(facingFromView());
+    var hx = x + pair.dx, hz = z + pair.dz;
+    if (!isReplaceable(Game.world.getBlock(hx, y, hz))) {
+      Game.lastPlace = 'ベッドの 2 マス目がふさがっている';
+      failHint('ベッドは 2 マスぶんの場所がいります（向いているほうを 1 マスあけてください）');
+      return;
+    }
+    if (Game.player.blocksSpace(hx, y, hz)) {
+      Game.lastPlace = '自分のいる場所';
+      failHint('自分のいる場所には置けません'); return;
+    }
+    Game.lastPlace = 'ok';
+    setBlock(x, y, z, pair.foot);
+    setBlock(hx, y, hz, pair.head);
+    if (Game.settings.sound) Audio.place(pair.foot);
+    Game.swing = 0.001;
+  }
+
   /* ================== ベッドで寝る ================== */
   /* はじめてベッドをねらったとき、使いかたを 1 回だけ知らせる */
   function bedHint() {
     if (Game.bedHintShown || Game.sleeping) return;
     var t = Game.target || Game.touchTarget;
-    if (!t || t.id !== ID.BED) return;
+    if (!t || !B.isBed(t.id)) return;
     Game.bedHintShown = true;
     hint(Game.touchUI ? 'ベッドをタップすると ねむれます（夜だけ）' : 'ベッドを右クリックすると ねむれます（夜だけ）', 4200);
   }
@@ -1570,7 +1608,7 @@
   function pickBlock() {
     var t = Game.target;
     if (!t) return;
-    Game.hotbar[Game.sel] = t.id;
+    Game.hotbar[Game.sel] = B.isBed(t.id) ? ID.BED : t.id;
     Game.handMesh = null;
     refreshHotbar();
     showItemName();
