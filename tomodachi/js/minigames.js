@@ -99,8 +99,12 @@ const MG_CSS = `
 /* だるま */
 .mg-daruma-pad{flex:0 0 auto;}
 .mg-beltwrap{flex:1 1 auto; display:flex; align-items:center; justify-content:center;
-  min-height:0; min-width:0;}
-.mg-belt{flex:0 1 auto; width:100%; aspect-ratio:16/9; min-height:0; max-height:100%; margin:auto;}
+  min-height:0; min-width:0; container-type:size;}
+.mg-belt{flex:0 0 auto; width:100%; min-height:0; max-height:100%; margin:auto;
+  /* cq が つかえない ときの ひかえ */
+  aspect-ratio:16/9;
+  /* よこ長 16:9 を 下じきに、たてに あきが あれば 4:3 まで 高くする */
+  height:min(100%, max(56.25cqw, min(75cqw, 100cqh)));}
 .mg-life{font-size:18px; letter-spacing:2px;}
 
 /* えあわせ */
@@ -548,7 +552,7 @@ function fitText(ctx, text, maxW, startPx, minPx, weight) {
 
 function drawDaruma(cv, S, t, art) {
   const { ctx, w, h } = fitCanvas(cv);
-  const groundY = h * 0.94;
+  const groundY = Math.min(h - 4, h * 0.86);   // 足もとの 線（下に くさの 帯を のこす）
   // そら と じめん
   const sky = ctx.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, '#d9f0ff');
@@ -561,10 +565,12 @@ function drawDaruma(cv, S, t, art) {
   }
 
   // キャラクターの おおきさ（ベルトの たかさに あわせて おおきく）
-  // かお＋からだは たて size*1.45 ぶんくらい つかう。ベルトに おさまる ぎりぎりまで おおきく。
-  const size = Math.max(36, Math.min(h * 0.62, w * 0.28));
-  const footY = size * 0.84;   // 中心から 足もとまで
-  const headY = size * 0.62;   // 中心から あたまの てっぺんまで
+  // face.js の すがたは 中心から 下に size*0.855、上に size*0.61、よこは size*0.403 ぶん。
+  // それが ぜんぶ ベルトに 入るように 大きさと いちを きめる。
+  const DOWN = 0.86, UP = 0.62;
+  const size = Math.max(36, Math.min(h * 0.56, w * 0.35));
+  const footY = size * DOWN;   // 中心から 足もとまで
+  const headY = size * UP;     // 中心から あたまの てっぺんまで
 
   // ゴール線
   const goalX = w - size * 0.92;
