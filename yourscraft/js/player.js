@@ -43,6 +43,14 @@
         for (var xx = x0; xx <= x1; xx++) {
           var id = this.world.getBlock(xx, yy, zz);
           if (!B.isSolid(id)) continue;
+          /* ドアのような箱は、その箱のぶんだけぶつかる（よこにすり抜けられる） */
+          var box = B.boxOf(id);
+          if (box) {
+            if (x + hw > xx + box[0] && x - hw < xx + box[3] &&
+              y + HEIGHT > yy + box[1] && y < yy + box[4] &&
+              z + hw > zz + box[2] && z - hw < zz + box[5]) return true;
+            continue;
+          }
           /* ベッドのような背の低いブロックは、その高さまでしかぶつからない */
           var bh = B.heightOf(id);
           if (bh >= 1 || y < yy + bh) return true;

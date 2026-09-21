@@ -132,6 +132,11 @@
       setTimeout(function () { self._tone(f, 0.32, 0.11, 'triangle', 1.0); }, i * 130);
     });
   };
+  /* ドアのあけしめ：木のきしみ + かちっという音 */
+  Audio2.prototype.door = function (opening) {
+    this._burst({ freq: 300, q: 1.2, dur: 0.22, gain: 0.26, sweep: 0.5, rate: 0.9 + Math.random() * 0.2 });
+    this._tone(opening ? 220 : 180, 0.18, 0.1, 'triangle', opening ? 1.45 : 0.7);
+  };
   Audio2.prototype.click = function () { this._tone(660, 0.05, 0.16, 'square', 1.5); };
   Audio2.prototype.open = function () { this._tone(440, 0.07, 0.12, 'triangle', 1.6); };
 

@@ -298,8 +298,9 @@
     this.f32[f] = x; this.f32[f + 1] = y; this.f32[f + 2] = z;
     this.u16[n * 10 + 6] = tile;
     var b = n * VSTRIDE;
-    this.u8[b + 14] = u ? 255 : 0;
-    this.u8[b + 15] = v ? 255 : 0;
+    /* UV は 0〜1 の小数も来る（ドアのような箱や、背の低いブロックの側面） */
+    this.u8[b + 14] = u >= 1 ? 255 : (u <= 0 ? 0 : Math.round(u * 255));
+    this.u8[b + 15] = v >= 1 ? 255 : (v <= 0 ? 0 : Math.round(v * 255));
     this.u8[b + 16] = skyL;
     this.u8[b + 17] = blkL;
     this.u8[b + 18] = shade;
@@ -334,6 +335,10 @@
     }
     return bufs;
   }
+
+  /* 箱（立方体でないブロック）の面が、マスのふちにぴったり付いているか */
+  var BOX_FLUSH = [[3, 1], [0, 0], [4, 1], [1, 0], [5, 1], [2, 0]];
+  function boxFlush(box, d) { return box[BOX_FLUSH[d][0]] === BOX_FLUSH[d][1]; }
 
   /* 隣のブロックから見て、この面を描く必要があるか */
   function faceVisible(self, other) {
@@ -408,13 +413,22 @@
           var bh = def.height;
           var low = bh < 1;
           var bed = def.bed;   /* 2 マスのベッドなら、相方とくっつく面は描かない */
+          var box = def.box;   /* ドアのような、立方体でない形 */
+          var door = def.door;
 
           for (d = 0; d < 6; d++) {
             var f = FACES[d];
             var nxl = x + f.n[0], nyl = y + f.n[1], nzl = z + f.n[2];
             var other = blockAt(nxl, nyl, nzl);
             if (bed && d === bed.partnerFace && other === bed.partner) continue;
-            if (!(low && d !== 3) && !faceVisible(id, other)) continue;
+            if (door && d === door.partnerFace && other === door.partner) continue;
+            if (box) {
+              /* 箱がマスのふちにぴったり付いている面だけ、となりで隠せる
+                 （ぴったりの面を描くと、となりのブロックの面と重なってちらつく） */
+              if (boxFlush(box, d) && !faceVisible(id, other)) continue;
+            } else {
+              if (!(low && d !== 3) && !faceVisible(id, other)) continue;
+            }
             if (isLiquid && d === 3 && other !== 0 && !B.isCross(other)) continue;
 
             var tile = def.faces[d];
@@ -448,13 +462,25 @@
               var py = y + f.o[1] + f.u[1] * cu + f.v[1] * cv;
               var pz = oz + z + f.o[2] + f.u[2] * cu + f.v[2] * cv;
               if (isLiquid && topCut < 1 && py > y + 0.5) py = y + topCut;
-              var tv = 1 - cv;
-              if (low) {
+              var tu = cu, tv = 1 - cv;
+              if (box) {
+                /* マスのなかの 0〜1 を箱の範囲へ写す。絵は引きのばさず、
+                   切り取ったぶんだけテクスチャも切り取る */
+                var lx = box[0] + (px - ox - x) * (box[3] - box[0]);
+                var ly = box[1] + (py - y) * (box[4] - box[1]);
+                var lz = box[2] + (pz - oz - z) * (box[5] - box[2]);
+                px = ox + x + lx; py = y + ly; pz = oz + z + lz;
+                var lp = [lx, ly, lz];
+                var au = f.u[0] ? 0 : (f.u[1] ? 1 : 2);
+                var av = f.v[0] ? 0 : (f.v[1] ? 1 : 2);
+                tu = f.u[au] > 0 ? lp[au] : 1 - lp[au];
+                tv = 1 - (f.v[av] > 0 ? lp[av] : 1 - lp[av]);
+              } else if (low) {
                 py = y + (py - y) * bh;
                 /* 側面はテクスチャの上のほうだけを使う（引きのばさない） */
                 if (d !== 2 && d !== 3) tv = (1 - cv) * bh;
               }
-              buf.vert(px, py, pz, tile, cu, tv, skyL, blkL, shade, isWater);
+              buf.vert(px, py, pz, tile, tu, tv, skyL, blkL, shade, isWater);
             }
             buf.quad(baseIdx, ao[0] + ao[2] > ao[1] + ao[3]);
           }

@@ -667,10 +667,19 @@
     /* --- 選択中のブロックのわく --- */
     if (s.selection) {
       gl.useProgram(this.progLine);
-      M4.translate(this.model, s.selection.x, s.selection.y, s.selection.z);
-      /* ベッドのような背の低いブロックは、わくもその高さに合わせる */
-      var selH = B.heightOf(s.selection.id);
-      if (selH < 1) this.model[5] = selH;
+      var selBox = B.boxOf(s.selection.id);
+      if (selBox) {
+        /* ドアのような箱は、わくもその形に合わせる */
+        M4.translate(this.model, s.selection.x + selBox[0], s.selection.y + selBox[1], s.selection.z + selBox[2]);
+        this.model[0] = selBox[3] - selBox[0];
+        this.model[5] = selBox[4] - selBox[1];
+        this.model[10] = selBox[5] - selBox[2];
+      } else {
+        M4.translate(this.model, s.selection.x, s.selection.y, s.selection.z);
+        /* ベッドのような背の低いブロックは、わくもその高さに合わせる */
+        var selH = B.heightOf(s.selection.id);
+        if (selH < 1) this.model[5] = selH;
+      }
       gl.uniformMatrix4fv(this.ul.uVP, false, this.vp);
       gl.uniformMatrix4fv(this.ul.uModel, false, this.model);
       gl.uniform4f(this.ul.uColor, 0, 0, 0, 0.62);

@@ -652,6 +652,75 @@
     def('bed_' + half + '_end', function (px, rnd) { copyInto(px, bedEndBase(half, rnd)); });
   });
 
+  /* ---- ドア。厚さ 3/16 の板なので、広い 2 面にだけこの絵を貼る ----
+     取っ手は「おもて側から見て右」に来るように描き、うら面には左右を
+     入れかえたものを貼る（同じ絵を両面に貼ると取っ手が反対側に見える）。 */
+  var DOOR_BASE = '#a5804b', DOOR_DARK = '#7d5f34', DOOR_EDGE = '#8a6a3b', DOOR_LIGHT = '#c0a070';
+
+  /* half: 'upper'（上半分） / 'lower'（下半分・取っ手つき） */
+  function doorBase(half, rnd) {
+    var px = new Px();
+    grain(px, DOOR_BASE, 10, rnd);
+    for (var i = 0; i < 30; i++) {
+      var lc = hex(DOOR_LIGHT);
+      px.blend((rnd() * TS) | 0, (rnd() * TS) | 0, lc[0], lc[1], lc[2], 0.4);
+    }
+    /* はめ板のくぼみ。まわりを暗く、内がわを少し明るくして段差に見せる */
+    var y0 = 3, h = 10;
+    rect(px, 3, y0, 10, h, DOOR_BASE, 12, rnd);
+    for (var x = 3; x < 13; x++) {
+      px.blend(x, y0, 40, 28, 14, 0.5);
+      px.blend(x, y0 + h - 1, 255, 230, 190, 0.22);
+    }
+    for (var y = y0; y < y0 + h; y++) {
+      px.blend(3, y, 40, 28, 14, 0.5);
+      px.blend(12, y, 255, 230, 190, 0.22);
+    }
+    /* 縦の板目（ドアの板は縦に並ぶ）。くぼみの上からも通す */
+    [5, 10].forEach(function (sx) {
+      for (var y2 = 0; y2 < TS; y2++) px.blend(sx, y2, 70, 50, 24, 0.55);
+    });
+    /* まわりのわく。外がわのふち（上半分なら上、下半分なら下）も締める */
+    rect(px, 0, 0, 1, TS, DOOR_EDGE, 6, rnd);
+    rect(px, TS - 1, 0, 1, TS, DOOR_EDGE, 6, rnd);
+    if (half === 'upper') rect(px, 0, 0, TS, 1, DOOR_EDGE, 6, rnd);
+    else rect(px, 0, TS - 1, TS, 1, DOOR_EDGE, 6, rnd);
+    if (half === 'lower') {
+      /* 取っ手（右上）。ドアの高さのまん中あたりに来る */
+      rect(px, 13, 1, 2, 1, '#3f3f3f', 0, rnd);
+      rect(px, 13, 2, 2, 2, '#707070', 0, rnd);
+      px.set(13, 2, 200, 200, 200, 255);
+      px.blend(14, 3, 30, 30, 30, 0.55);
+    }
+    return px;
+  }
+
+  ['lower', 'upper'].forEach(function (half) {
+    def('door_' + half, function (px, rnd) { copyInto(px, doorBase(half, rnd)); });
+    def('door_' + half + '_r', function (px, rnd) { copyInto(px, flipX(doorBase(half, rnd))); });
+  });
+  /* こぐち（厚み 3/16 の細い面）と、上下の切り口 */
+  def('door_edge', function (px, rnd) {
+    grain(px, DOOR_EDGE, 8, rnd);
+    rect(px, 0, 0, 1, TS, DOOR_DARK, 5, rnd);
+    rect(px, TS - 1, 0, 1, TS, DOOR_DARK, 5, rnd);
+  });
+  /* 持ちものの絵。1 枚でドア 1 まいぶんを描く */
+  def('door_item', function (px, rnd) {
+    for (var y = 0; y < TS; y++) for (var x = 0; x < TS; x++) px.set(x, y, 0, 0, 0, 0);
+    rect(px, 3, 0, 10, TS, DOOR_BASE, 10, rnd);
+    rect(px, 5, 2, 6, 5, DOOR_BASE, 14, rnd);
+    rect(px, 5, 9, 6, 5, DOOR_BASE, 14, rnd);
+    for (var x2 = 5; x2 < 11; x2++) { px.blend(x2, 2, 40, 28, 14, 0.5); px.blend(x2, 9, 40, 28, 14, 0.5); }
+    for (var y2 = 2; y2 < 7; y2++) { px.blend(5, y2, 40, 28, 14, 0.5); px.blend(10, y2, 255, 230, 190, 0.2); }
+    for (var y3 = 9; y3 < 14; y3++) { px.blend(5, y3, 40, 28, 14, 0.5); px.blend(10, y3, 255, 230, 190, 0.2); }
+    rect(px, 3, 0, 1, TS, DOOR_EDGE, 6, rnd);
+    rect(px, 12, 0, 1, TS, DOOR_EDGE, 6, rnd);
+    rect(px, 3, 0, 10, 1, DOOR_EDGE, 6, rnd);
+    rect(px, 3, TS - 1, 10, 1, DOOR_EDGE, 6, rnd);
+    px.set(11, 7, 60, 60, 60, 255); px.set(11, 8, 190, 190, 190, 255);
+  });
+
   def('skin', function (px, rnd) {
     grain(px, '#c98a55', 8, rnd);
     speck(px, '#b87c4a', 20, rnd);
@@ -708,6 +777,12 @@
     def2.faces = names.map(function (n) { return texIndex[n]; });
     def2.iconTex = { top: texIndex[top], side: texIndex[side] };
     def2.bed = opts.bed || null;
+    def2.door = opts.door || null;
+    /* 立方体でないブロックの形 [x0,y0,z0,x1,y1,z1]（ドアのような板）。
+       当たり判定・メッシュ・選択わくが、そのままこの箱を使う */
+    def2.box = opts.box || null;
+    /* 持ちものの絵を平らに描く（ドアのように立方体に見せたくないもの） */
+    def2.iconFlat = opts.iconFlat ? texIndex[opts.iconFlat] : null;
     BLOCKS[id] = def2;
     return def2;
   }
@@ -727,6 +802,7 @@
   };
   var WOOL_START = 51;   /* 51〜66 が羊毛 16 色。あとから足すブロックは 67 番から */
   var BED_ID = 67;
+  var DOOR_ID = 76;   /* 68〜75 はベッドの 8 種。ドアはそのつぎから */
 
   block(ID.GRASS, '草ブロック', { tex: 'grass_side', top: 'grass_top', bottom: 'dirt', side: 'grass_side', sound: 'grass' });
   block(ID.DIRT, '土', { tex: 'dirt', sound: 'gravel' });
@@ -852,6 +928,80 @@
   function bedOf(id) { var b = BLOCKS[id]; return (b && b.bed) || null; }
   function isBed(id) { return id === BED_ID || !!bedOf(id); }
 
+  /* ---------- ドア（たて 2 マス・あけしめできる） ----------
+     ID 76 は「持ちもの・アイコン」用。世界に置かれるのは 77〜92 の
+     「4 方向 × あけ／しめ × 上／下」。
+     しめているときは、向いているほうのふち 3/16 に板が立つ。
+     あけると、ちょうつがい（おもてから見て左）のがわへ 90 度ひらく。 */
+  var DOOR_T = 0.1875;   /* 板の厚み 3/16 */
+  ID.DOOR = DOOR_ID;
+  block(ID.DOOR, 'ドア', {
+    tex: 'door_lower', top: 'door_edge', bottom: 'door_edge', side: 'door_lower',
+    faces: ['door_edge', 'door_edge', 'door_edge', 'door_edge', 'door_lower', 'door_lower_r'],
+    opaque: false, sound: 'wood', iconFlat: 'door_item',
+    box: [0, 0, 0.5 - DOOR_T / 2, 1, 1, 0.5 + DOOR_T / 2]
+  });
+
+  /* 向きは BED_DIRS と同じ並び（N,E,S,W）。face はその向きの面の番号 */
+  function dirIndex(dx, dz) {
+    for (var i = 0; i < BED_DIRS.length; i++) if (BED_DIRS[i].dx === dx && BED_DIRS[i].dz === dz) return i;
+    return 0;
+  }
+  /* その向きのふちに立てた板の箱 */
+  function doorBox(d) {
+    if (d.dx > 0) return [1 - DOOR_T, 0, 0, 1, 1, 1];
+    if (d.dx < 0) return [0, 0, 0, DOOR_T, 1, 1];
+    if (d.dz > 0) return [0, 0, 1 - DOOR_T, 1, 1, 1];
+    return [0, 0, 0, 1, 1, DOOR_T];
+  }
+
+  var DOOR_STATE_START = DOOR_ID + 1;
+  var doorIds = [];
+  /* id = 77 + 向き*4 + (あいている ? 2 : 0) + (上半分 ? 1 : 0) */
+  function doorId(i, open, half) { return DOOR_STATE_START + i * 4 + (open ? 2 : 0) + (half === 'upper' ? 1 : 0); }
+
+  BED_DIRS.forEach(function (F, i) {
+    /* ちょうつがいのがわ（真上から見て、向きを反時計まわりに 90 度） */
+    var hinge = BED_DIRS[dirIndex(-F.dz, F.dx)];
+    [false, true].forEach(function (open) {
+      ['lower', 'upper'].forEach(function (half) {
+        var id = doorId(i, open, half);
+        /* 板が立つふちと、おもて面の向き */
+        var panel = open ? hinge : F;
+        var front = open ? BED_DIRS[bedOpposite(dirIndex(hinge.dx, hinge.dz))] : F;
+        var back = BED_DIRS[bedOpposite(dirIndex(front.dx, front.dz))];
+        var faces = ['door_edge', 'door_edge', 'door_edge', 'door_edge', 'door_edge', 'door_edge'];
+        faces[front.face] = 'door_' + half;
+        faces[back.face] = 'door_' + half + '_r';
+        block(id, 'ドア', {
+          tex: 'door_' + half, top: 'door_edge', side: 'door_' + half,
+          faces: faces, opaque: false, sound: 'wood', iconFlat: 'door_item',
+          box: doorBox(panel),
+          door: {
+            facing: F.k, half: half, open: open,
+            partnerFace: half === 'lower' ? 2 : 3,          /* 相方は上／下 */
+            partner: doorId(i, open, half === 'lower' ? 'upper' : 'lower'),
+            toggled: doorId(i, !open, half)
+          }
+        });
+        doorIds.push(id);
+      });
+    });
+  });
+
+  /* 向き（'N'/'E'/'S'/'W'）から、下半分・上半分のブロック ID を返す */
+  function doorPair(facing) {
+    var i = dirIndex(0, -1);
+    for (var j = 0; j < BED_DIRS.length; j++) if (BED_DIRS[j].k === facing) i = j;
+    return { lower: doorId(i, false, 'lower'), upper: doorId(i, false, 'upper') };
+  }
+  function doorOf(id) { var b = BLOCKS[id]; return (b && b.door) || null; }
+  function isDoor(id) { return id === DOOR_ID || !!doorOf(id); }
+  /* あいている ⇔ しまっている を入れかえた ID */
+  function doorToggle(id) { var d = doorOf(id); return d ? d.toggled : id; }
+  /* 立方体でないブロックの形（ドアなど）。ないときは null */
+  function boxOf(id) { var b = BLOCKS[id]; return (b && b.box) || null; }
+
   for (var i = 0; i < BLOCKS.length; i++) if (!BLOCKS[i]) BLOCKS[i] = null;
 
   function isAir(id) { return id === 0; }
@@ -883,7 +1033,7 @@
     },
     {
       name: '装飾', icon: ID.TORCH, items: [
-        ID.TORCH, ID.GLOWSTONE, ID.SEA_LANTERN, ID.BED, ID.CRAFTING_TABLE, ID.BOOKSHELF, ID.TNT,
+        ID.TORCH, ID.GLOWSTONE, ID.SEA_LANTERN, ID.BED, ID.DOOR, ID.CRAFTING_TABLE, ID.BOOKSHELF, ID.TNT,
         ID.POPPY, ID.DANDELION, ID.TALL_GRASS, ID.SAPLING,
         ID.GOLD_BLOCK, ID.IRON_BLOCK, ID.DIAMOND_BLOCK
       ]
@@ -907,6 +1057,12 @@
     bedOf: bedOf,
     isBed: isBed,
     bedIds: bedIds,
+    doorPair: doorPair,
+    doorOf: doorOf,
+    isDoor: isDoor,
+    doorToggle: doorToggle,
+    doorIds: doorIds,
+    boxOf: boxOf,
     texNames: texNames,
     texIndex: texIndex,
     buildTextures: buildTextures,
