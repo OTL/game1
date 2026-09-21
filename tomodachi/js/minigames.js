@@ -61,6 +61,7 @@ function ensureStyle() {
 
 const MG_CSS = `
 .mg-root{
+  align-self:stretch; flex:1 1 auto; max-width:100%; min-width:0;
   --mg-ink:#4a4059; --mg-sub:#8b82a0; --mg-line:#e7ddf2;
   --mg-bg:#fff8fb; --mg-card:#ffffff; --mg-pink:#ffc7dd; --mg-blue:#bfe4ff;
   --mg-mint:#c6f0dd; --mg-lemon:#ffeab0; --mg-grape:#ded0ff; --mg-hot:#ff8fb4;
@@ -71,12 +72,13 @@ const MG_CSS = `
   -webkit-tap-highlight-color:transparent; overflow:hidden;
 }
 .mg-root *{box-sizing:border-box;}
-.mg-head{display:flex; align-items:center; gap:8px; flex:0 0 auto;}
-.mg-title{font-size:17px; font-weight:800; letter-spacing:.02em;}
-.mg-status{margin-left:auto; font-size:14px; font-weight:700; color:var(--mg-sub);
-  background:#fff; border-radius:999px; padding:6px 12px; border:2px solid var(--mg-line);
-  white-space:nowrap;}
-.mg-quit{min-height:44px; min-width:76px; padding:0 14px; border:none; border-radius:999px;
+.mg-head{display:flex; align-items:center; gap:8px; flex:0 0 auto; min-width:0; flex-wrap:nowrap;}
+.mg-title{font-size:clamp(14px,4.2vw,18px); font-weight:800; letter-spacing:.02em;
+  flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.mg-status{margin-left:auto; font-size:clamp(11px,3.2vw,14px); font-weight:700; color:var(--mg-sub);
+  background:#fff; border-radius:999px; padding:6px 10px; border:2px solid var(--mg-line);
+  white-space:nowrap; flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;}
+.mg-quit{flex:0 0 auto; min-height:44px; min-width:72px; padding:0 12px; border:none; border-radius:999px;
   background:#fff; color:var(--mg-sub); font-size:14px; font-weight:800;
   border:2px solid var(--mg-line); cursor:pointer; touch-action:manipulation;}
 .mg-quit:active{transform:scale(.96);}
@@ -96,13 +98,23 @@ const MG_CSS = `
 
 /* だるま */
 .mg-daruma-pad{flex:0 0 auto;}
+.mg-beltwrap{flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+  min-height:0; min-width:0;}
+.mg-belt{flex:0 1 auto; width:100%; aspect-ratio:16/9; min-height:0; max-height:100%; margin:auto;}
 .mg-life{font-size:18px; letter-spacing:2px;}
 
 /* えあわせ */
-.mg-grid{flex:1 1 auto; display:grid; gap:7px; align-content:center; min-height:0;}
+.mg-gridwrap{flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+  min-height:0; min-width:0; container-type:size;}
+.mg-grid{display:grid; gap:2.2%; width:100%; max-width:100%; margin:auto; container-type:size;
+  /* もとの たてよこ比（cq が つかえない ときの ひかえ） */
+  aspect-ratio:var(--mg-ar,1); height:auto; max-height:100%;
+  /* たてに あきが あれば カードを すこし たてながに して うめる */
+  height:min(100%, calc(100cqw * var(--mg-hr, 1)));}
 .mg-card{position:relative; border:none; padding:0; border-radius:14px; cursor:pointer;
-  background:var(--mg-blue); font-size:clamp(20px,7vmin,40px); line-height:1;
-  display:flex; align-items:center; justify-content:center; aspect-ratio:3/4;
+  background:var(--mg-blue); line-height:1; width:100%; height:100%; min-width:0; min-height:0;
+  font-size:clamp(16px,7vmin,38px); font-size:min(9cqmin,46px);
+  display:flex; align-items:center; justify-content:center;
   touch-action:manipulation; box-shadow:0 3px 0 rgba(120,110,160,.22); transition:transform .12s;}
 .mg-card-back{color:transparent;}
 .mg-card-back::after{content:'？'; position:absolute; inset:0; display:flex; align-items:center;
@@ -405,22 +417,24 @@ export function playMinigame(id, hostEl, ctx = {}) {
 const CHANT = 'だるまさんが ころんだ';
 
 function playDaruma(host, c, resolve) {
-  const st = new Stage(host, '🚦 だるまさんが ころんだ', resolve);
+  const st = new Stage(host, '🚦 だるまさん', resolve);
   const rand = c.rand;
   const oni = c.residents.find((r) => r && r !== c.main) || c.residents[0] || null;
   const oniFace = (oni && oni.face) || safeRandomFace(rand);
   const oniName = (oni && oni.name) || 'おに';
   const meFace = (c.main && c.main.face) || safeRandomFace(rand);
 
-  const box = div('mg-stagebox');
+  const beltwrap = div('mg-beltwrap');
+  const box = div('mg-stagebox mg-belt');
   const cv = document.createElement('canvas');
   cv.className = 'mg-canvas';
   box.append(cv);
+  beltwrap.append(box);
   const pad = div('mg-daruma-pad');
   const goBtn = button('mg-btn mg-btn-main', 'すすむ（おしっぱなし）');
   pad.append(goBtn);
   const note = div('mg-note', 'おには「' + CHANT + '」と となえて ふりむくよ。ふりむいたら 手を はなそう。');
-  st.body.append(box, pad, note);
+  st.body.append(beltwrap, pad, note);
 
   const S = {
     pos: 0,            // 0..1 すすんだ わりあい
@@ -441,7 +455,7 @@ function playDaruma(host, c, resolve) {
   function setStatus() {
     const hearts = '❤️'.repeat(Math.max(0, 3 - S.outs)) + '🖤'.repeat(S.outs);
     const left = Math.max(0, Math.ceil((LIMIT - (now() - S.startAt)) / 1000));
-    st.status(hearts + '  のこり ' + left + ' びょう');
+    st.status(hearts + ' ' + left);
   }
   function now() { return (typeof performance !== 'undefined' ? performance.now() : Date.now()); }
 
@@ -520,9 +534,21 @@ function playDaruma(host, c, resolve) {
   });
 }
 
+/** 文字が はみ出さない ように、はばを 測って ちいさくする。 */
+function fitText(ctx, text, maxW, startPx, minPx, weight) {
+  let px = Math.max(minPx, Math.round(startPx));
+  const set = () => { ctx.font = (weight || '700') + ' ' + px + 'px system-ui,sans-serif'; };
+  set();
+  let guard = 0;
+  while (px > minPx && ctx.measureText(text).width > maxW && guard < 200) {
+    px -= 1; set(); guard++;
+  }
+  return px;
+}
+
 function drawDaruma(cv, S, t, art) {
   const { ctx, w, h } = fitCanvas(cv);
-  const groundY = h * 0.78;
+  const groundY = h * 0.94;
   // そら と じめん
   const sky = ctx.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, '#d9f0ff');
@@ -530,47 +556,49 @@ function drawDaruma(cv, S, t, art) {
   ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#cdeecb'; ctx.fillRect(0, groundY, w, h - groundY);
   ctx.fillStyle = '#b7e3b4';
-  for (let i = 0; i < 8; i++) {
-    ctx.fillRect(((i * 97) % w), groundY + 6 + ((i * 31) % 20), 18, 4);
+  for (let i = 0; i < 10; i++) {
+    ctx.fillRect(((i * 97) % w), groundY + 5 + ((i * 31) % Math.max(6, h - groundY - 8)), 16, 3);
   }
+
+  // キャラクターの おおきさ（ベルトの たかさに あわせて おおきく）
+  // かお＋からだは たて size*1.45 ぶんくらい つかう。ベルトに おさまる ぎりぎりまで おおきく。
+  const size = Math.max(36, Math.min(h * 0.62, w * 0.28));
+  const footY = size * 0.84;   // 中心から 足もとまで
+  const headY = size * 0.62;   // 中心から あたまの てっぺんまで
+
   // ゴール線
-  const goalX = w - 74;
-  ctx.strokeStyle = '#ff9fc0'; ctx.lineWidth = 4; ctx.setLineDash([10, 8]);
-  ctx.beginPath(); ctx.moveTo(goalX, h * 0.2); ctx.lineTo(goalX, groundY + 10); ctx.stroke();
+  const goalX = w - size * 0.92;
+  ctx.strokeStyle = '#ff9fc0'; ctx.lineWidth = 4; ctx.setLineDash([9, 7]);
+  ctx.beginPath(); ctx.moveTo(goalX, h * 0.16); ctx.lineTo(goalX, Math.min(h - 2, groundY + 4)); ctx.stroke();
   ctx.setLineDash([]);
 
-  const size = Math.min(96, h * 0.34);
-
   // おに
-  const oniX = w - 40, oniY = groundY - size * 0.55;
+  const oniX = w - size * 0.44;
+  const oniY = Math.max(headY + 2, groundY - footY);
   if (S.phase === 'away') {
     drawBackHead(ctx, oniX, oniY, size);
   } else {
     safeFace(ctx, art.oniFace, {
-      size, cx: oniX, cy: oniY, body: false, mood: 2, talking: false, blink: false, t,
+      size, cx: oniX, cy: oniY, body: true, mood: 2, talking: false, blink: false, t,
     });
   }
 
   // じぶん
-  const meX = 34 + S.pos * (goalX - 46);
+  const meX = size * 0.5 + S.pos * (goalX - size * 0.9);
   const bob = S.holding ? Math.sin(t / 90) * 4 : 0;
   safeFace(ctx, art.meFace, {
-    size: size * 0.92, cx: meX, cy: groundY - size * 0.5 + bob, body: true,
+    size, cx: meX, cy: Math.max(headY + 2, groundY - footY) + bob, body: true,
     mood: 0, talking: false, blink: false, t,
   });
 
-  // となえ
-  ctx.font = '700 ' + Math.max(13, Math.round(h * 0.075)) + 'px system-ui,sans-serif';
+  // となえ（はばに おさまる 大きさに する）
+  const msg = S.phase === 'away' ? CHANT.slice(0, Math.max(1,
+    Math.round(CHANT.length * clamp((t - S.phaseStart) / S.phaseLen, 0, 1)))) : 'ふりむいた！ とまれ！';
+  const maxW = w - 20;
+  fitText(ctx, 'ふりむいた！ とまれ！', maxW, Math.max(13, Math.min(h * 0.14, 30)), 10, '700');
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  if (S.phase === 'away') {
-    const p = clamp((t - S.phaseStart) / S.phaseLen, 0, 1);
-    const n = Math.max(1, Math.round(CHANT.length * p));
-    ctx.fillStyle = '#7a6f92';
-    ctx.fillText(CHANT.slice(0, n), 10, 10);
-  } else {
-    ctx.fillStyle = '#e04a7a';
-    ctx.fillText('ふりむいた！ とまれ！', 10, 10);
-  }
+  ctx.fillStyle = S.phase === 'away' ? '#7a6f92' : '#e04a7a';
+  ctx.fillText(msg, 10, 8);
 
   // アウトの ひかり
   if (t - S.flash < 320) {
@@ -579,31 +607,66 @@ function drawDaruma(cv, S, t, art) {
   }
   // ふきだし
   if (S.toast && t < S.toastUntil) {
-    ctx.font = '900 ' + Math.round(h * 0.13) + 'px system-ui,sans-serif';
+    fitText(ctx, S.toast, maxW * 0.8, Math.min(h * 0.3, 54), 14, '900');
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
-    ctx.fillText(S.toast, w / 2, h * 0.42);
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.fillText(S.toast, w / 2, h * 0.44);
     ctx.lineWidth = 3; ctx.strokeStyle = '#e04a7a';
-    ctx.strokeText(S.toast, w / 2, h * 0.42);
+    ctx.strokeText(S.toast, w / 2, h * 0.44);
   }
 }
 
-/** うしろを むいた あたま。 */
+/** うしろを むいた すがた。face.js の からだと おなじ 大きさに そろえてある。 */
 function drawBackHead(ctx, cx, cy, size) {
+  const s = size / 100;
   ctx.save();
-  ctx.fillStyle = '#ffe0c0';
-  ctx.beginPath(); ctx.arc(cx, cy, size * 0.42, 0, Math.PI * 2); ctx.fill();
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  const cloth = '#9fc7f0';
+  const skin = '#f4cfae';
+  // からだ（かたの いちは face.js と そろえる）
+  ctx.save();
+  ctx.translate(0, 31);
+  ctx.beginPath();
+  ctx.moveTo(-10, -2);
+  ctx.bezierCurveTo(-26, 2, -32, 10, -33, 30);
+  ctx.lineTo(-33, 52);
+  ctx.lineTo(33, 52);
+  ctx.lineTo(33, 30);
+  ctx.bezierCurveTo(32, 10, 26, 2, 10, -2);
+  ctx.closePath();
+  ctx.fillStyle = cloth; ctx.fill();
+  ctx.strokeStyle = '#6f96c4'; ctx.lineWidth = 1.2; ctx.stroke();
+  // うで
+  ctx.fillStyle = '#93bce6';
+  for (const d of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(d * 28, 4);
+    ctx.quadraticCurveTo(d * 40, 20, d * 36, 40);
+    ctx.quadraticCurveTo(d * 30, 42, d * 26, 30);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(d * 35, 43, 5.4, 5.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = skin; ctx.fill();
+    ctx.fillStyle = '#93bce6';
+  }
+  ctx.restore();
+  // くび
+  ctx.fillStyle = '#e8bd9b';
+  ctx.beginPath(); ctx.moveTo(-7.4, 11); ctx.lineTo(-6.4, 33); ctx.lineTo(6.4, 33); ctx.lineTo(7.4, 11);
+  ctx.closePath(); ctx.fill();
+  // みみ（あたまの よこから すこし のぞく）
+  ctx.fillStyle = '#e8bd9b';
+  for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(d * 31, -16, 4.8, 6.4, 0, 0, Math.PI * 2); ctx.fill(); }
+  // あたま（うしろ姿なので ぜんぶ かみ）
   ctx.fillStyle = '#5a4738';
-  ctx.beginPath();
-  ctx.arc(cx, cy - size * 0.04, size * 0.43, Math.PI * 0.92, Math.PI * 2.08);
-  ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx, cy + size * 0.12, size * 0.3, 0, Math.PI); ctx.fill();
-  // からだ
-  ctx.fillStyle = '#9fc7f0';
-  ctx.beginPath();
-  ctx.moveTo(cx - size * 0.34, cy + size * 0.95);
-  ctx.quadraticCurveTo(cx, cy + size * 0.28, cx + size * 0.34, cy + size * 0.95);
-  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -18, 32, 34, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -6, 27, 22, 0, 0, Math.PI); ctx.fill();
+  // つむじの ハイライト
+  ctx.fillStyle = 'rgba(255,255,255,.14)';
+  ctx.beginPath(); ctx.ellipse(-9, -34, 13, 8, -0.4, 0, Math.PI * 2); ctx.fill();
+  // えりあし
+  ctx.fillStyle = '#e8bd9b';
+  ctx.beginPath(); ctx.ellipse(0, 14, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -638,11 +701,17 @@ function playMemory(host, c, resolve) {
     const deck = shuffle(marks.concat(marks), rand);
     st.body.textContent = '';
 
+    const wrap = div('mg-gridwrap');
     const grid = div('mg-grid');
-    grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-    grid.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ',minmax(0,1fr))';
+    grid.style.gridTemplateRows = 'repeat(' + rows + ',minmax(0,1fr))';
+    // ばん ぜんたいの たてよこ比。カードは だいたい 3:4。
+    grid.style.setProperty('--mg-ar', (cols * 3) + ' / ' + (rows * 4));
+    // たてに のびても いい かぎり（カードは 3 : 4.6 まで）
+    grid.style.setProperty('--mg-hr', String((rows * 4.6) / (cols * 3)));
+    wrap.append(grid);
     const info = div('mg-note', '手かず 0');
-    st.body.append(grid, info);
+    st.body.append(wrap, info);
 
     const cards = deck.map((mark, i) => {
       const b = button('mg-card mg-card-back', mark);
