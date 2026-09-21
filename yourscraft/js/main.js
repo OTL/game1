@@ -11,7 +11,7 @@
   var MORNING = 0.02;           /* timeOfDay=0 が朝 6 時。すこし進めて明るい朝にする */
   var DUSK_START = 0.48;        /* これを過ぎると日がかたむきはじめる */
   var NIGHT_START = 0.52, NIGHT_END = 0.98;   /* この間が「夜」（ねむれる時間） */
-  var VERSION = '1.4';
+  var VERSION = '1.5';
 
   var Game = {
     mode: 'boot',
@@ -708,6 +708,15 @@
         setBlock(t.x + sx, t.y, t.z + sz, 0);
       }
     }
+    /* ドアもたて 2 マスで 1 つ。かた方を壊したら、もうかた方も消す */
+    var door = B.doorOf(t.id);
+    if (door) {
+      var dy2 = door.half === 'lower' ? 1 : -1;
+      if (Game.world.getBlock(t.x, t.y + dy2, t.z) === door.partner) {
+        spawnParticles(t.x, t.y + dy2, t.z, door.partner);
+        setBlock(t.x, t.y + dy2, t.z, 0);
+      }
+    }
     spawnParticles(t.x, t.y, t.z, t.id);
     setBlock(t.x, t.y, t.z, 0);
     if (Game.settings.sound) Audio.dig(t.id);
@@ -744,6 +753,13 @@
       sleepInBed();
       return;
     }
+    /* ドアをねらったときは「置く」ではなく「あけしめ」。
+       しゃがみながらならブロックを置ける（マイクラと同じ） */
+    if (B.isDoor(t.id) && !(Game.ctrl && Game.ctrl.sneak)) {
+      Game.lastPlace = 'ドアをあけしめ';
+      toggleDoor(t);
+      return;
+    }
     if (!id) { Game.lastPlace = 'ホットバーが空'; return; }
     var x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
     if (y < 0 || y >= G.WH) { Game.lastPlace = '世界の外'; return; }
@@ -759,6 +775,7 @@
       failHint('自分のいる場所には置けません'); return;
     }
     if (B.isBed(id)) { placeBed(x, y, z); return; }
+    if (B.isDoor(id)) { placeDoor(x, y, z); return; }
     /* 草花は土や草の上だけ（マイクラと同じ） */
     if (def.render === 'cross' && id !== ID.TORCH) {
       var below = Game.world.getBlock(x, y - 1, z);
@@ -799,6 +816,51 @@
     setBlock(hx, y, hz, pair.head);
     if (Game.settings.sound) Audio.place(pair.foot);
     Game.swing = 0.001;
+  }
+
+  /* ================== ドア（たて 2 マス・あけしめできる） ================== */
+  function placeDoor(x, y, z) {
+    if (y + 1 >= G.WH) { Game.lastPlace = '世界の外'; return; }
+    if (!isReplaceable(Game.world.getBlock(x, y + 1, z))) {
+      Game.lastPlace = 'ドアの 2 マス目がふさがっている';
+      failHint('ドアは たて 2 マスぶんの場所がいります（上を 1 マスあけてください）');
+      return;
+    }
+    if (Game.player.blocksSpace(x, y + 1, z)) {
+      Game.lastPlace = '自分のいる場所';
+      failHint('自分のいる場所には置けません'); return;
+    }
+    if (!B.isSolid(Game.world.getBlock(x, y - 1, z))) {
+      Game.lastPlace = 'ドアの下が地面でない';
+      failHint('ドアは しっかりしたブロックの上にだけ置けます'); return;
+    }
+    var pair = B.doorPair(facingFromView());
+    Game.lastPlace = 'ok';
+    setBlock(x, y, z, pair.lower);
+    setBlock(x, y + 1, z, pair.upper);
+    if (Game.settings.sound) Audio.place(pair.lower);
+    Game.swing = 0.001;
+  }
+
+  /* あけしめ。上下 2 マスをいっしょに入れかえる */
+  function toggleDoor(t) {
+    var d = B.doorOf(t.id);
+    if (!d) return;
+    var by = d.half === 'lower' ? t.y : t.y - 1;
+    var lo = Game.world.getBlock(t.x, by, t.z), up = Game.world.getBlock(t.x, by + 1, t.z);
+    if (B.doorOf(lo)) setBlock(t.x, by, t.z, B.doorToggle(lo));
+    if (B.doorOf(up)) setBlock(t.x, by + 1, t.z, B.doorToggle(up));
+    if (Game.settings.sound) Audio.door(!d.open);
+    Game.swing = 0.001;
+  }
+
+  /* はじめてドアをねらったとき、使いかたを 1 回だけ知らせる */
+  function doorHint() {
+    if (Game.doorHintShown || Game.sleeping) return;
+    var t = Game.target || Game.touchTarget;
+    if (!t || !B.isDoor(t.id)) return;
+    Game.doorHintShown = true;
+    hint(Game.touchUI ? 'ドアをタップすると あけしめできます' : 'ドアを右クリックすると あけしめできます', 4200);
   }
 
   /* ================== ベッドで寝る ================== */
@@ -950,6 +1012,12 @@
       buf.quad(b2, false);
       return buf;
     }
+    if (def.box) {
+      /* ドアのような箱は、その形のまま持つ */
+      var bx = def.box;
+      cube(buf, bx[0] - 0.5, bx[1] - 0.5, bx[2] - 0.5, bx[3] - 0.5, bx[4] - 0.5, bx[5] - 0.5, def.faces);
+      return buf;
+    }
     cube(buf, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, def.faces);
     return buf;
   }
@@ -1068,6 +1136,7 @@
       Game.target = targetBlock();
       Game.touchTarget = activeTouchTarget();
       bedHint();
+      doorHint();
       handleHold(dt, now);
       if (Game.swing > 0) { Game.swing += dt; if (Game.swing > 0.26) Game.swing = 0; }
       var p = Game.player;
@@ -1608,7 +1677,7 @@
   function pickBlock() {
     var t = Game.target;
     if (!t) return;
-    Game.hotbar[Game.sel] = B.isBed(t.id) ? ID.BED : t.id;
+    Game.hotbar[Game.sel] = B.isBed(t.id) ? ID.BED : (B.isDoor(t.id) ? ID.DOOR : t.id);
     Game.handMesh = null;
     refreshHotbar();
     showItemName();

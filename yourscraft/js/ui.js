@@ -46,9 +46,10 @@
     ctx.imageSmoothingEnabled = false;
     if (!def) { iconCache[key] = cv; return cv; }
 
-    if (def.render === 'cross') {
-      /* 花や草はそのまま平面で（マイクラのアイテム表示と同じ） */
-      ctx.drawImage(texCanvas(def.faces[0], 1), 0, 0, size, size);
+    if (def.render === 'cross' || def.iconFlat !== null) {
+      /* 花や草・ドアはそのまま平面で（マイクラのアイテム表示と同じ） */
+      var flat = def.iconFlat !== null ? def.iconFlat : def.faces[0];
+      ctx.drawImage(texCanvas(flat, 1), 0, 0, size, size);
       iconCache[key] = cv;
       return cv;
     }
