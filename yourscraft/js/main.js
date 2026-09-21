@@ -1247,6 +1247,14 @@
   var holdAction = null, holdSource = null, holdLast = 0;
   var holdTouch = null;       /* 長押し中の指 */
   var lastTouchAt = 0;   /* タッチの直後に来る「合成マウスイベント」を無視するため */
+  /* ポインタロックが使えないときの「左ドラッグで見まわす」用 */
+  var dragLook = false;    /* ロックなしで見まわす方式に切りかえたか */
+  var dragging = false;    /* 左ボタンを押したままか */
+  var dragMoved = 0;       /* 押してからの移動量（クリックか、ドラッグかの判定に使う） */
+  var dragAt = 0;          /* 押した時刻 */
+  var dragLast = null;     /* 直前のカーソル位置（movementX が来ないブラウザ用） */
+  var lockFails = 0;       /* ポインタロックに失敗した回数 */
+  var CLICK_SLOP = 8;      /* これ以下の動きならクリックとみなす（px） */
   /* 実機で操作が効かないときの調べもの用のカウンタ（座標表示に出る） */
   Game.ev = { ts: 0, tm: 0, te: 0, btn: 0, md: 0 };
   /* これより短く離せば「タップ（置く）」、押し続ければ「長押し（壊す）」。
@@ -1296,6 +1304,10 @@
         pendingTap = null;
       }
     }
+    /* ドラッグ方式のとき、左ボタンをほとんど動かさずに押し続けていたら壊し続ける */
+    if (!holdAction && dragging && dragMoved < CLICK_SLOP && now - dragAt > 300) {
+      holdAction = 'dig'; holdSource = 'mouse'; holdLast = 0;
+    }
     if (!holdAction) return;
     if (now - holdLast < (holdAction === 'dig' ? 190 : 260)) return;
     holdLast = now;
@@ -1343,30 +1355,97 @@
       selectSlot(Game.sel + (e.deltaY > 0 ? 1 : -1));
     }, { passive: true });
 
-    /* ---- マウス（ポインタロック）。タッチは下の touch イベントで扱うので、
-       ここは本物のマウス専用 ---- */
+    /* ---- マウス。タッチは下の touch イベントで扱うので、ここは本物のマウス専用 ----
+
+       ふつうはポインタロック（画面をつかんで、カーソルを消したまま視点を回す）を使うが、
+       これは環境によって失敗することがある。
+         ・埋めこみ表示（iframe）で許可されていない
+         ・Esc で外したあとしばらくは、かけ直そうとしても拒否される
+         ・ブラウザや OS の設定・リモート接続などで、そもそも使えない
+       失敗すると「カーソルが画面の真ん中に戻されるだけで視点が回せない」状態になるので、
+       失敗を見つけたら自動で「左ドラッグで見まわす」やり方に切りかえる。 */
+    function lockFailed() {
+      if (dragLook) return;
+      lockFails++;
+      /* Esc で外した直後などは、少しのあいだかけ直せないだけのこともあるので、
+         一度目はもう一度クリックしてもらう。二度続けて失敗したら方式を変える。 */
+      if (lockFails < 2) { hint('もう一度クリックしてください', 2000); return; }
+      dragLook = true;
+      Game.dragLook = true;
+      dragging = false;
+      dragLast = null;
+      hint('画面をつかめないので、左ドラッグで見まわします（左クリックで壊す / 右クリックで置く）', 6000);
+    }
+
+    function tryLock() {
+      /* そもそも使えない環境なら、ためらわずドラッグ方式へ */
+      if (!canvas.requestPointerLock) { lockFails = 2; lockFailed(); return; }
+      var r;
+      try { r = canvas.requestPointerLock(); }
+      catch (err) { lockFailed(); return; }
+      /* 新しいブラウザは Promise を返す。拒否されたらドラッグ方式にする
+         （受け取らないと「未処理の拒否」としてエラーにもなる） */
+      if (r && typeof r.catch === 'function') r.catch(function () { lockFailed(); });
+    }
+
     canvas.addEventListener('mousedown', function (e) {
       if (Game.mode !== 'play' || fromTouch()) return;
       /* 本物のマウスを一度も見ていないタッチ端末では、マウス操作系をまるごと使わない
          （ポインタロックがかかると指のドラッグと二重に視点が動いてしまう） */
       if (Game.touchUI && !Game.sawMouse) return;
-      if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
+      if (!dragLook && document.pointerLockElement !== canvas) { tryLock(); return; }
       Game.ev.md++;
+      if (dragLook) {
+        if (e.cancelable) e.preventDefault();
+        if (e.button === 0) {
+          /* 左ボタン：動かせば見まわす、動かさずに離せば壊す、押し続ければ壊し続ける */
+          dragging = true; dragMoved = 0; dragAt = performance.now();
+          return;
+        }
+        if (e.button === 2) { placeBlock(); holdAction = 'place'; holdSource = 'mouse'; holdLast = performance.now(); return; }
+        if (e.button === 1) { pickBlock(); }
+        return;
+      }
       if (e.button === 0) { digBlock(); holdAction = 'dig'; holdSource = 'mouse'; holdLast = performance.now(); }
       else if (e.button === 2) { placeBlock(); holdAction = 'place'; holdSource = 'mouse'; holdLast = performance.now(); }
       else if (e.button === 1) { pickBlock(); }
     });
     window.addEventListener('mouseup', function () {
+      if (dragging) {
+        dragging = false;
+        /* ほとんど動いていなくて、長押しにもなっていなければ「クリックで壊す」 */
+        if (dragMoved < CLICK_SLOP && holdSource !== 'mouse') digBlock();
+      }
       if (holdSource === 'mouse') { holdAction = null; holdSource = null; }
     });
     document.addEventListener('mousemove', function (e) {
-      if (document.pointerLockElement !== canvas || fromTouch()) return;
-      /* ロックした直後は、カーソルが画面中央へ飛ぶぶんの大きな移動量が来るので少しの間捨てる */
-      if (performance.now() - (Game.lockTime || 0) < 120) return;
-      look(e.movementX, e.movementY);
+      if (fromTouch()) return;
+      if (document.pointerLockElement === canvas) {
+        /* ロックした直後は、カーソルが画面中央へ飛ぶぶんの大きな移動量が来るので少しの間捨てる */
+        if (performance.now() - (Game.lockTime || 0) < 120) return;
+        look(e.movementX, e.movementY);
+        return;
+      }
+      if (!dragLook || !dragging || Game.mode !== 'play') return;
+      /* ロックなしのときは movementX が来ない（あるいは 0 のままの）ブラウザがあるので、
+         前のフレームからの差を自分で出す */
+      var dx = e.movementX, dy = e.movementY;
+      if (!dx && !dy) {
+        if (dragLast) { dx = e.clientX - dragLast.x; dy = e.clientY - dragLast.y; }
+        else { dx = 0; dy = 0; }
+      }
+      dragLast = { x: e.clientX, y: e.clientY };
+      dragMoved += Math.abs(dx) + Math.abs(dy);
+      if (dragMoved >= CLICK_SLOP) look(dx, dy);
     });
+    document.addEventListener('pointerlockerror', function () { lockFailed(); });
     document.addEventListener('pointerlockchange', function () {
       if (document.pointerLockElement === canvas) { Game.lockTime = performance.now(); return; }
+      /* 十分ながいあいだロックできていたなら、失敗の数えなおし */
+      if (performance.now() - (Game.lockTime || 0) > 1000) lockFails = 0;
+      /* かかった直後に外れたときは、ロックが使えない環境とみなしてドラッグ方式にする
+         （ここで一時停止すると、クリックのたびに真ん中に戻されるだけになってしまう） */
+      if (performance.now() - (Game.lockTime || 0) < 300) { lockFailed(); return; }
       if (Game.mode === 'play' && !isTouch()) pauseGame();
     });
     /* 本物のマウスがつながっているかの判定だけ、ポインタイベントで拾う */
@@ -1696,6 +1775,7 @@
   Game.inputState = function () {
     return { holdAction: holdAction, holdSource: holdSource, pendingTap: pendingTap,
       lookId: lookId, stickId: stickId, touches: touchMap.size, sawMouse: !!Game.sawMouse,
+      dragLook: dragLook, dragging: dragging, lockFails: lockFails,
       fromTouch: fromTouch(), tapMs: TAP_MS, lastPlace: Game.lastPlace, lastDig: Game.lastDig };
   };
   Game.dig = digBlock;
