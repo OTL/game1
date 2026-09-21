@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#ffe9c9">
+<title>トモダチアイランド — 島の住人はみんな あなたの知り合い</title>
+<meta name="description" content="自分でつくった住人たちが島のマンションで暮らす生活観察ゲーム。ごはん・なやみ相談・けんかの仲裁・告白・結婚・子ども。ミニゲームとお宝あつめ、願いのふんすいのエンディングつき。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="トモダチアイランド">
+<meta property="og:description" content="自分でつくった住人たちが島で勝手に暮らす。なやみを聞いて、ごはんをあげて、恋のせわを焼く。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2340c4e0'/><ellipse cx='16' cy='24' rx='12' ry='6' fill='%23f6d98a'/><circle cx='16' cy='14' r='7' fill='%23ffe0c0'/><circle cx='13' cy='13' r='1.4' fill='%2335304a'/><circle cx='19' cy='13' r='1.4' fill='%2335304a'/><path d='M13 17 q3 2.4 6 0' stroke='%23c8705c' stroke-width='1.4' fill='none' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ══ タイトル ══════════════════════════════ -->
+  <section class="view view-title" id="view-title">
+    <div class="title-card">
+      <h1 class="logo">トモダチ<span>アイランド</span></h1>
+      <p class="tagline">島の住人は、ぜんぶ あなたが つくった人。</p>
+      <div class="title-buttons">
+        <button class="btn btn-primary btn-big" id="btn-start" type="button">はじめる</button>
+        <button class="btn btn-big" id="btn-continue" type="button" hidden>つづきから</button>
+        <button class="btn btn-ghost" id="btn-title-help" type="button">あそびかた</button>
+      </div>
+      <p class="title-note">データはこのブラウザの中だけに保存されます。</p>
+    </div>
+  </section>
+
+  <!-- ══ 住人づくり ══════════════════════════════ -->
+  <section class="view view-create" id="view-create" hidden>
+    <header class="create-head">
+      <h2 id="create-title">あたらしい住人</h2>
+      <button class="btn btn-ghost" id="btn-create-cancel" type="button">やめる</button>
+    </header>
+
+    <div class="create-body">
+      <div class="create-preview">
+        <canvas id="create-canvas" width="360" height="360" aria-label="つくっている住人の顔"></canvas>
+        <button class="btn" id="btn-face-random" type="button">🎲 おまかせ</button>
+      </div>
+
+      <div class="create-form">
+        <div class="field">
+          <label for="inp-name">なまえ</label>
+          <input id="inp-name" type="text" maxlength="8" placeholder="8 文字まで" autocomplete="off">
+        </div>
+        <div class="field">
+          <span class="field-label">せいべつ</span>
+          <div class="seg" id="seg-gender" role="group">
+            <button class="seg-btn" data-v="m" type="button">おとこ</button>
+            <button class="seg-btn is-on" data-v="x" type="button">どちらでも</button>
+            <button class="seg-btn" data-v="f" type="button">おんな</button>
+          </div>
+        </div>
+
+        <div class="tabs" id="create-tabs" role="tablist">
+          <button class="tab is-on" data-tab="face" type="button" role="tab">かお</button>
+          <button class="tab" data-tab="pers" type="button" role="tab">せいかく</button>
+          <button class="tab" data-tab="voice" type="button" role="tab">こえ</button>
+        </div>
+
+        <div class="tabpane" id="pane-face"></div>
+        <div class="tabpane" id="pane-pers" hidden></div>
+        <div class="tabpane" id="pane-voice" hidden></div>
+
+        <button class="btn btn-primary btn-big" id="btn-create-done" type="button">この人を 島に よぶ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 島（マンション） ══════════════════════════════ -->
+  <section class="view view-island" id="view-island" hidden>
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="wallet">🪙 <b id="money">0</b></span>
+        <span class="daycount" id="daycount"></span>
+      </div>
+      <div class="topbar-right">
+        <button class="chip" id="btn-add" type="button">＋ 住人</button>
+        <button class="chip" id="btn-help" type="button">？</button>
+      </div>
+    </header>
+
+    <div class="island-scroll">
+      <div class="sky" id="sky"></div>
+      <div class="mansion">
+        <div class="mansion-roof"><span>トモダチ マンション</span></div>
+        <div class="rooms" id="rooms"></div>
+        <div class="mansion-base"></div>
+      </div>
+    </div>
+
+    <nav class="facilities" id="facilities"></nav>
+  </section>
+
+  <!-- ══ 部屋 ══════════════════════════════ -->
+  <section class="view view-room" id="view-room" hidden>
+    <header class="topbar">
+      <button class="chip" id="btn-room-back" type="button">← 島へ</button>
+      <div class="topbar-right"><span class="wallet">🪙 <b id="money2">0</b></span></div>
+    </header>
+
+    <div class="room-stage" id="room-stage">
+      <div class="room-bg" id="room-bg"></div>
+      <canvas id="room-canvas" width="480" height="480" aria-label="住人のすがた"></canvas>
+      <div class="speech" id="speech" hidden></div>
+      <button class="room-bubble" id="room-bubble" type="button" hidden></button>
+    </div>
+
+    <div class="room-info">
+      <div class="room-name">
+        <h2 id="r-name">—</h2>
+        <span class="tag" id="r-pers"></span>
+        <span class="tag" id="r-mood"></span>
+      </div>
+      <div class="meters">
+        <div class="meter">
+          <span class="meter-label">まんぞくど Lv <b id="r-level">1</b></span>
+          <div class="bar"><i id="r-exp-fill"></i></div>
+        </div>
+        <div class="meter">
+          <span class="meter-label">おなか <b id="r-hunger-label">—</b></span>
+          <div class="bar bar-hunger"><i id="r-hunger-fill"></i></div>
+        </div>
+      </div>
+      <div class="room-actions" id="room-actions"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ══ 汎用モーダル ══════════════════════════════ -->
+<div class="modal-layer" id="modal-layer" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header class="modal-head">
+      <h3 id="modal-title">—</h3>
+      <button class="modal-close" id="modal-close" type="button" aria-label="とじる">✕</button>
+    </header>
+    <div class="modal-body" id="modal-body"></div>
+    <footer class="modal-foot" id="modal-foot"></footer>
+  </div>
+</div>
+
+<!-- ══ ミニゲーム用の全面レイヤー ══════════════════ -->
+<div class="game-layer" id="game-layer" hidden>
+  <div class="game-host" id="game-host"></div>
+</div>
+
+<!-- ══ トースト ══════════════════════════════ -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
