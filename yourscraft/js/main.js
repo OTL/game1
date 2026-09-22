@@ -347,10 +347,13 @@
     Game.mode = 'play';
     showScreen(null);
     Audio.resume();
+    /* マイクラと同じで、遊んでいるあいだはマウスを捕まえたままにする。
+       「クリックして画面をつかむ」という手順は入れない。 */
+    grabMouse();
     if (!Game.hintShown) {
       Game.hintShown = true;
       hint(isTouch() ? 'v' + VERSION + '：壊したいブロックを長押し / 置きたい場所をタップ（⛏ ▣ ボタンは画面中央の十字）' :
-        'クリックで画面をつかむ → 左クリックで壊す / 右クリックで置く', 6000);
+        'マウスを動かすと見まわせます → 左クリックで壊す（押しっぱなしで続けて壊す）/ 右クリックで置く / Esc でひとやすみ', 6000);
     }
   }
 
@@ -366,6 +369,47 @@
 
   function isTouch() {
     return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  }
+
+  /* ================== マウスの捕まえかた ==================
+     マイクラ（Java 版）は、遊んでいるあいだマウスをつかみっぱなしにしていて、
+     Esc でポーズにすると離し、ゲームに戻るとまたつかむ。ここでも同じにする。
+
+     ただしブラウザは、ボタンを押すなどの「その場のユーザー操作」のなかでしか
+     ポインタロックをかけさせてくれない。また、
+       ・埋めこみ表示（iframe）で許可されていない
+       ・Esc で外した直後（しばらくはかけ直せない）
+       ・ブラウザや OS の設定・リモート接続などで、そもそも使えない
+     といった理由で断られることもある。断られたままだとカーソルが画面の真ん中に
+     戻されるだけで視点が回せなくなるので、失敗を見つけて「左ドラッグで見まわす」
+     やり方に切りかえる。 */
+  function grabMouse() {
+    if (Game.mode !== 'play' || dragLook) return;
+    var canvas = el.gl;
+    if (!canvas || document.pointerLockElement === canvas) return;
+    /* 本物のマウスを一度も見ていないタッチ端末では、ロックをかけない
+       （指のドラッグと二重に視点が動いてしまう） */
+    if (Game.touchUI && !Game.sawMouse) return;
+    if (!canvas.requestPointerLock) { lockFails = 2; lockFailed(); return; }
+    var r;
+    try { r = canvas.requestPointerLock(); }
+    catch (err) { lockFailed(); return; }
+    /* 新しいブラウザは Promise を返す。拒否されたら数えておく
+       （受け取らないと「未処理の拒否」としてエラーにもなる） */
+    if (r && typeof r.catch === 'function') r.catch(function () { lockFailed(); });
+  }
+
+  function lockFailed() {
+    if (dragLook) return;
+    lockFails++;
+    /* 一度目は黙って見送る。ユーザーの操作の外から頼んだときや、Esc の直後は
+       ふつうに断られることがあり、次のクリックでかけ直せるため。 */
+    if (lockFails < 2) return;
+    dragLook = true;
+    Game.dragLook = true;
+    dragging = false;
+    dragLast = null;
+    hint('マウスをつかめないので、左ドラッグで見まわします（左クリックで壊す / 右クリックで置く）', 6000);
   }
 
   /* ================== ホットバーとインベントリ ================== */
@@ -1355,45 +1399,15 @@
       selectSlot(Game.sel + (e.deltaY > 0 ? 1 : -1));
     }, { passive: true });
 
-    /* ---- マウス。タッチは下の touch イベントで扱うので、ここは本物のマウス専用 ----
-
-       ふつうはポインタロック（画面をつかんで、カーソルを消したまま視点を回す）を使うが、
-       これは環境によって失敗することがある。
-         ・埋めこみ表示（iframe）で許可されていない
-         ・Esc で外したあとしばらくは、かけ直そうとしても拒否される
-         ・ブラウザや OS の設定・リモート接続などで、そもそも使えない
-       失敗すると「カーソルが画面の真ん中に戻されるだけで視点が回せない」状態になるので、
-       失敗を見つけたら自動で「左ドラッグで見まわす」やり方に切りかえる。 */
-    function lockFailed() {
-      if (dragLook) return;
-      lockFails++;
-      /* Esc で外した直後などは、少しのあいだかけ直せないだけのこともあるので、
-         一度目はもう一度クリックしてもらう。二度続けて失敗したら方式を変える。 */
-      if (lockFails < 2) { hint('もう一度クリックしてください', 2000); return; }
-      dragLook = true;
-      Game.dragLook = true;
-      dragging = false;
-      dragLast = null;
-      hint('画面をつかめないので、左ドラッグで見まわします（左クリックで壊す / 右クリックで置く）', 6000);
-    }
-
-    function tryLock() {
-      /* そもそも使えない環境なら、ためらわずドラッグ方式へ */
-      if (!canvas.requestPointerLock) { lockFails = 2; lockFailed(); return; }
-      var r;
-      try { r = canvas.requestPointerLock(); }
-      catch (err) { lockFailed(); return; }
-      /* 新しいブラウザは Promise を返す。拒否されたらドラッグ方式にする
-         （受け取らないと「未処理の拒否」としてエラーにもなる） */
-      if (r && typeof r.catch === 'function') r.catch(function () { lockFailed(); });
-    }
-
+    /* ---- マウス。タッチは下の touch イベントで扱うので、ここは本物のマウス専用 ---- */
     canvas.addEventListener('mousedown', function (e) {
       if (Game.mode !== 'play' || fromTouch()) return;
       /* 本物のマウスを一度も見ていないタッチ端末では、マウス操作系をまるごと使わない
          （ポインタロックがかかると指のドラッグと二重に視点が動いてしまう） */
       if (Game.touchUI && !Game.sawMouse) return;
-      if (!dragLook && document.pointerLockElement !== canvas) { tryLock(); return; }
+      /* 何かの理由でマウスを離してしまっていたら、ここでつかみ直す。
+         クリックそのものは、つかみ直しに使わずいつもどおり壊す／置くに使う。 */
+      if (!dragLook && document.pointerLockElement !== canvas) grabMouse();
       Game.ev.md++;
       if (dragLook) {
         if (e.cancelable) e.preventDefault();
@@ -1445,7 +1459,7 @@
       if (performance.now() - (Game.lockTime || 0) > 1000) lockFails = 0;
       /* かかった直後に外れたときは、ロックが使えない環境とみなしてドラッグ方式にする
          （ここで一時停止すると、クリックのたびに真ん中に戻されるだけになってしまう） */
-      if (performance.now() - (Game.lockTime || 0) < 300) { lockFailed(); return; }
+      if (performance.now() - (Game.lockTime || 0) < 300) { lockFails = 2; lockFailed(); return; }
       if (Game.mode === 'play' && !isTouch()) pauseGame();
     });
     /* 本物のマウスがつながっているかの判定だけ、ポインタイベントで拾う */
