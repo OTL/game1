@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffe3ee">
+<title>きせかえドレッサー — 女の子も男の子も着せかえ</title>
+<meta name="description" content="肌の色・髪型・髪の色・服・スカート・上着・アクセサリー・目・目の色・鼻・口・靴をえらんで着せかえ。女の子と男の子を切りかえられる。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ffe3ee'/><path d='M10 9 L16 13 L22 9 L25 14 L21 16 L21 27 L11 27 L11 16 L7 14 Z' fill='%23ff5c8a' stroke='%23c23a66' stroke-width='1.5' stroke-linejoin='round'/><circle cx='16' cy='18' r='1.4' fill='%23fff'/><circle cx='16' cy='22' r='1.4' fill='%23fff'/></svg>">
+<style>
+  :root{
+    --bg:#fff0f6;
+    --panel:#ffffff;
+    --ink:#3b2a33;
+    --muted:#8a6f7c;
+    --line:#f3d6e3;
+    --soft:#fff5f9;
+    --accent:#ff5c8a;
+    --accent-dark:#c23a66;
+    --boy:#3d7fd9;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,-apple-system,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button{font:inherit;color:inherit;cursor:pointer;}
+  .app{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(340px,480px);
+    height:100dvh;
+  }
+  /* ---- 人形 ---- */
+  .stage{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:12px 16px 16px;
+    min-height:0;
+  }
+  .top-links{
+    position:absolute;left:14px;top:10px;
+    display:flex;align-items:center;gap:10px;z-index:3;
+  }
+  .top-links a{
+    font-size:13px;color:var(--accent-dark);text-decoration:none;
+    background:rgba(255,255,255,.85);border:2px solid var(--line);
+    border-radius:999px;padding:4px 12px;font-weight:bold;
+  }
+  .doll-box{
+    position:relative;
+    flex:1 1 auto;
+    min-height:0;
+    width:100%;
+    display:flex;
+    justify-content:center;
+  }
+  #doll{
+    height:100%;width:auto;max-width:100%;display:block;aspect-ratio:300/530;
+    border-radius:26px;
+    box-shadow:0 14px 34px rgba(160,60,100,.18);
+    background:#fff;
+  }
+  .doll-box.pop #doll{animation:pop .35s ease;}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
+  .spark{
+    position:absolute;pointer-events:none;color:#ffd84d;
+    text-shadow:0 0 6px #fff,0 0 12px #ffe98a;
+    font-size:22px;animation:spark .8s ease-out forwards;
+  }
+  @keyframes spark{
+    0%{opacity:0;transform:scale(.2) rotate(0)}
+    30%{opacity:1;transform:scale(1.2) rotate(30deg)}
+    100%{opacity:0;transform:scale(.6) rotate(90deg) translateY(-10px)}
+  }
+  /* ---- パネル ---- */
+  .panel{
+    background:var(--panel);
+    border-left:2px solid var(--line);
+    display:flex;flex-direction:column;
+    min-height:0;
+  }
+  .panel-head{
+    padding:12px 14px 8px;
+    border-bottom:2px solid var(--line);
+    display:flex;flex-direction:column;gap:10px;
+  }
+  h1{margin:0;font-size:20px;letter-spacing:.02em;}
+  h1 span{color:var(--accent);}
+  .kind{
+    display:grid;grid-template-columns:1fr 1fr;
+    background:#f7eef3;border-radius:14px;padding:4px;gap:4px;
+  }
+  .kind button{
+    border:0;border-radius:11px;padding:8px 6px;background:transparent;
+    font-weight:bold;font-size:15px;color:var(--muted);
+  }
+  .kind button[aria-pressed="true"]{background:var(--accent);color:#fff;box-shadow:0 3px 8px rgba(255,92,138,.35);}
+  .kind button.boy[aria-pressed="true"]{background:var(--boy);box-shadow:0 3px 8px rgba(61,127,217,.35);}
+  .actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .actions button{
+    flex:1 1 auto;
+    border:2px solid #ffc2d8;background:#ffe9f1;border-radius:999px;
+    padding:6px 10px;font-weight:bold;font-size:13px;white-space:nowrap;
+  }
+  .actions button:disabled{opacity:.4;cursor:default;}
+  .actions button:not(:disabled):active{transform:translateY(1px);}
+  .tabs{
+    display:flex;flex-wrap:wrap;gap:6px;
+    padding:10px 14px;border-bottom:2px solid var(--line);
+  }
+  .tab{
+    border:2px solid transparent;background:#f7eef3;border-radius:12px;
+    padding:6px 9px;font-size:13px;font-weight:bold;white-space:nowrap;
+  }
+  .tab[aria-selected="true"]{background:var(--accent);color:#fff;}
+  .body.boy .tab[aria-selected="true"]{background:var(--boy);}
+  .scroll{overflow-y:auto;padding:12px 14px 20px;flex:1;min-height:0;}
+  .hint{margin:0 0 10px;font-size:12.5px;color:var(--muted);}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
+    gap:8px;
+  }
+  .opt{
+    border:3px solid #f3dbe6;background:var(--soft);border-radius:16px;
+    padding:4px 4px 3px;text-align:center;font-size:12px;font-weight:bold;
+    display:flex;flex-direction:column;align-items:center;gap:1px;
+  }
+  .opt svg{width:100%;aspect-ratio:1;display:block;border-radius:10px;}
+  .opt[aria-pressed="true"]{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px #ffd0e0;}
+  .body.boy .opt[aria-pressed="true"]{border-color:var(--boy);box-shadow:0 0 0 3px #cfe0fb;}
+  .opt:active{transform:scale(.97);}
+  .pal-title{margin:16px 0 8px;font-size:14px;font-weight:bold;}
+  .pal{display:flex;flex-wrap:wrap;gap:8px;}
+  .sw{
+    width:34px;height:34px;border-radius:50%;
+    border:3px solid #fff;box-shadow:0 0 0 1.5px #d8c0cc;padding:0;
+  }
+  .sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--accent);}
+  .body.boy .sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--boy);}
+
+  @media (max-width:760px){
+    .app{grid-template-columns:minmax(0,1fr);grid-template-rows:44dvh minmax(0,1fr);}
+    .stage{padding:8px 10px 8px;}
+    .panel{border-left:0;border-top:2px solid var(--line);}
+    .panel-head{padding:10px 12px 8px;gap:8px;}
+    h1{display:none;}
+    .tabs{flex-wrap:nowrap;overflow-x:auto;padding:8px 12px;scrollbar-width:none;}
+    .tabs::-webkit-scrollbar{display:none;}
+    .scroll{padding:10px 12px 18px;}
+    .grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr));}
+    .actions button{font-size:12px;padding:5px 8px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .doll-box.pop #doll,.spark{animation:none;}
+    .spark{display:none;}
+  }
+</style>
+</head>
+<body class="body">
+<div class="app">
+  <section class="stage">
+    <div class="top-links"><a href="../">← ゲームいちらん</a></div>
+    <div class="doll-box" id="dollBox">
+      <svg id="doll" viewBox="0 0 300 530" role="img" aria-label="きせかえ人形"></svg>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h1>きせかえ<span>ドレッサー</span></h1>
+      <div class="kind" role="group" aria-label="女の子か男の子か">
+        <button type="button" class="girl" data-kind="girl">👧 おんなのこ</button>
+        <button type="button" class="boy" data-kind="boy">👦 おとこのこ</button>
+      </div>
+      <div class="actions">
+        <button type="button" id="btnRandom">🎲 おまかせ</button>
+        <button type="button" id="btnUndo">↶ もどす</button>
+        <button type="button" id="btnSave">📷 ほぞん</button>
+        <button type="button" id="btnReset">⟲ はじめから</button>
+      </div>
+    </div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="scroll" id="scroll">
+      <p class="hint" id="hint"></p>
+      <div class="grid" id="grid"></div>
+      <div id="palWrap"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+'use strict';
+
+/* ================= いろの道具 ================= */
+function hex2rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[n>>16&255,n>>8&255,n&255];}
+function rgb2hex(r,g,b){return'#'+[r,g,b].map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join('');}
+function shade(h,a){const[r,g,b]=hex2rgb(h);return rgb2hex(r*(1-a),g*(1-a),b*(1-a));}
+function tint(h,a){const[r,g,b]=hex2rgb(h);return rgb2hex(r+(255-r)*a,g+(255-g)*a,b+(255-b)*a);}
+function lum(h){const[r,g,b]=hex2rgb(h);return(0.299*r+0.587*g+0.114*b)/255;}
+const ol=c=>shade(c,.38);
+const pop=c=>lum(c)>.62?'#ff5c8a':'#ffffff';
+
+/* ================= SVG の道具 ================= */
+const P=(d,f,s,w=2,x='')=>`<path d="${d}" fill="${f}"${s?` stroke="${s}" stroke-width="${w}" stroke-linejoin="round"`:''} ${x}/>`;
+const L=(d,s,w=2,x='')=>`<path d="${d}" fill="none" stroke="${s}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${x}/>`;
+const C=(cx,cy,r,f,s,w=2,x='')=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${f}"${s?` stroke="${s}" stroke-width="${w}"`:''} ${x}/>`;
+const E=(cx,cy,rx,ry,f,s,w=2,x='')=>`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f}"${s?` stroke="${s}" stroke-width="${w}"`:''} ${x}/>`;
+const mir=g=>`<g transform="translate(300 0) scale(-1 1)">${g}</g>`;
+const both=g=>g+mir(g);
+function star(cx,cy,r,ri=r*.45,n=5){let d='';for(let k=0;k<n*2;k++){const a=-Math.PI/2+k*Math.PI/n,rr=k%2?ri:r;d+=(k?'L':'M')+(cx+rr*Math.cos(a)).toFixed(1)+','+(cy+rr*Math.sin(a)).toFixed(1);}return d+'Z';}
+function heart(x,y,s){return`M${x},${y-.3*s} C${x},${y-.9*s} ${x-s},${y-.9*s} ${x-s},${y-.35*s} C${x-s},${y+.15*s} ${x-.3*s},${y+.45*s} ${x},${y+.8*s} C${x+.3*s},${y+.45*s} ${x+s},${y+.15*s} ${x+s},${y-.35*s} C${x+s},${y-.9*s} ${x},${y-.9*s} ${x},${y-.3*s} Z`;}
+function rng(seed){return()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};}
+
+/* うで：pathLength=100 の線。len で袖の長さ（肩からの割合）を決める */
+const ARMS=['M106,232 Q86,290 84,350','M194,232 Q214,290 216,350'];
+function armS(color,w,len,start=0,cap='round'){
+  let da='';
+  if(len!=null) da=start?` stroke-dasharray="0 ${start} ${len} 300"`:` stroke-dasharray="${len} 300"`;
+  return ARMS.map(d=>`<path d="${d}" pathLength="100" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="${cap}"${da}/>`).join('');
+}
+const sleeves=(c,len,w)=>armS(ol(c),w+4,len)+armS(c,w,len);
+const cuff=(c,w,len)=>armS(c,w,5,len-5,'butt');
+
+/* ================= データ ================= */
+const PALETTE=[
+  ['しろ','#ffffff'],['くろ','#2b2b3a'],['あか','#e8384f'],['ピンク','#ff8fb1'],['うすピンク','#ffd1e1'],
+  ['オレンジ','#ffa94d'],['きいろ','#ffe066'],['きみどり','#9ad97a'],['みどり','#3fa66b'],['みずいろ','#8fd3ff'],
+  ['あお','#3d7fd9'],['こん','#1f3a6e'],['むらさき','#9b6bdf'],['ベージュ','#e3cba5'],['ちゃいろ','#8a5a3b'],
+];
+const SKINS=[
+  {id:'milk',name:'ミルク',c:'#ffe6d6'},{id:'peach',name:'ピーチ',c:'#f9d2b5'},{id:'honey',name:'はちみつ',c:'#eab58f'},
+  {id:'caramel',name:'キャラメル',c:'#c98b5e'},{id:'cocoa',name:'ココア',c:'#9a6340'},{id:'choco',name:'チョコ',c:'#6b4028'},
+];
+const HAIRC=[
+  {id:'black',name:'くろ',c:'#2a2226'},{id:'dark',name:'こげちゃ',c:'#4a2e22'},{id:'choco',name:'ちゃいろ',c:'#8a5530'},
+  {id:'gold',name:'きんいろ',c:'#f2c96b'},{id:'red',name:'あか',c:'#c8402e'},{id:'pink',name:'ピンク',c:'#ff8fbf'},
+  {id:'aqua',name:'みずいろ',c:'#7fd3f7'},{id:'purple',name:'むらさき',c:'#9a6ad6'},{id:'silver',name:'ぎんいろ',c:'#d9dde6'},
+  {id:'green',name:'みどり',c:'#5fbf7f'},
+];
+const EYEC=[
+  {id:'black',name:'くろ',c:'#2b1d1a'},{id:'brown',name:'ちゃいろ',c:'#7a4a2a'},{id:'blue',name:'あお',c:'#2f7fd8'},
+  {id:'green',name:'みどり',c:'#2f9e5a'},{id:'purple',name:'むらさき',c:'#8a4fd1'},{id:'red',name:'あか',c:'#d23b4a'},
+  {id:'gold',name:'きんいろ',c:'#d9a21b'},{id:'pink',name:'ピンク',c:'#ff6fa8'},{id:'aqua',name:'みずいろ',c:'#3fc6d9'},
+];
+
+/* ---------- かみがた ---------- */
+const CAP_MID='M84,140 C78,40 222,40 216,140 Q210,170 200,176 L100,176 Q90,170 84,140 Z';
+const LONG_BACK='M80,140 C70,34 230,34 220,140 Q230,240 232,330 Q190,344 150,338 Q110,344 68,330 Q70,240 80,140 Z';
+const BANGS_STRAIGHT='M86,140 C78,38 222,38 214,140 L210,112 Q200,116 190,110 Q180,116 170,110 Q160,116 150,110 Q140,116 130,110 Q120,116 110,110 Q100,116 90,112 Z';
+const BANGS_SOFT='M88,138 C80,42 220,42 212,138 Q206,112 190,104 Q184,118 168,112 Q160,100 150,106 Q138,118 124,108 Q114,104 104,112 Q94,120 88,138 Z';
+const hp=(d,H)=>P(d,H.h,H.o);
+const ring=H=>L('M112,80 Q150,62 188,80',H.l,5,'opacity=".55"');
+const tie=(x,y)=>C(x,y,7,'#ff5c8a','#c23a66');
+function cloud(list,H){return list.map(([x,y,r])=>C(x,y,r+2.5,H.o)).join('')+list.map(([x,y,r])=>C(x,y,r,H.h)).join('');}
+function braid(H){
+  let g='';
+  for(let i=0;i<7;i++) g+=E(96,178+i*17,12-i*.5,10.5,H.h,H.o)+L(`M${88+i*.4},${174+i*17} Q96,${182+i*17} ${104-i*.4},${174+i*17}`,H.o,1.5,'opacity=".6"');
+  return g+P('M90,300 L102,300 L108,322 L96,314 L84,322 Z',H.h,H.o)+C(96,298,6.5,'#ff5c8a','#c23a66');
+}
+const HAIRS=[
+  {id:'short',name:'ショート',for:'g',back:H=>hp('M84,140 C78,40 222,40 216,140 Q218,170 206,186 L194,160 L106,160 L94,186 Q82,170 84,140 Z',H),
+    front:H=>hp(BANGS_SOFT,H)+hp('M90,120 Q84,160 92,182 Q98,160 100,128 Z',H)+hp('M210,120 Q216,160 208,182 Q202,160 200,128 Z',H)+ring(H)},
+  {id:'bob',name:'ボブ',for:'g',back:H=>hp('M80,140 C72,36 228,36 220,140 L224,196 Q214,206 200,200 L100,200 Q86,206 76,196 Z',H),
+    front:H=>hp(BANGS_STRAIGHT,H)+hp('M88,110 Q80,160 88,200 L104,200 Q96,160 100,112 Z',H)+hp('M212,110 Q220,160 212,200 L196,200 Q204,160 200,112 Z',H)+ring(H)},
+  {id:'long',name:'ロング',for:'g',back:H=>hp(LONG_BACK,H),
+    front:H=>hp('M86,142 C76,36 224,36 214,142 Q210,112 196,98 Q170,112 140,104 Q112,114 98,130 Q92,134 86,142 Z',H)+hp('M88,118 Q76,200 92,292 Q100,300 108,288 Q96,200 102,130 Z',H)+hp('M212,118 Q224,200 208,292 Q200,300 192,288 Q204,200 198,130 Z',H)+ring(H)},
+  {id:'pony',name:'ポニーテール',for:'g',back:H=>hp('M198,78 Q262,96 256,190 Q252,260 222,300 Q226,250 222,210 Q216,160 196,112 Z',H)+hp(CAP_MID,H),
+    front:H=>hp('M88,140 C80,40 220,40 212,140 Q208,116 196,104 Q176,112 160,100 Q150,114 132,108 Q112,106 100,120 Q92,128 88,140 Z',H)+ring(H)+tie(204,86)},
+  {id:'twin',name:'ツインテール',for:'g',back:H=>hp('M98,92 Q40,110 42,210 Q44,280 78,320 Q72,260 80,210 Q88,150 104,118 Z',H)+hp('M202,92 Q260,110 258,210 Q256,280 222,320 Q228,260 220,210 Q212,150 196,118 Z',H)+hp(CAP_MID,H),
+    front:H=>hp(BANGS_STRAIGHT,H)+ring(H)+tie(100,96)+tie(200,96)},
+  {id:'odango',name:'おだんご',for:'g',back:H=>[[104,60],[196,60]].map(([x,y])=>C(x,y,24,H.h,H.o)+L(`M${x-12},${y-2} Q${x-4},${y-16} ${x+10},${y-8} M${x-8},${y+8} Q${x+4},${y+12} ${x+12},${y+2}`,H.o,2)).join('')+hp(CAP_MID,H),
+    front:H=>hp(BANGS_SOFT,H)+ring(H)},
+  {id:'braids',name:'みつあみ',for:'g',back:H=>hp(CAP_MID,H),
+    front:H=>hp(BANGS_STRAIGHT,H)+ring(H)+braid(H)+mir(braid(H))},
+  {id:'curly',name:'ふわふわ',for:'g',back:H=>cloud([[150,92,64],[92,118,30],[208,118,30],[84,160,28],[216,160,28],[90,200,26],[210,200,26],[108,232,24],[192,232,24],[130,244,22],[170,244,22],[150,248,22],[150,190,60]],H),
+    front:H=>hp('M90,128 C82,42 218,42 210,128 Q150,96 90,128 Z',H)+cloud([[100,112,15],[122,100,16],[146,94,17],[170,97,17],[192,105,16],[206,122,12],[94,126,12]],H)},
+  {id:'hime',name:'ひめカット',for:'g',back:H=>hp(LONG_BACK,H),
+    front:H=>hp(BANGS_STRAIGHT,H)+hp('M88,112 L88,198 L106,198 L104,112 Z',H)+hp('M212,112 L212,198 L194,198 L196,112 Z',H)+ring(H)},
+  {id:'bshort',name:'ふつう',for:'b',back:H=>hp('M84,140 C78,40 222,40 216,140 Q216,162 204,168 L96,168 Q84,162 84,140 Z',H),
+    front:H=>hp('M88,136 C80,42 220,42 212,136 Q210,120 204,110 L196,118 Q180,100 160,104 L150,96 L140,108 Q120,100 106,114 L98,110 Q92,120 88,136 Z',H)+hp('M90,118 Q86,146 92,160 L98,150 Q96,134 100,124 Z',H)+hp('M210,118 Q214,146 208,160 L202,150 Q204,134 200,124 Z',H)+ring(H)},
+  {id:'veryshort',name:'ツンツン',back:H=>hp('M86,136 C80,46 220,46 214,136 Q214,156 206,164 L94,164 Q86,156 86,136 Z',H),
+    front:H=>hp('M88,136 C80,44 220,44 212,136 L206,112 L196,120 L188,102 L176,114 L166,98 L154,112 L142,98 L130,112 L120,100 L110,118 L100,108 L94,122 Z',H)+hp('M100,62 L92,40 L116,54 L118,30 L138,50 L148,24 L160,48 L176,28 L182,52 L204,40 L198,64 Z',H)+ring(H)},
+  {id:'twoblock',name:'ツーブロック',for:'b',back:H=>hp('M86,136 C80,50 220,50 214,136 Q212,156 204,164 L96,164 Q88,156 86,136 Z',{h:shade(H.h,.18),o:H.o}),
+    front:H=>hp('M88,122 C78,26 226,24 214,118 Q202,96 178,94 Q162,108 140,98 Q118,104 104,114 Q96,110 88,122 Z',H)+ring(H)},
+  {id:'mash',name:'マッシュ',for:'b',back:H=>hp('M80,136 C74,36 226,36 220,136 Q222,160 214,172 L86,172 Q78,160 80,136 Z',H),
+    front:H=>hp('M84,146 C74,32 226,32 216,146 Q214,128 206,118 Q150,104 94,118 Q86,128 84,146 Z',H)+L('M110,112 L112,118 M130,108 L131,115 M150,107 L150,114 M170,108 L169,115 M190,112 L188,118',H.o,1.5,'opacity=".6"')+ring(H)},
+  {id:'buzz',name:'ぼうず',for:'b',back:H=>'',
+    front:H=>P('M89,128 C86,62 214,62 211,128 Q204,104 150,100 Q96,104 89,128 Z',H.h,H.o,2,'opacity=".9"')},
+  {id:'center',name:'センターわけ',for:'b',back:H=>hp('M84,140 C78,40 222,40 216,140 Q218,168 208,184 L92,184 Q82,168 84,140 Z',H),
+    front:H=>hp('M88,142 C80,40 220,40 212,142 Q206,112 182,100 Q164,100 154,120 L150,98 L146,120 Q136,100 118,100 Q94,112 88,142 Z',H)+ring(H)},
+  {id:'curlyS',name:'くるくる',for:'b',back:H=>cloud([[150,88,60],[96,110,24],[204,110,24],[90,146,20],[210,146,20]],H),
+    front:H=>hp('M90,128 C82,44 218,44 210,128 Q150,98 90,128 Z',H)+cloud([[102,110,14],[124,99,15],[148,94,16],[172,97,15],[194,106,14]],H)},
+];
+
+/* ---------- め ---------- */
+const EYES=[
+  {id:'maru',name:'まる'},{id:'kira',name:'キラキラ'},{id:'tare',name:'たれ目'},{id:'tsuri',name:'つり目'},
+  {id:'nikko',name:'にっこり'},{id:'wink',name:'ウインク'},{id:'nemui',name:'ねむい'},{id:'pacchiri',name:'ぱっちり'},
+  {id:'star',name:'おほしさま'},{id:'ten',name:'てんてん'},
+];
+function drawEyes(type,col,skin,brow,boy){
+  let g='';
+  const LC='#3a2418';
+  [[126,-1],[174,1]].forEach(([cx,dir],i)=>{
+    const cy=142;
+    g+=boy?L(`M${cx-11},117 Q${cx},113 ${cx+11},117`,brow,4.2):L(`M${cx-10},118 Q${cx},113 ${cx+10},118`,brow,3);
+    const closed=type==='nikko'||(type==='wink'&&i===1);
+    if(closed){g+=L(`M${cx-11},${cy+3} Q${cx},${cy-10} ${cx+11},${cy+3}`,LC,3.5);return;}
+    if(type==='ten'){g+=E(cx,cy,5,7,LC)+C(cx+2,cy-3,1.8,'#fff');return;}
+    const big=type==='kira'||type==='pacchiri';
+    g+=E(cx,cy,big?12:10,big?14:12,'#fff');
+    if(type==='star'){
+      g+=P(star(cx,cy+1,10.5,4.8),col,shade(col,.3),1.2)+C(cx+3,cy-3,2,'#fff');
+    }else{
+      g+=E(cx,cy+1,big?9.5:8,big?12:10.5,col)+E(cx,cy+6,big?7:6,big?5.5:4.5,tint(col,.35),null,0,'opacity=".7"');
+      g+=E(cx,cy+1,4,5.5,shade(col,.6));
+      g+=C(cx+3,cy-4,3,'#fff')+C(cx-3,cy+5,1.5,'#fff');
+      if(type==='kira') g+=P(star(cx-4,cy-5,3.8,1.2,4),'#fff')+C(cx+4,cy+6,1.2,'#fff');
+    }
+    let lash=`M${cx-12},${cy-6} Q${cx},${cy-17} ${cx+12},${cy-6}`;
+    if(type==='tare') lash=`M${cx-dir*11},${cy-10} Q${cx},${cy-16} ${cx+dir*13},${cy-3}`;
+    if(type==='tsuri') lash=`M${cx-dir*11},${cy-4} Q${cx+dir*2},${cy-16} ${cx+dir*13},${cy-12}`;
+    if(type==='nemui') g+=P(`M${cx-14},${cy-19} L${cx+14},${cy-19} L${cx+14},${cy-1} Q${cx},${cy+2} ${cx-14},${cy-1} Z`,skin)+L(`M${cx-12},${cy-1} Q${cx},${cy+2} ${cx+12},${cy-1}`,LC,3);
+    else g+=L(lash,LC,boy?3:3.5);
+    if(!boy&&type!=='nemui'){
+      const oy=type==='tare'?cy-3:type==='tsuri'?cy-12:cy-6;
+      g+=L(`M${cx+dir*12},${oy} L${cx+dir*16},${oy-4}`,LC,2.5);
+      if(type==='pacchiri'||type==='kira') g+=L(`M${cx+dir*7},${cy-13} L${cx+dir*9},${cy-19} M${cx+dir*11},${cy-10} L${cx+dir*16},${cy-15}`,LC,2);
+    }
+  });
+  return g;
+}
+
+/* ---------- はな ---------- */
+const NOSES=[
+  {id:'choko',name:'ちょこん',draw:k=>E(150,161,2.2,1.6,shade(k,.25))},
+  {id:'sen',name:'せん',draw:k=>L('M151,151 Q155,160 149,163',shade(k,.3),2)},
+  {id:'maru',name:'まる',draw:k=>C(150,160,5,shade(k,.1),shade(k,.25),1.2)+C(148,158,1.5,'#fff','',0,'opacity=".7"')},
+  {id:'sankaku',name:'さんかく',draw:k=>P('M150,153 L155,163 L145,163 Z',shade(k,.25),'',0,'opacity=".7"')},
+  {id:'ku',name:'くの字',draw:k=>L('M152,150 L146,160 L152,163',shade(k,.3),2)},
+  {id:'neko',name:'ねこ',draw:k=>P('M145,158 L155,158 L150,164 Z','#f28aa0','#c95f76',1.2)+L('M108,160 L128,163 M108,169 L128,167 M192,160 L172,163 M192,169 L172,167',shade(k,.4),1.5)},
+  {id:'none',name:'なし',draw:k=>''},
+];
+
+/* ---------- くち ---------- */
+const MR='#b0473f';
+const MOUTHS=[
+  {id:'nikko',name:'にっこり',draw:()=>L('M140,175 Q150,184 160,175',MR,2.5)},
+  {id:'warau',name:'わらう',draw:()=>P('M138,172 L162,172 Q160,190 150,190 Q140,190 138,172 Z','#9e2b3a','#6e1b26')+P('M143,184 Q150,178 157,184 Q155,190 150,190 Q145,190 143,184 Z','#ff7b8a')+P('M140,172.5 L160,172.5 L159,176 L141,176 Z','#fff')},
+  {id:'hohoemi',name:'ほほえみ',draw:()=>L('M144,177 Q150,181 156,177',MR,2.2)},
+  {id:'omega',name:'ねこ口',draw:()=>L('M140,174 Q145,181 150,175 Q155,181 160,174',MR,2.3)},
+  {id:'ochobo',name:'おちょぼ',draw:()=>E(150,178,3.5,3,'#e0607a')},
+  {id:'bikkuri',name:'びっくり',draw:()=>E(150,179,5,6.5,'#9e2b3a','#6e1b26')},
+  {id:'pero',name:'ぺろっ',draw:()=>P('M149,178 Q150,188 156,187 Q160,184 157,178 Z','#ff7b8a','#c94a5a',1.5)+L('M141,175 Q150,182 159,175',MR,2.5)},
+  {id:'mu',name:'むっ',draw:()=>L('M142,179 Q150,173 158,179',MR,2.5)},
+  {id:'beni',name:'くちべに',for:'g',draw:()=>P('M140,176 Q145,171 150,174 Q155,171 160,176 Q150,185 140,176 Z','#e0405a','#a52a40',1.5)},
+];
+
+/* ---------- ふく ---------- */
+const BASE='M108,217 L135,212 Q150,230 165,212 L192,217 Q205,222 205,238 L191,310 L109,310 L95,238 Q95,222 108,217 Z';
+const BODICE='M108,217 L135,212 Q150,230 165,212 L192,217 Q205,222 205,238 L190,300 L110,300 L95,238 Q95,222 108,217 Z';
+const roundCollar=f=>both(P('M150,226 Q144,240 128,234 Q120,224 134,212 Q142,222 150,226 Z',f,ol(f)));
+const pointCollar=f=>both(P('M134,210 L150,230 L130,246 Q126,228 134,210 Z',f,ol(f)));
+const buttons=(ys,f,x=150,r=2.6)=>ys.map(y=>C(x,y,r,f)).join('');
+const TOPS=[
+  {id:'tshirt',name:'Tシャツ',draw:c=>({body:P(BASE,c,ol(c))+P(star(150,262,14),pop(c),'',0,'opacity=".9"'),sleeve:sleeves(c,28,26)})},
+  {id:'blouse',name:'ブラウス',for:'g',draw:c=>{const cl=lum(c)>.9?'#ffd1e1':'#ffffff';
+    return{body:P(BASE,c,ol(c))+roundCollar(cl)+buttons([248,268,288],shade(c,.25)),sleeve:sleeves(c,22,36)};}},
+  {id:'sailor',name:'セーラー',for:'g',draw:c=>{const nv=lum(c)<.35?'#ffffff':'#1f3a6e';
+    return{body:P(BASE,c,ol(c))+P('M104,219 L135,212 L150,256 L165,212 L196,219 L194,240 L168,242 L150,268 L132,242 L106,240 Z',nv,ol(nv))
+      +L('M108,234 L134,236 L150,261 L166,236 L192,234',nv==='#ffffff'?'#1f3a6e':'#ffffff',2)
+      +P('M150,262 L134,292 L146,290 Z','#e8384f','#a52a3a')+P('M150,262 L166,292 L154,290 Z','#e8384f','#a52a3a')+E(150,262,7,5,'#e8384f','#a52a3a'),
+      sleeve:sleeves(c,86,24)+cuff(nv,24,86)};}},
+  {id:'border',name:'ボーダー',draw:(c,u)=>{let st='';for(let y=222;y<312;y+=15)st+=`<rect x="90" y="${y}" width="120" height="7" fill="${c}"/>`;
+    let dash='';for(let i=0;i<8;i++)dash+=' 5 5';
+    return{body:`<clipPath id="${u}bd"><path d="${BASE}"/></clipPath>`+P(BASE,'#ffffff')+`<g clip-path="url(#${u}bd)">${st}</g>`+P(BASE,'none',ol(c)),
+      sleeve:armS(ol(c),30,86)+armS('#ffffff',26,86)+ARMS.map(d=>`<path d="${d}" pathLength="100" fill="none" stroke="${c}" stroke-width="26" stroke-dasharray="0 6${dash} 300"/>`).join('')};}},
+  {id:'tank',name:'タンクトップ',draw:c=>({body:P('M117,214 L127,214 Q150,240 173,214 L183,214 L189,240 L191,310 L109,310 L111,240 Z',c,ol(c)),sleeve:''})},
+  {id:'knit',name:'ニット',draw:c=>{const d=shade(c,.12);
+    return{body:P(BASE,c,ol(c))+P('M136,194 L164,194 Q166,210 166,224 Q150,230 134,224 Q134,210 136,194 Z',c,ol(c))
+      +L('M141,197 L141,224 M146,197 L146,226 M150,197 L150,227 M154,197 L154,226 M159,197 L159,224',d,1.5)
+      +P('M108,298 L192,298 L191,310 L109,310 Z',d,ol(c))
+      +L('M128,236 L134,246 L128,256 L134,266 L128,276 L134,286 L128,296 M172,236 L166,246 L172,256 L166,266 L172,276 L166,286 L172,296',d,2),
+      sleeve:sleeves(c,86,28)+cuff(d,28,86)};}},
+  {id:'frill',name:'フリル',for:'g',draw:c=>{const f=tint(c,.55);let d='M98,232 L202,232 L200,244';for(let i=0;i<10;i++){const x=200-i*10;d+=` Q${x-5},${254} ${x-10},244`;}d+=' Z';
+    return{body:P(BASE,c,ol(c))+P(d,f,ol(c),1.5)+buttons([266,286],shade(c,.25)),sleeve:sleeves(c,20,32)+cuff(f,32,20)};}},
+  {id:'polo',name:'ポロシャツ',draw:c=>({body:P(BASE,c,ol(c))+pointCollar(c)+L('M150,230 L150,256',ol(c),1.5)+buttons([238,250],'#ffffff',150,2.4),sleeve:sleeves(c,28,26)+cuff(shade(c,.15),26,28)})},
+  {id:'uniform',name:'ユニフォーム',draw:c=>{const t=pop(c);
+    return{body:P(BASE,c,ol(c))+L('M136,213 L150,232 L164,213',t,4)+L('M99,244 L111,306 M201,244 L189,306',t,5)
+      +`<text x="150" y="290" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="36" fill="${t}">10</text>`,
+      sleeve:sleeves(c,28,26)+cuff(t,26,28)};}},
+  {id:'shirt',name:'ワイシャツ',for:'b',draw:c=>{const tc=lum(c)<.5?'#ffe066':'#e8384f';
+    return{body:P(BASE,c,ol(c))+pointCollar(c)+P('M145,226 L155,226 L157,234 L150,239 L143,234 Z',tc,ol(tc),1.5)+P('M147,237 L153,237 L159,282 L150,292 L141,282 Z',tc,ol(tc),1.5)
+      +L('M146,250 L156,244 M144,264 L158,256 M143,278 L159,270',shade(tc,.25),2),sleeve:sleeves(c,86,24)+cuff(tint(c,.5),24,86)};}},
+  {id:'gakuran',name:'学ラン',for:'b',draw:c=>({body:P(BASE,c,ol(c))+P('M136,198 L164,198 L166,222 Q150,228 134,222 Z',c,ol(c))+L('M150,226 L150,310',shade(c,.35),2)
+      +buttons([238,254,270,286,302],'#e8c14a',150,3.6)+L('M138,200 L162,200',tint(c,.6),2),sleeve:sleeves(c,86,26)})},
+  {id:'onepiece',name:'ワンピース',for:'g',dress:1,draw:c=>({
+      body:P('M110,292 L190,292 Q212,350 222,404 Q150,416 78,404 Q88,350 110,292 Z',c,ol(c))+L('M130,300 Q120,350 112,404 M170,300 Q180,350 188,404 M150,300 L150,410',ol(c),1.5,'opacity=".4"')
+        +P(BODICE,c,ol(c))+roundCollar('#ffffff')+P('M110,290 L190,290 L190,301 L110,301 Z',shade(c,.25),ol(c))
+        +P('M150,296 L134,286 L134,306 Z',shade(c,.25),ol(c))+P('M150,296 L166,286 L166,306 Z',shade(c,.25),ol(c))+C(150,296,4,shade(c,.3)),
+      sleeve:sleeves(c,22,32)})},
+  {id:'princess',name:'ドレス',for:'g',dress:1,draw:c=>{const t=tint(c,.4);const r=rng(7);let sp='';for(let i=0;i<14;i++)sp+=P(star(90+r()*120,320+r()*150,3.5,1.3,4),'#fff','',0,'opacity=".85"');
+    return{body:P('M112,290 L188,290 Q230,380 250,476 Q150,492 50,476 Q70,380 112,290 Z',c,ol(c))
+        +P('M126,300 L174,300 Q192,390 204,480 Q150,490 96,480 Q108,390 126,300 Z',t,ol(c),1.5)+sp
+        +P('M106,226 Q118,214 134,222 Q146,228 150,236 Q154,228 166,222 Q182,214 194,226 L190,300 L110,300 Z',c,ol(c))
+        +P('M110,288 L190,288 L190,300 L110,300 Z','#ffd24a','#c9931a')+C(150,294,5,'#ff8fb1','#c23a66',1.5),
+      sleeve:sleeves(t,18,40)};}},
+];
+
+/* ---------- スカート・ズボン ---------- */
+const band=c=>P('M113,293 L187,293 L187,301 L113,301 Z',shade(c,.12),ol(c));
+function tutu(c){let g='';[[3,'.8'],[2,'.85'],[1,'.9'],[0,'1']].forEach(([l,op])=>{const y=334+l*6,w=56+l*6;let d=`M113,294 L187,294 L${150+w},${y}`;const n=12,sw=(w*2)/n;for(let i=0;i<n;i++){const x=150+w-i*sw;d+=` Q${x-sw/2},${y+9} ${x-sw},${y}`;}g+=P(d+' Z',l?tint(c,.3*l/3):c,ol(c),1.5,`opacity="${op}"`);});return g;}
+const BOTTOMS=[
+  {id:'mini',name:'ミニ',for:'g',draw:c=>P('M113,294 L187,294 L204,352 Q150,360 96,352 Z',c,ol(c))+band(c)},
+  {id:'flare',name:'フレア',for:'g',draw:c=>P('M113,294 L187,294 Q208,350 218,396 Q150,410 82,396 Q92,350 113,294 Z',c,ol(c))+L('M132,300 Q124,350 118,398 M168,300 Q176,350 182,398 M150,300 L150,404',ol(c),1.5,'opacity=".45"')+band(c)},
+  {id:'pleats',name:'プリーツ',for:'g',draw:c=>{let l='';for(let i=1;i<8;i++)l+=`M${113+i*74/8},301 L${88+i*124/8},384 `;return P('M113,294 L187,294 L212,384 L88,384 Z',c,ol(c))+L(l,ol(c),1.5,'opacity=".6"')+band(c);}},
+  {id:'check',name:'チェック',for:'g',draw:(c,u)=>{const sh='M113,294 L187,294 L212,384 L88,384 Z',d=shade(c,.3),t=pop(c);let st='';
+    for(let x=84;x<216;x+=22)st+=`<rect x="${x}" y="290" width="9" height="100" fill="${d}" opacity=".45"/>`;
+    for(let y=306;y<390;y+=22)st+=`<rect x="80" y="${y}" width="140" height="9" fill="${d}" opacity=".45"/>`;
+    for(let x=95;x<216;x+=22)st+=`<rect x="${x}" y="290" width="1.5" height="100" fill="${t}" opacity=".7"/>`;
+    let l='';for(let i=1;i<8;i++)l+=`M${113+i*74/8},301 L${88+i*124/8},384 `;
+    return P(sh,c)+`<clipPath id="${u}ck"><path d="${sh}"/></clipPath><g clip-path="url(#${u}ck)">${st}</g>`+P(sh,'none',ol(c))+L(l,ol(c),1.2,'opacity=".5"')+band(c);}},
+  {id:'long',name:'ロング',for:'g',draw:c=>P('M113,294 L187,294 Q204,380 214,472 Q150,482 86,472 Q96,380 113,294 Z',c,ol(c))+L('M134,300 Q124,390 118,474 M166,300 Q176,390 182,474',ol(c),1.5,'opacity=".4"')+band(c)},
+  {id:'balloon',name:'バルーン',for:'g',draw:c=>P('M113,294 L187,294 Q214,320 206,350 Q200,362 150,362 Q100,362 94,350 Q86,320 113,294 Z',c,ol(c))+L('M126,302 Q118,330 124,358 M150,302 L150,360 M174,302 Q182,330 176,358',ol(c),1.5,'opacity=".45"')+band(c)},
+  {id:'tutu',name:'チュール',for:'g',draw:c=>tutu(c)+band(c)},
+  {id:'shorts',name:'半ズボン',draw:c=>P('M113,294 L187,294 L192,346 L154,346 L150,318 L146,346 L108,346 Z',c,ol(c))+band(c)},
+  {id:'half',name:'ハーフパンツ',for:'b',draw:c=>P('M113,294 L187,294 L195,398 L154,398 L150,330 L146,398 L105,398 Z',c,ol(c))+L('M106,386 L146,386 M154,386 L194,386',ol(c),1.5,'opacity=".5"')+band(c)},
+  {id:'jeans',name:'ジーンズ',draw:c=>P('M113,294 L187,294 L182,486 L154,486 L150,330 L146,486 L118,486 Z',c,ol(c))+L('M150,301 L150,330 M118,306 Q128,318 136,306 M182,306 Q172,318 164,306',tint(c,.45),1.5,'stroke-dasharray="3 3"')+L('M118,474 L146,474 M154,474 L182,474',tint(c,.45),1.5,'stroke-dasharray="3 3"')+band(c)},
+  {id:'slacks',name:'長ズボン',for:'b',draw:c=>P('M113,294 L187,294 L182,486 L154,486 L150,330 L146,486 L118,486 Z',c,ol(c))+L('M132,330 L132,484 M168,330 L168,484',ol(c),1.2,'opacity=".45"')+band(c)},
+  {id:'jersey',name:'ジャージ',for:'b',draw:c=>P('M113,294 L187,294 L182,486 L154,486 L150,330 L146,486 L118,486 Z',c,ol(c))+L('M116,304 L121,480 M184,304 L179,480',pop(c)==='#ffffff'?'#ffffff':'#ffffff',4)+band(c)},
+  {id:'none',name:'なし',for:'g',draw:c=>''},
+];
+const bloomers='M113,296 L187,296 L186,332 L153,334 L150,326 L147,334 L114,332 Z';
+
+/* ---------- うわぎ ---------- */
+const HALF='M106,216 L136,211 Q132,242 140,262 L137,312 L95,312 L93,240 Q93,222 106,216 Z';
+const OUTERS=[
+  {id:'none',name:'なし'},
+  {id:'cardigan',name:'カーディガン',body:c=>both(P(HALF,c,ol(c))+P('M95,302 L137,302 L137,312 L95,312 Z',shade(c,.1),ol(c)))+buttons([250,272,294],shade(c,.35),138,3),sleeve:c=>sleeves(c,86,28)+cuff(shade(c,.1),28,86)},
+  {id:'jacket',name:'ジャケット',body:c=>both(P(HALF,c,ol(c))+P('M136,211 Q132,242 140,262 L126,240 L118,224 Z',shade(c,.15),ol(c))+L('M104,290 L126,290',ol(c),2))+C(139,284,3.5,shade(c,.4)),sleeve:c=>sleeves(c,86,28)},
+  {id:'denim',name:'Gジャン',body:c=>{const s=tint(c,.5);return both(P(HALF,c,ol(c))+P('M106,238 L126,238 L126,252 L116,256 L106,252 Z','none',s,1.5,'stroke-dasharray="3 2"')+L('M98,270 L136,270',s,1.5,'stroke-dasharray="3 2"')+C(116,242,2,s));},sleeve:c=>sleeves(c,86,28)+cuff(shade(c,.1),28,86)},
+  {id:'parka',name:'パーカー',hood:c=>P('M108,222 Q90,172 150,168 Q210,172 192,222 Z',shade(c,.12),ol(c)),
+    body:c=>both(P(HALF,c,ol(c))+P('M137,276 L110,280 Q104,296 108,308 L137,308 Z',shade(c,.08),ol(c),1.5)+L('M140,222 L138,262',tint(c,.6),2)+C(138,264,2.5,tint(c,.6))),sleeve:c=>sleeves(c,86,28)+cuff(shade(c,.1),28,86)},
+  {id:'coat',name:'ロングコート',body:c=>both(P('M106,216 L136,211 Q132,242 140,262 L138,420 L88,420 L93,240 Q93,222 106,216 Z',c,ol(c))+P('M136,211 Q132,242 140,262 L126,240 L118,224 Z',shade(c,.15),ol(c))+P('M91,300 L139,300 L139,310 L91,310 Z',shade(c,.25),ol(c)))+buttons([330,360,390],shade(c,.4),132,3.2),sleeve:c=>sleeves(c,86,28)},
+  {id:'cape',name:'ケープ',for:'g',over:c=>{let f='';for(let x=72;x<=228;x+=10){const y=292+Math.pow((x-150)/78,2)*-6+6;f+=C(x,y,6,'#fff',"#d8c8d0",1.5);}
+    return P('M102,208 Q150,194 198,208 Q238,250 234,294 Q150,310 66,294 Q62,250 102,208 Z',c,ol(c))+f+P('M150,220 L134,212 L136,230 Z','#fff','#d8c8d0',1.5)+P('M150,220 L166,212 L164,230 Z','#fff','#d8c8d0',1.5)+C(150,220,4,'#fff','#d8c8d0',1.5);}},
+  {id:'bolero',name:'ボレロ',for:'g',body:c=>both(P('M106,216 L136,211 Q128,236 120,256 L95,258 L93,240 Q93,222 106,216 Z',c,ol(c))),sleeve:c=>sleeves(c,30,34)},
+];
+
+/* ---------- くつ（左足を描いてかがみうつし） ---------- */
+const SHOES=[
+  {id:'none',name:'はだし'},
+  {id:'sneaker',name:'スニーカー',draw:c=>P('M123,482 L147,482 Q152,492 151,501 L113,501 Q109,493 118,488 Z',c,ol(c))+P('M111,499 L152,499 L152,506 Q132,509 111,506 Z','#ffffff','#b9b9b9',1.5)+L('M126,487 L140,487 M124,492 L141,492',pop(c)==='#ffffff'?'#ffffff':'#ff5c8a',2)},
+  {id:'hightop',name:'ハイカット',for:'b',draw:c=>P('M122,462 L148,462 L148,488 Q153,494 151,501 L113,501 Q109,493 120,488 Z',c,ol(c))+P('M111,499 L152,499 L152,506 Q132,509 111,506 Z','#ffffff','#b9b9b9',1.5)+C(140,472,4.5,'#ffffff',ol(c),1.2)+L('M127,468 L141,468 M126,477 L141,477 M125,486 L141,486',pop(c)==='#ffffff'?'#ffffff':'#2b2b3a',1.8)},
+  {id:'loafer',name:'ローファー',draw:c=>P('M124,486 L147,486 Q151,495 150,503 L113,503 Q110,496 120,490 Z',c,ol(c))+P('M112,502 L151,502 L151,507 L112,507 Z',shade(c,.55),shade(c,.6),1)+L('M121,492 L146,492',shade(c,.3),2)},
+  {id:'boots',name:'ブーツ',draw:c=>P('M121,420 L149,420 L149,500 L151,500 L151,507 L111,507 Q108,497 121,488 Z',c,ol(c))+P('M119,416 L151,416 L151,430 L119,430 Z',shade(c,.15),ol(c))+L('M112,503 L150,503',shade(c,.5),3)},
+  {id:'rain',name:'ながぐつ',draw:c=>P('M121,438 Q135,432 149,438 L150,504 Q150,508 146,508 L114,508 Q108,500 120,490 Z',c,ol(c))+L('M127,446 L127,480',"#ffffff",3.5,'opacity=".55"')},
+  {id:'sandal',name:'サンダル',draw:c=>P('M114,500 L150,500 L150,506 L114,506 Z',c,ol(c),1.5)+L('M120,494 L146,494',c,4)+L('M128,486 L145,486',c,3)+C(122,494,3,'#ffffff',ol(c),1)},
+  {id:'ballet',name:'バレエシューズ',for:'g',draw:c=>P('M121,488 L147,488 Q151,496 150,503 L114,503 Q110,496 121,488 Z',c,ol(c))+L('M130,488 L144,460 M142,488 L128,460',tint(c,.25),2.5)+C(125,491,3,tint(c,.4),ol(c),1)},
+  {id:'heels',name:'ハイヒール',for:'g',draw:c=>P('M125,484 L147,484 Q150,492 147,499 L133,504 Q117,507 115,500 Q117,493 125,484 Z',c,ol(c))+P('M141,498 L147,497 L146,510 L143,510 Z',shade(c,.35),shade(c,.5),1)},
+];
+
+/* ---------- アクセサリー（いくつでも） ---------- */
+function flowerCrown(){const pts=[];for(let i=0;i<9;i++){const t=.06+i*.11,m=1-t;pts.push([m*m*m*90+3*m*m*t*84+3*m*t*t*216+t*t*t*210,m*m*m*112+3*m*m*t*48+3*m*t*t*48+t*t*t*112]);}
+  const cols=['#ff8fb1','#ffe066','#ffffff','#b9a2ff'];let g=L('M90,112 C84,48 216,48 210,112','#6fbf73',3);
+  pts.forEach(([x,y],i)=>{const c=cols[i%4];for(let k=0;k<5;k++){const a=k*Math.PI*2/5;g+=C((x+5*Math.cos(a)).toFixed(1),(y+5*Math.sin(a)).toFixed(1),4.2,c,shade(c,.25),1);}g+=C(x.toFixed(1),y.toFixed(1),3,'#ffb000');});return g;}
+const ACCS=[
+  {id:'none',name:'はずす'},
+  {id:'ribbon',name:'リボン',for:'g',z:6,box:'50 16 200 200',draw:()=>P('M188,74 L164,58 Q158,74 164,90 Z','#ff5c8a','#c23a66')+P('M188,74 L212,58 Q218,74 212,90 Z','#ff5c8a','#c23a66')+C(188,74,6,'#ff5c8a','#c23a66')},
+  {id:'kachusha',name:'カチューシャ',for:'g',z:4,box:'50 16 200 200',draw:()=>L('M90,112 C84,48 216,48 210,112','#c23a66',9)+L('M90,112 C84,48 216,48 210,112','#ff8fb1',6)},
+  {id:'tiara',name:'ティアラ',for:'g',z:7,box:'50 16 200 200',draw:()=>P('M124,66 L130,40 L140,54 L150,32 L160,54 L170,40 L176,66 Z','#ffd24a','#c9931a')+C(150,52,4,'#ff5c8a','#c23a66',1.2)+C(134,58,2.6,'#7fd3f7')+C(166,58,2.6,'#7fd3f7')},
+  {id:'mugiwara',name:'むぎわらぼうし',z:8,box:'40 8 220 220',draw:()=>E(150,76,98,20,'#f4d58d','#c8a24e')+P('M104,78 Q102,26 150,24 Q198,26 196,78 Z','#f4d58d','#c8a24e')+P('M103,60 Q150,68 197,60 L197,72 Q150,80 103,72 Z','#e8384f','#a52a3a',1.5)},
+  {id:'beret',name:'ベレー帽',z:8,box:'50 16 200 200',draw:()=>E(140,62,66,22,'#d6334f','#8f1f33',2,'transform="rotate(-10 140 62)"')+L('M132,40 L134,32','#8f1f33',4)},
+  {id:'cap',name:'キャップ',z:8,box:'50 16 200 200',draw:()=>P('M100,86 Q98,30 150,28 Q202,30 200,86 Z','#3d7fd9','#244b80')+L('M150,30 L150,84 M124,36 Q116,60 116,86 M176,36 Q184,60 184,86','#244b80',1.5,'opacity=".6"')+P('M96,82 Q150,94 204,82 Q212,94 198,102 Q150,112 102,102 Q88,94 96,82 Z','#2c63b0','#1c3f75')+C(150,30,4,'#2c63b0','#1c3f75',1.5)},
+  {id:'nekomimi',name:'ねこみみ',z:3,box:'50 16 200 200',draw:ctx=>both(P('M100,84 L96,38 L134,64 Z',ctx.H.h,ctx.H.o)+P('M104,74 L102,50 L124,64 Z','#ffb3c7'))},
+  {id:'flower',name:'はなかんむり',for:'g',z:5,box:'50 16 200 200',draw:flowerCrown},
+  {id:'hairpin',name:'ヘアピン',for:'g',z:5,box:'50 16 200 200',draw:()=>P(star(112,100,8),'#ffe066','#d9a21b',1.5)+P(star(126,90,5.5),'#ff8fb1','#c23a66',1.2)},
+  {id:'headphones',name:'ヘッドホン',z:9,box:'50 16 200 200',draw:()=>L('M86,128 C78,28 222,28 214,128','#3a3a4a',8)+both(P('M78,118 Q76,114 80,114 L94,114 Q98,114 98,118 L98,152 Q98,156 94,156 L80,156 Q76,156 76,152 Z','#ff5c8a','#3a3a4a')+C(87,135,5,'#ffffff','',0,'opacity=".5"'))},
+  {id:'glasses',name:'めがね',z:10,box:'50 16 200 200',draw:()=>C(126,142,16,'#cfe8ff','#5b3a29',3,'fill-opacity=".25"')+C(174,142,16,'#cfe8ff','#5b3a29',3,'fill-opacity=".25"')+L('M142,140 Q150,134 158,140 M110,140 L92,134 M190,140 L208,134','#5b3a29',3)},
+  {id:'sunglasses',name:'サングラス',z:10,box:'50 16 200 200',draw:()=>both(P('M106,132 L144,132 L141,150 Q126,158 110,150 Z','#23232e','#111',2,'opacity=".93"')+L('M112,137 L120,137','#ffffff',2,'opacity=".6"'))+L('M144,134 Q150,130 156,134 M106,134 L92,132 M194,134 L208,132','#111',3)},
+  {id:'heartsun',name:'ハートめがね',for:'g',z:10,box:'50 16 200 200',draw:()=>P(heart(126,144,15),'#ff4f8b','#b3204f',2,'opacity=".88"')+P(heart(174,144,15),'#ff4f8b','#b3204f',2,'opacity=".88"')+L('M141,136 Q150,131 159,136 M111,136 L92,132 M189,136 L208,132','#b3204f',3)},
+  {id:'bandage',name:'ばんそうこう',z:11,box:'66 76 168 168',draw:()=>`<g transform="rotate(-20 180 168)">${P('M168,163 L194,163 Q198,163 198,168 Q198,173 194,173 L168,173 Q164,173 164,168 Q164,163 168,163 Z','#f3c89a','#c89a6a',1.2)}${P('M176,164 L186,164 L186,172 L176,172 Z','#e9b27f')}${C(170,168,.9,'#c89a6a')+C(192,168,.9,'#c89a6a')}</g>`},
+  {id:'earring',name:'イヤリング',for:'g',z:2,box:'56 70 188 188',draw:()=>both(C(91,156,3.5,'#ffd24a','#c9931a',1.2)+E(91,166,4,6,'#7fd3f7','#2f8fb5',1.2))},
+  {id:'necklace',name:'ネックレス',for:'g',z:2,box:'70 130 160 160',draw:()=>{let g='';for(let i=0;i<=12;i++){const t=i/12,m=1-t,x=m*m*134+2*m*t*150+t*t*166,y=m*m*214+2*m*t*250+t*t*214;g+=C(x.toFixed(1),y.toFixed(1),3,'#ffffff','#cdbfb2',1);}return g+P(heart(150,238,6),'#ff5c8a','#c23a66',1.2);}},
+  {id:'scarf',name:'マフラー',z:2,box:'60 130 180 180',draw:()=>P('M124,204 Q150,222 176,204 L180,224 Q150,242 120,224 Z','#e8384f','#a52a3a')+P('M158,226 L174,222 L180,280 L164,282 Z','#e8384f','#a52a3a')+L('M128,212 Q150,228 172,212 M161,244 L176,241 M163,262 L178,259','#ffffff',3,'opacity=".75"')+L('M166,282 L165,290 M171,282 L171,290 M176,281 L177,289','#a52a3a',2)},
+  {id:'pochette',name:'ポシェット',for:'g',z:1,box:'50 150 220 220',draw:()=>L('M112,220 L196,312','#8a5a3b',3)+P('M184,306 L214,306 Q219,306 219,311 L219,331 Q219,337 213,337 L186,337 Q180,337 180,331 L180,311 Q180,306 184,306 Z','#f7a8c4','#c96f93')+P('M180,312 Q199,326 219,312 L219,308 Q219,306 214,306 L184,306 Q180,306 180,310 Z','#ff8fb1','#c96f93')+P(heart(199,322,4),'#ffe066','#d9a21b',1)},
+  {id:'backpack',name:'リュック',z:1,box:'50 150 220 220',draw:()=>both(P('M108,216 L122,213 L125,306 L114,308 Z','#e8a13d','#9c6516')+P('M113,272 L125,272 L125,280 L113,280 Z','#9c6516'))},
+  {id:'stick',name:'まほうのステッキ',z:12,box:'60 170 220 220',draw:ctx=>L('M216,352 L240,282','#c89b3c',4.5)+P(star(242,272,15),'#ffe066','#d9a21b',2)+C(242,272,4,'#ff8fb1')+P(star(262,254,4,1.5,4),'#ffffff')+P(star(226,250,3,1.1,4),'#ffffff')+C(216,352,10,ctx.skin,shade(ctx.skin,.3))},
+];
+
+/* ---------- はいけい ---------- */
+const BGS=[
+  {id:'pink',name:'ピンク',draw:()=>{let g='<rect width="300" height="530" fill="#ffe3ee"/>';for(let y=20;y<530;y+=40)for(let x=(y/40%2?40:20);x<300;x+=40)g+=C(x,y,5,'#ffc9dd');return g;}},
+  {id:'sky',name:'あおぞら',draw:()=>{const cl=(x,y,s)=>[[0,0,18],[18,-8,20],[36,0,16],[18,6,16]].map(([a,b,r])=>C(x+a*s,y+b*s,r*s,'#ffffff')).join('');
+    return'<rect width="300" height="530" fill="#bfe8ff"/><rect y="470" width="300" height="60" fill="#9fdc8a"/>'+C(262,54,24,'#fff3a6')+cl(26,90,1)+cl(190,180,.8)+cl(40,330,.7);}},
+  {id:'night',name:'よぞら',draw:()=>{const r=rng(3);let g='<rect width="300" height="530" fill="#232452"/>';for(let i=0;i<46;i++)g+=P(star(r()*300,r()*530,1.5+r()*3.5,1,4),'#fff7c2','',0,`opacity="${(.5+r()*.5).toFixed(2)}"`);
+    return g+C(250,64,24,'#fff3b0')+C(260,56,20,'#232452');}},
+  {id:'room',name:'おへや',draw:()=>{let g='<rect width="300" height="530" fill="#fff4e0"/>';for(let x=0;x<300;x+=30)g+=`<rect x="${x}" width="14" height="460" fill="#ffe9c9"/>`;
+    return g+'<rect y="456" width="300" height="74" fill="#deb287"/>'+E(150,500,120,20,'#ff9fbf','',0,'opacity=".6"')+P('M26,420 L54,420 L50,456 L30,456 Z','#e07b5a')+C(32,400,14,'#6fbf73')+C(48,392,16,'#5aa862')+C(40,410,12,'#6fbf73');}},
+  {id:'stage',name:'ステージ',draw:()=>'<rect width="300" height="530" fill="#2c1a47"/>'+P('M112,0 L188,0 L278,530 L22,530 Z','#fff6c9','',0,'opacity=".14"')+E(150,505,130,22,'#ffffff','',0,'opacity=".14"')+P('M0,0 L56,0 Q30,260 66,530 L0,530 Z','#b3203b')+P('M300,0 L244,0 Q270,260 234,530 L300,530 Z','#b3203b')+P('M0,0 L300,0 L300,26 Q150,46 0,26 Z','#8f1830')},
+  {id:'garden',name:'おはなばたけ',draw:()=>{const r=rng(11);let g='<rect width="300" height="530" fill="#e3f7ff"/><rect y="380" width="300" height="150" fill="#b8e6a0"/>'+C(40,60,20,'#fff3a6');
+    const cols=['#ff8fb1','#ffe066','#ffffff','#b9a2ff','#ff9f68'];for(let i=0;i<26;i++){const x=r()*300,y=392+r()*130,c=cols[i%5];for(let k=0;k<5;k++){const a=k*1.2566;g+=C((x+4*Math.cos(a)).toFixed(1),(y+4*Math.sin(a)).toFixed(1),3.5,c);}g+=C(x.toFixed(1),y.toFixed(1),2.4,'#ffb000');}return g;}},
+  {id:'white',name:'しろ',draw:()=>'<rect width="300" height="530" fill="#ffffff"/>'},
+];
+
+/* ================= 人形をかく ================= */
+let UID=0;
+const byId=(list,id)=>list.find(o=>o.id===id)||list[0];
+function render(kind,s,opt={}){
+  const u='u'+(UID++);
+  const hide=opt.hide||[];
+  const boy=kind==='boy';
+  const skin=byId(SKINS,s.skin).c,so=shade(skin,.3);
+  const hc=byId(HAIRC,s.hairColor).c;
+  const H={h:hc,o:shade(hc,.4),l:tint(hc,.55)};
+  const hair=byId(HAIRS,s.hair);
+  let top=byId(TOPS,s.top);
+  if(hide.includes('bottom')&&top.dress) top=TOPS[0];
+  const bottom=byId(BOTTOMS,s.bottom);
+  const outer=hide.includes('outer')?OUTERS[0]:byId(OUTERS,s.outer);
+  const shoes=byId(SHOES,s.shoes);
+  let g='';
+  if(!opt.noBg) g+=byId(BGS,s.bg).draw();
+  g+=E(150,508,62,8,'#000','',0,'opacity=".12"');
+  const noHair=hide.includes('hair');
+  if(!noHair) g+=hair.back(H);
+  // あし
+  g+=P('M118,318 L149,318 L145,490 L127,490 Z',skin,so)+P('M151,318 L182,318 L173,490 L155,490 Z',skin,so);
+  g+=E(132,496,13,7,skin,so)+E(168,496,13,7,skin,so);
+  if(shoes.draw) g+=both(shoes.draw(s.shoesColor));
+  // どう・くび
+  g+=P('M110,220 Q150,210 190,220 Q202,225 201,240 L187,300 Q190,318 184,332 L116,332 Q110,318 113,300 L99,240 Q98,225 110,220 Z',skin,so);
+  g+=`<rect x="140" y="178" width="20" height="46" fill="${skin}"/>`+L('M140,178 L140,214 M160,178 L160,214',so,2)+E(150,198,16,7,shade(skin,.1));
+  // した
+  if(!top.dress&&!hide.includes('bottom')){
+    g+=bottom.id==='none'?P(bloomers,'#ffffff','#c9c0c4'):bottom.draw(s.bottomColor,u);
+  }else if(!top.dress){
+    g+=P(bloomers,'#ffffff','#c9c0c4');
+  }
+  // うえ
+  if(outer.hood) g+=outer.hood(s.outerColor);
+  const t=top.draw(s.topColor,u);
+  g+=t.body;
+  if(outer.body) g+=outer.body(s.outerColor);
+  g+=armS(so,22)+armS(skin,18);
+  g+=t.sleeve;
+  if(outer.sleeve) g+=outer.sleeve(s.outerColor);
+  g+=C(84,352,10,skin,so)+C(216,352,10,skin,so);
+  if(outer.over) g+=outer.over(s.outerColor);
+  // あたま
+  g+=E(91,140,9,12,skin,so)+E(209,140,9,12,skin,so)+L('M89,134 Q86,142 91,148 M211,134 Q214,142 209,148',so,1.5,'opacity=".6"');
+  g+=P('M90,128 C90,64 210,64 210,128 C210,172 184,198 150,198 C116,198 90,172 90,128 Z',skin,so);
+  g+=E(116,165,9,5,'#ff8fa3','',0,`opacity="${boy?.22:.45}"`)+E(184,165,9,5,'#ff8fa3','',0,`opacity="${boy?.22:.45}"`);
+  g+=drawEyes(s.eyes,byId(EYEC,s.eyeColor).c,skin,shade(hc,.3),boy);
+  g+=byId(NOSES,s.nose).draw(skin);
+  g+=byId(MOUTHS,s.mouth).draw();
+  if(!noHair) g+=hair.front(H);
+  // アクセ
+  if(!hide.includes('acc')){
+    const ctx={H,skin};
+    ACCS.filter(a=>a.draw&&s.acc.includes(a.id)).sort((a,b)=>a.z-b.z).forEach(a=>g+=a.draw(ctx));
+  }
+  return g;
+}
+
+/* ================= じょうたい ================= */
+const DEFAULTS={
+  girl:{skin:'peach',hair:'long',hairColor:'choco',top:'blouse',topColor:'#ffffff',bottom:'flare',bottomColor:'#ff8fb1',
+        outer:'none',outerColor:'#ffd1e1',acc:['ribbon'],eyes:'maru',eyeColor:'brown',nose:'choko',mouth:'nikko',
+        shoes:'loafer',shoesColor:'#8a5a3b',bg:'pink'},
+  boy:{skin:'peach',hair:'bshort',hairColor:'dark',top:'tshirt',topColor:'#3d7fd9',bottom:'shorts',bottomColor:'#e3cba5',
+       outer:'none',outerColor:'#9ad97a',acc:[],eyes:'maru',eyeColor:'brown',nose:'choko',mouth:'nikko',
+       shoes:'sneaker',shoesColor:'#e8384f',bg:'sky'},
+};
+const okFor=(o,kind)=>!o.for||o.for===(kind==='boy'?'b':'g');
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+const CATS=[
+  {key:'skin',label:'はだ',icon:'🖐',list:SKINS,box:'80 66 140 140',hide:['acc']},
+  {key:'hair',label:'かみがた',icon:'💇',list:HAIRS,box:'30 16 240 300',hide:['acc']},
+  {key:'hairColor',label:'かみのいろ',icon:'🎨',list:HAIRC,box:'62 30 176 176',hide:['acc']},
+  {key:'top',label:'ふく',icon:'👚',list:TOPS,box:'56 176 188 188',hide:['acc','outer','hair'],color:'topColor',boxOf:o=>o.dress?'20 176 260 320':null},
+  {key:'bottom',label:k=>k==='boy'?'ズボン':'スカート',icon:k=>k==='boy'?'👖':'👗',list:BOTTOMS,box:'50 270 200 226',hide:['acc','outer','hair'],color:'bottomColor'},
+  {key:'outer',label:'うわぎ',icon:'🧥',list:OUTERS,box:'30 170 240 260',hide:['acc','hair'],color:'outerColor'},
+  {key:'acc',label:'アクセ',icon:'🎀',list:ACCS,multi:true,box:'40 10 220 220',boxOf:o=>o.box||null},
+  {key:'eyes',label:'め',icon:'👁',list:EYES,box:'96 104 108 72',hide:['acc']},
+  {key:'eyeColor',label:'めのいろ',icon:'🌈',list:EYEC,box:'96 104 108 72',hide:['acc']},
+  {key:'nose',label:'はな',icon:'👃',list:NOSES,box:'100 124 100 64',hide:['acc']},
+  {key:'mouth',label:'くち',icon:'👄',list:MOUTHS,box:'118 150 64 44',hide:['acc']},
+  {key:'shoes',label:'くつ',icon:'👟',list:SHOES,box:'76 400 148 120',hide:['bottom'],color:'shoesColor'},
+  {key:'bg',label:'はいけい',icon:'🏞',list:BGS,box:'0 0 300 530',bg:true},
+];
+const HINTS={
+  acc:'いくつでも つけられるよ。もういちど おすと はずれます。',
+  top:'ワンピースとドレスのときは、スカートは かくれます。',
+};
+
+const SAVE_KEY='kisekae-v1';
+let data={kind:'girl',looks:{girl:clone(DEFAULTS.girl),boy:clone(DEFAULTS.boy)}};
+let undoStack=[];
+let curTab='hair';
+
+function sanitize(kind,s){
+  const d=DEFAULTS[kind],out=clone(d);
+  if(!s||typeof s!=='object') return out;
+  const pal=PALETTE.map(p=>p[1]);
+  CATS.forEach(cat=>{
+    if(cat.multi){
+      if(Array.isArray(s.acc)) out.acc=s.acc.filter(id=>ACCS.some(a=>a.id===id&&a.draw&&okFor(a,kind)));
+    }else{
+      const o=cat.list.find(x=>x.id===s[cat.key]);
+      if(o&&okFor(o,kind)) out[cat.key]=s[cat.key];
+    }
+    if(cat.color&&pal.includes(s[cat.color])) out[cat.color]=s[cat.color];
+  });
+  return out;
+}
+function load(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
+    if(raw&&raw.looks){
+      data.kind=raw.kind==='boy'?'boy':'girl';
+      data.looks.girl=sanitize('girl',raw.looks.girl);
+      data.looks.boy=sanitize('boy',raw.looks.boy);
+    }
+  }catch(e){}
+}
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(data));}catch(e){}}
+const cur=()=>data.looks[data.kind];
+function remember(){undoStack.push(JSON.stringify(data));if(undoStack.length>60)undoStack.shift();}
+
+/* ================= がめん ================= */
+const $=s=>document.querySelector(s);
+const dollEl=$('#doll'),dollBox=$('#dollBox');
+function labelOf(cat){return typeof cat.label==='function'?cat.label(data.kind):cat.label;}
+function iconOf(cat){return typeof cat.icon==='function'?cat.icon(data.kind):cat.icon;}
+
+function drawDoll(sparkle){
+  dollEl.innerHTML=render(data.kind,cur());
+  if(sparkle){
+    dollBox.classList.remove('pop');void dollBox.offsetWidth;dollBox.classList.add('pop');
+    for(let i=0;i<5;i++){
+      const sp=document.createElement('span');sp.className='spark';sp.textContent='✦';
+      sp.style.left=(10+Math.random()*75)+'%';sp.style.top=(8+Math.random()*80)+'%';
+      sp.style.animationDelay=(i*60)+'ms';
+      dollBox.appendChild(sp);setTimeout(()=>sp.remove(),1000);
+    }
+  }
+}
+function drawTabs(){
+  $('#tabs').innerHTML=CATS.map(c=>`<button type="button" class="tab" role="tab" data-key="${c.key}" aria-selected="${c.key===curTab}">${iconOf(c)} ${labelOf(c)}</button>`).join('');
+}
+function drawPanel(){
+  const cat=CATS.find(c=>c.key===curTab),s=cur(),kind=data.kind;
+  $('#hint').textContent=HINTS[cat.key]||'';
+  $('#hint').style.display=HINTS[cat.key]?'':'none';
+  const list=cat.list.filter(o=>okFor(o,kind));
+  $('#grid').innerHTML=list.map(o=>{
+    let st,on;
+    if(cat.multi){st={...s,acc:o.id==='none'?[]:[o.id]};on=o.id==='none'?s.acc.length===0:s.acc.includes(o.id);}
+    else{st={...s,[cat.key]:o.id};on=s[cat.key]===o.id;}
+    const box=(cat.boxOf&&cat.boxOf(o))||cat.box;
+    const hide=cat.multi?[]:(cat.hide||[]);
+    const bg=cat.bg?'':'<rect x="-50" y="-50" width="400" height="630" fill="#fff5f9"/>';
+    return`<button type="button" class="opt" data-id="${o.id}" aria-pressed="${on}"><svg viewBox="${box}" aria-hidden="true">${bg}${render(kind,st,{noBg:!cat.bg,hide})}</svg>${o.name}</button>`;
+  }).join('');
+  if(cat.color){
+    const c=s[cat.color];
+    $('#palWrap').innerHTML=`<div class="pal-title">いろ</div><div class="pal">`+PALETTE.map(([n,h])=>`<button type="button" class="sw" data-color="${h}" style="background:${h}" aria-label="${n}" title="${n}" aria-pressed="${h===c}"></button>`).join('')+'</div>';
+  }else $('#palWrap').innerHTML='';
+}
+function drawKind(){
+  document.querySelectorAll('.kind button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.kind===data.kind));
+  document.body.classList.toggle('boy',data.kind==='boy');
+  $('#btnUndo').disabled=undoStack.length===0;
+}
+function refresh(sparkle){save();drawKind();drawTabs();drawPanel();drawDoll(sparkle);}
+
+/* ---- そうさ ---- */
+$('#tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab');if(!b)return;
+  curTab=b.dataset.key;drawTabs();drawPanel();$('#scroll').scrollTop=0;
+});
+$('#grid').addEventListener('click',e=>{
+  const b=e.target.closest('.opt');if(!b)return;
+  const cat=CATS.find(c=>c.key===curTab),s=cur(),id=b.dataset.id;
+  remember();
+  if(cat.multi){
+    if(id==='none') s.acc=[];
+    else s.acc=s.acc.includes(id)?s.acc.filter(x=>x!==id):[...s.acc,id];
+  }else{
+    if(s[cat.key]===id){undoStack.pop();return;}
+    s[cat.key]=id;
+  }
+  const y=$('#scroll').scrollTop;refresh(true);$('#scroll').scrollTop=y;
+});
+$('#palWrap').addEventListener('click',e=>{
+  const b=e.target.closest('.sw');if(!b)return;
+  const cat=CATS.find(c=>c.key===curTab),s=cur();
+  if(s[cat.color]===b.dataset.color)return;
+  remember();s[cat.color]=b.dataset.color;
+  const y=$('#scroll').scrollTop;refresh(true);$('#scroll').scrollTop=y;
+});
+document.querySelector('.kind').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||b.dataset.kind===data.kind)return;
+  remember();data.kind=b.dataset.kind;refresh(true);
+});
+$('#btnUndo').addEventListener('click',()=>{
+  if(!undoStack.length)return;
+  data=JSON.parse(undoStack.pop());refresh(true);
+});
+$('#btnReset').addEventListener('click',()=>{
+  remember();data.looks[data.kind]=clone(DEFAULTS[data.kind]);refresh(true);
+});
+const ACC_GROUP={kachusha:'head',tiara:'head',mugiwara:'head',beret:'head',cap:'head',headphones:'head',flower:'head',nekomimi:'head',
+  glasses:'eye',sunglasses:'eye',heartsun:'eye',pochette:'bag',backpack:'bag',necklace:'neck',scarf:'neck'};
+$('#btnRandom').addEventListener('click',()=>{
+  remember();
+  const kind=data.kind,s=cur(),pick=a=>a[Math.floor(Math.random()*a.length)];
+  CATS.forEach(cat=>{
+    const list=cat.list.filter(o=>okFor(o,kind)&&o.id!=='none');
+    if(cat.multi){
+      const n=Math.floor(Math.random()*3),got=[],used=new Set();
+      for(let i=0;i<10&&got.length<n;i++){const a=pick(list),gp=ACC_GROUP[a.id]||a.id;if(!used.has(gp)){used.add(gp);got.push(a.id);}}
+      s.acc=got;
+    }else if(cat.key==='outer'||cat.key==='shoes'){
+      s[cat.key]=Math.random()<.35?'none':pick(list).id;
+    }else if(cat.key==='nose'){
+      s.nose=pick(list).id;
+    }else s[cat.key]=pick(list).id;
+    if(cat.color) s[cat.color]=pick(PALETTE)[1];
+  });
+  refresh(true);
+});
+$('#btnSave').addEventListener('click',()=>{
+  const W=600,Hh=1060;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 530" width="${W}" height="${Hh}">${render(data.kind,cur())}</svg>`;
+  const img=new Image();
+  img.onload=()=>{
+    const cv=document.createElement('canvas');cv.width=W;cv.height=Hh;
+    cv.getContext('2d').drawImage(img,0,0,W,Hh);
+    cv.toBlob(b=>{
+      if(!b)return;
+      const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='kisekae.png';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    },'image/png');
+  };
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+});
+
+load();
+refresh(false);
+</script>
+</body>
+</html>
