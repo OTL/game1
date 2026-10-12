@@ -1,5 +1,5 @@
 // うさどくのステージ生成: node tools/generate.js out.json
-// くぎり・行・列に 1 ぴきずつ、となりあわない。答えが 1 とおりで、推理だけで解けるものをえらぶ
+// くぎり・行・列に 1 わずつ、となりあわない。答えが 1 とおりで、推理だけで解けるものをえらぶ
 let seed = 20261011;
 function rnd(){ seed = (seed*1664525+1013904223)>>>0; return seed/4294967296; }
 function ri(n){ return Math.floor(rnd()*n); }
