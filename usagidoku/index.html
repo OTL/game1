@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#fff4ea">
 <title>うさどく — うさぎのロジックパズル</title>
-<meta name="description" content="色のくぎりに 1 ぴきずつうさぎをおくロジックパズル。たて・よこの列にも 1 ぴきずつ、うさぎどうしはななめもふくめてとなりあわない。5×5 から 10×10 まで全 100 ステージ。">
+<meta name="description" content="色のくぎりに 1 わずつうさぎをおくロジックパズル。たて・よこの列にも 1 わずつ、うさぎどうしはななめもふくめてとなりあわない。5×5 から 10×10 まで全 100 ステージ。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ffd9a8'/><ellipse cx='11' cy='9' rx='3' ry='8' fill='%23fff' stroke='%235a3d33' stroke-width='1.5'/><ellipse cx='21' cy='9' rx='3' ry='8' fill='%23fff' stroke='%235a3d33' stroke-width='1.5'/><ellipse cx='16' cy='21' rx='10' ry='8.5' fill='%23fff' stroke='%235a3d33' stroke-width='1.5'/><circle cx='12.5' cy='20' r='1.4' fill='%235a3d33'/><circle cx='19.5' cy='20' r='1.4' fill='%235a3d33'/><ellipse cx='16' cy='23' rx='1.3' ry='1' fill='%23ff8fa3'/></svg>">
 <style>
   :root{
@@ -121,6 +121,9 @@
     content:"";position:absolute;inset:8%;border-radius:50%;border:3px solid #fff;
     box-shadow:0 0 0 3px var(--accent);animation:pulse 1s infinite;
   }
+  .cell.why::before{
+    content:"";position:absolute;inset:10%;border-radius:22%;border:2.5px dashed var(--accent);opacity:.9;
+  }
   .cell.dance .bun{animation:hop .6s ease-in-out infinite alternate;}
   @keyframes pop{0%{transform:scale(.2)}100%{transform:scale(1)}}
   @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
@@ -218,8 +221,8 @@
     <p class="sub">うさぎをならべるロジックパズル　全 100 ステージ</p>
     <div class="rules">
       <ol>
-        <li>色のくぎりごとに、うさぎを <b>1 ぴき</b>ずつおく</li>
-        <li>たての列にも、よこの列にも <b>1 ぴき</b>ずつ</li>
+        <li>色のくぎりごとに、うさぎを <b>1 わ</b>ずつおく</li>
+        <li>たての列にも、よこの列にも <b>1 わ</b>ずつ</li>
         <li>うさぎどうしは<b>となりあわない</b>（ななめもダメ）</li>
       </ol>
       <div class="ops">タップで ✕ じるし（なぞると続けて ✕）、ダブルタップでうさぎ。まちがえるとニンジンが 1 本へって、3 本なくなるとやりなおし。</div>
@@ -295,7 +298,7 @@
     <h3>せってい</h3>
     <div class="opt"><div>自動で ✕<small>うさぎをおくと、おけなくなったマスに ✕ をつける</small></div><button class="sw" id="swAuto" aria-label="自動で✕"></button></div>
     <div class="opt"><div>音<small>効果音をならす</small></div><button class="sw" id="swSound" aria-label="音"></button></div>
-    <div class="opt"><div>あそびかた<small>くぎり・たて・よこに 1 ぴきずつ。となりあわせはダメ</small></div></div>
+    <div class="opt"><div>あそびかた<small>くぎり・たて・よこに 1 わずつ。となりあわせはダメ</small></div></div>
     <div class="row-btns" style="margin-top:16px">
       <button class="btn" id="mClose">とじる</button>
       <button class="btn sub2" id="mTitle">タイトルへ</button>
@@ -519,7 +522,7 @@ function startStage(i){
   G.lives = 3; G.mistakes = 0; G.hints = 0; G.history = []; G.done = false;
   G.elapsed = 0; G.start = performance.now();
   $('gTitle').textContent = `ステージ ${i+1}`;
-  setMsg(i === 0 ? 'ダブルタップでうさぎをおこう' : `${n}×${n}　うさぎは ${n} ぴき`);
+  setMsg(i === 0 ? 'ダブルタップでうさぎをおこう' : `${n}×${n}　うさぎは ${n} わ`);
   buildBoard();
   drawLives();
   clearInterval(G.timerId);
@@ -557,6 +560,7 @@ function drawLives(){
 function buildBoard(){
   const b = $('board'), n = G.n;
   b.innerHTML = '';
+  hintCells = [];
   b.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
   G.cells = [];
   for (let i = 0; i < n*n; i++) {
@@ -774,38 +778,84 @@ $('tMode').addEventListener('click', () => {
   setMsg(G.mode === 'bunny' ? 'タップでうさぎをおくモード' : 'タップで ✕、ダブルタップでうさぎ');
 });
 
-// ヒント: いちばん候補の少ないくぎり・列から、うさぎの場所をおしえる
-let hintCell = -1;
-function clearHint(){ if (hintCell >= 0) { G.cells[hintCell].classList.remove('hint'); hintCell = -1; } }
+// ヒント: うさぎの場所ではなく、✕ をつけられるマスとそのわけをおしえる
+let hintCells = [];
+function clearHint(){
+  for (const i of hintCells) G.cells[i].classList.remove('hint', 'why');
+  hintCells = [];
+}
+function showHint(target, why, msg){
+  G.hints++;
+  G.cells[target].classList.add('hint');
+  hintCells.push(target);
+  for (const i of why) if (i !== target) { G.cells[i].classList.add('why'); hintCells.push(i); }
+  setMsg(msg);
+}
+const LAB = {reg:'くぎり', row:'よこの列', col:'たての列'};
+function groups(){
+  const n = G.n, res = [], regs = {};
+  for (let r = 0; r < n; r++) res.push({kind:'row', cells:[...Array(n)].map((_, c) => r*n + c)});
+  for (let c = 0; c < n; c++) res.push({kind:'col', cells:[...Array(n)].map((_, r) => r*n + c)});
+  for (let i = 0; i < n*n; i++) (regs[G.reg[i]] = regs[G.reg[i]] || []).push(i);
+  for (const k in regs) res.push({kind:'reg', cells:regs[k]});
+  return res;
+}
+function findXHint(){
+  const n = G.n, rowOf = i => (i / n) | 0, colOf = i => i % n;
+  const ok = i => G.st[i] === 0 && !G.sol.includes(i);
+  // 1. おいたうさぎと おなじ列・くぎり、またはとなり
+  for (let b = 0; b < n*n; b++) {
+    if (G.st[b] !== 2) continue;
+    for (const j of blockedBy(b)) {
+      if (!ok(j)) continue;
+      const why = rowOf(j) === rowOf(b) ? 'おなじよこの列' : colOf(j) === colOf(b) ? 'おなじたての列'
+        : G.reg[j] === G.reg[b] ? 'おなじくぎり' : 'となり';
+      return [j, [b], `◯ のマスは うさぎと${why}だから ✕`];
+    }
+  }
+  const gs = groups().filter(g => !g.cells.some(i => G.st[i] === 2));
+  const cand = g => g.cells.filter(i => G.st[i] === 0);
+  // 2. ある列・くぎりの候補が、ぜんぶべつの列・くぎりにおさまっている
+  for (const g of gs) {
+    const cs = cand(g);
+    if (!cs.length) continue;
+    for (const h of gs) {
+      if (h === g || h.kind === g.kind || !cs.every(i => h.cells.includes(i))) continue;
+      const t = cand(h).find(i => !g.cells.includes(i) && ok(i));
+      if (t !== undefined) return [t, cs, `点線は この${LAB[g.kind]}の候補。ぜんぶ おなじ${LAB[h.kind]}にあるから、◯ のマスは ✕`];
+    }
+  }
+  // 3. そこにおくと、どこかの列・くぎりに うさぎがおけなくなる
+  for (let i = 0; i < n*n; i++) {
+    if (!ok(i)) continue;
+    const bl = blockedBy(i);
+    for (const g of gs) {
+      if (g.cells.includes(i)) continue;
+      const cs = cand(g);
+      if (cs.length && cs.every(j => bl.has(j)))
+        return [i, cs, `◯ にうさぎをおくと、点線の${LAB[g.kind]}に うさぎがおけなくなる。だから ✕`];
+    }
+  }
+  // 4. てがかりが見つからないときは、候補のいちばん少ないくぎりから
+  let best = -1, bestCnt = 1e9;
+  for (const g of gs) {
+    const cs = cand(g), t = cs.find(ok);
+    if (t !== undefined && cs.length < bestCnt) { bestCnt = cs.length; best = t; }
+  }
+  return best < 0 ? null : [best, [], '◯ のマスには うさぎはいないよ。✕ をつけよう'];
+}
 $('tHint').addEventListener('click', () => {
   if (G.done) return;
   clearHint();
-  // ✕ をつけたマスにうさぎがいたら、まずそれをおしえる
-  const wrongX = G.sol.find(i => G.st[i] === 1);
-  if (wrongX !== undefined) {
-    hintCell = wrongX;
-    G.cells[wrongX].classList.add('hint');
+  // うさぎのいるマスに ✕ がついていたら、場所はいわずに数だけおしえる
+  const wrong = G.sol.filter(i => G.st[i] === 1).length;
+  if (wrong) {
     G.hints++;
-    setMsg('このマスの ✕ はまちがい。ここにうさぎがいるよ', true);
-    const batch = [];
-    setState(wrongX, 0, batch);
-    if (batch.length) G.history.push(batch);
+    setMsg(`まちがった ✕ が ${wrong} こ あるよ。「もどす」か「✕ を消す」でなおそう`, true);
     return;
   }
-  const n = G.n;
-  let best = null, bestCnt = 1e9;
-  for (const i of G.sol) {
-    if (G.st[i] === 2) continue;
-    const g = G.reg[i];
-    let cnt = 0;
-    for (let k = 0; k < n*n; k++) if (G.reg[k] === g && G.st[k] === 0) cnt++;
-    if (cnt < bestCnt) { bestCnt = cnt; best = i; }
-  }
-  if (best === null) return;
-  G.hints++;
-  hintCell = best;
-  G.cells[best].classList.add('hint');
-  setMsg('ひかっているマスをダブルタップしてみよう');
+  const h = findXHint();
+  if (h) showHint(...h);
 });
 
 $('tReset').addEventListener('click', () => {
