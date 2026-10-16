@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#fff4ea">
 <title>うさどく — うさぎのロジックパズル</title>
-<meta name="description" content="色のくぎりに 1 わずつうさぎをおくロジックパズル。たて・よこの列にも 1 わずつ、うさぎどうしはななめもふくめてとなりあわない。5×5 から 10×10 まで全 100 ステージ。">
+<meta name="description" content="色のくぎりに 1 わずつうさぎをおくロジックパズル。たて・よこの列にも 1 わずつ、うさぎどうしはななめもふくめてとなりあわない。5×5 から 11×11 まで全 150 ステージ。ステージ 101 からは いわ のマスがでてくる。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ffd9a8'/><ellipse cx='11' cy='9' rx='3' ry='8' fill='%23fff' stroke='%235a3d33' stroke-width='1.5'/><ellipse cx='21' cy='9' rx='3' ry='8' fill='%23fff' stroke='%235a3d33' stroke-width='1.5'/><ellipse cx='16' cy='21' rx='10' ry='8.5' fill='%23fff' stroke='%235a3d33' stroke-width='1.5'/><circle cx='12.5' cy='20' r='1.4' fill='%235a3d33'/><circle cx='19.5' cy='20' r='1.4' fill='%235a3d33'/><ellipse cx='16' cy='23' rx='1.3' ry='1' fill='%23ff8fa3'/></svg>">
 <style>
   :root{
@@ -77,6 +77,11 @@
   #stageList{width:min(640px,100%);flex:1;overflow:auto;padding:4px 0 24px;}
   .size-head{margin:14px 2px 8px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:baseline;}
   .size-head small{color:var(--muted);font-weight:400;font-size:12px;}
+  .chap{margin:22px 2px 0;padding:8px 12px;border-radius:14px;background:#fff;border:2px solid #f0d6c2;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .chap:first-child{margin-top:8px;}
+  .chap svg{width:24px;height:24px;flex:none;}
+  .chap span{white-space:nowrap;}
+  .chap small{color:var(--muted);font-weight:400;font-size:12px;margin-left:auto;text-align:right;}
   .stages{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
   .st{
     aspect-ratio:1;border-radius:14px;border:2px solid #f0d6c2;background:#fff;
@@ -113,6 +118,7 @@
     width:34%;height:34%;opacity:.55;
   }
   .cell .bun{width:84%;height:84%;}
+  .cell .rock{width:74%;height:74%;}
   .cell.pop .bun{animation:pop .35s cubic-bezier(.3,1.6,.5,1);}
   .cell.wrong{animation:shake .4s;}
   .cell.wrong::after{
@@ -161,6 +167,13 @@
   .sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s;}
   .sw.on{background:var(--accent);}
   .sw.on::after{left:25px;}
+  .opt.col{flex-direction:column;align-items:stretch;}
+  .accs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+  .acc{border:2px solid #f0d6c2;background:#fff;border-radius:14px;padding:4px 2px 5px;font-size:11px;display:flex;flex-direction:column;align-items:center;}
+  .acc svg{width:40px;height:40px;}
+  .acc.on{background:#ffe7d4;border-color:var(--accent);}
+  .acc.lock{background:#f3e6dc;color:#b39a8b;}
+  .acc.lock svg{opacity:.35;filter:grayscale(1);}
 
   #confetti{position:fixed;inset:0;pointer-events:none;z-index:9;}
 </style>
@@ -202,6 +215,37 @@
       <path d="M13 13 q7 -4 14 0 q-2 14 -7 25 q-5 -11 -7 -25 z" fill="#ff8a3d" stroke="#c8611c" stroke-width="1.5" stroke-linejoin="round"/>
       <path d="M15 19 h4 M17 25 h4 M18 31 h3" stroke="#c8611c" stroke-width="1.5" stroke-linecap="round"/>
     </symbol>
+    <symbol id="rock" viewBox="0 0 100 100">
+      <path d="M14 78 q-4 -22 12 -36 q10 -22 32 -20 q22 2 28 26 q10 14 2 30 q-4 6 -12 6 h-52 q-8 0 -10 -6 z" fill="#b9b2ab" stroke="#5a3d33" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M34 40 q8 -10 20 -10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".7"/>
+      <path d="M58 60 q8 4 12 14 M30 66 l10 -4" fill="none" stroke="#8f8780" stroke-width="4" stroke-linecap="round"/>
+      <path d="M20 84 q6 -10 14 -4 q6 -8 12 0" fill="#8fd694" stroke="#5a3d33" stroke-width="3" stroke-linejoin="round"/>
+    </symbol>
+    <!-- きせかえ（うさぎとおなじ 100×100 にかさねる） -->
+    <symbol id="acc-ribbon" viewBox="0 0 100 100">
+      <path d="M68 40 l-15 -10 v20 z M68 40 l15 -10 v20 z" fill="#ff5c8a" stroke="#5a3d33" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="68" cy="40" r="5" fill="#ff8fa3" stroke="#5a3d33" stroke-width="3"/>
+    </symbol>
+    <symbol id="acc-flower" viewBox="0 0 100 100">
+      <g fill="#fff59d" stroke="#5a3d33" stroke-width="2.5">
+        <circle cx="30" cy="31" r="6"/><circle cx="38.5" cy="37" r="6"/><circle cx="35" cy="47" r="6"/><circle cx="25" cy="47" r="6"/><circle cx="21.5" cy="37" r="6"/>
+      </g>
+      <circle cx="30" cy="40" r="5" fill="#ff8a3d" stroke="#5a3d33" stroke-width="2.5"/>
+    </symbol>
+    <symbol id="acc-tie" viewBox="0 0 100 100">
+      <path d="M50 92 l-13 -8 v16 z M50 92 l13 -8 v16 z" fill="#5aa9e6" stroke="#5a3d33" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="50" cy="92" r="4" fill="#8fd3f4" stroke="#5a3d33" stroke-width="3"/>
+    </symbol>
+    <symbol id="acc-glasses" viewBox="0 0 100 100">
+      <g fill="#bfe6ff" fill-opacity=".35" stroke="#5a3d33" stroke-width="3.5">
+        <circle cx="36" cy="64" r="10"/><circle cx="64" cy="64" r="10"/>
+      </g>
+      <path d="M46 63 q4 -3 8 0 M26 62 l-10 -4 M74 62 l10 -4" fill="none" stroke="#5a3d33" stroke-width="3.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="acc-crown" viewBox="0 0 100 100">
+      <path d="M35 42 l-2 -20 l9 8 l8 -13 l8 13 l9 -8 l-2 20 z" fill="#ffd166" stroke="#5a3d33" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="50" cy="35" r="3" fill="#ff5c8a"/><circle cx="40" cy="37" r="2.2" fill="#5aa9e6"/><circle cx="60" cy="37" r="2.2" fill="#5aa9e6"/>
+    </symbol>
     <symbol id="xmark" viewBox="0 0 20 20">
       <path d="M3 3 L17 17 M17 3 L3 17" stroke="#5a3d33" stroke-width="3.2" stroke-linecap="round"/>
     </symbol>
@@ -215,18 +259,19 @@
       <rect x="20" y="96" width="200" height="40" rx="12" fill="#ffd9a8"/>
       <use href="#bunny" x="22" y="40" width="70" height="70"/>
       <use href="#bunny" x="85" y="18" width="80" height="80"/>
+      <use id="heroAcc" href="#acc-none" x="85" y="18" width="80" height="80"/>
       <use href="#bunny" x="158" y="44" width="64" height="64"/>
       <use href="#carrot" x="104" y="96" width="34" height="34" transform="rotate(-70 121 113)"/>
     </svg>
     <h1 class="logo">うさ<span>どく</span></h1>
-    <p class="sub">うさぎをならべるロジックパズル　全 100 ステージ</p>
+    <p class="sub">うさぎをならべるロジックパズル　全 150 ステージ</p>
     <div class="rules">
       <ol>
         <li>色のくぎりごとに、うさぎを <b>1 わ</b>ずつおく</li>
         <li>たての列にも、よこの列にも <b>1 わ</b>ずつ</li>
         <li>うさぎどうしは<b>となりあわない</b>（ななめもダメ）</li>
       </ol>
-      <div class="ops">タップで ✕ じるし（なぞると続けて ✕）、ダブルタップでうさぎ。まちがえるとニンジンが 1 本へって、3 本なくなるとやりなおし。</div>
+      <div class="ops">タップで ✕ じるし（なぞると続けて ✕）、ダブルタップでうさぎ。まちがえるとニンジンが 1 本へって、3 本なくなるとやりなおし。<br>ステージ 101 からは、うさぎをおけない <b>いわ</b> がでてくるよ。</div>
     </div>
     <div class="row-btns">
       <button class="btn" id="btnPlay">あそぶ</button>
@@ -269,7 +314,7 @@
 <!-- クリア -->
 <div class="modal hidden" id="mClear">
   <div class="card">
-    <svg class="face" viewBox="0 0 100 100"><use href="#bunny"/></svg>
+    <svg class="face" viewBox="0 0 100 100"><use href="#bunny"/><use id="clearAcc" href="#acc-none"/></svg>
     <h3>クリア！</h3>
     <div class="big-stars" id="clearStars"></div>
     <p id="clearInfo"></p>
@@ -299,7 +344,8 @@
     <h3>せってい</h3>
     <div class="opt"><div>自動で ✕<small>うさぎをおくと、おけなくなったマスに ✕ をつける</small></div><button class="sw" id="swAuto" aria-label="自動で✕"></button></div>
     <div class="opt"><div>音<small>効果音をならす</small></div><button class="sw" id="swSound" aria-label="音"></button></div>
-    <div class="opt"><div>あそびかた<small>くぎり・たて・よこに 1 わずつ。となりあわせはダメ</small></div></div>
+    <div class="opt col"><div>きせかえ<small>★ をあつめると、うさぎのおしゃれがふえる</small></div><div class="accs" id="accList"></div></div>
+    <div class="opt"><div>あそびかた<small>くぎり・たて・よこに 1 わずつ。となりあわせはダメ。いわにはおけない</small></div></div>
     <div class="row-btns" style="margin-top:16px">
       <button class="btn" id="mClose">とじる</button>
       <button class="btn sub2" id="mTitle">タイトルへ</button>
@@ -312,7 +358,7 @@
 <script>
 'use strict';
 
-// ステージデータ: 各マスのくぎり（A〜J）| 各行の答えの列
+// ステージデータ: 各マスのくぎり（A〜K、小文字はいわ）| 各行の答えの列
 const PUZZLES = [
   "AABBBAABBBACBBDAEEEDEEEEE|03142",
   "AABBBAABBBACBBBCCCDDCEEED|03142",
@@ -413,28 +459,97 @@ const PUZZLES = [
   "EEBBBBBAAAEEBBBCBBAAEEECCCBDAAEEECBBBDDAEEEEBBDDDAFFFEGGDDAAFFFFFGGAAAHIFFFJJJAAHIIJJJAAAAIIJJJAAAAA|9758316024",
   "AABBBBEEEEDDCCBEEEEGDCCCCCEEGGDDDFFEEGGGDFFFFEEEEGDFFFFFEHHGHFFHFFHHGGHHHHHFHIIIHHHHHHHHHIHHHHHJHIII|1420738695",
   "AAAABBBBCCAAIAAABBCCAAIIICCCCCDDIDIIICECFDDDDICCECFFIIIIGGCCIIIJHHJGGCIIIJHJJJGJIJJJJJJJJJIJJJJJJJJJ|2693817405",
-  "GAAAAAAAABGGCCCCABBBGGCDCCAEEEGGDDHHEEEHGFFFFHEHHHGFFFFHHHHHGGFFFHHHHHGIIFHHHHHHIIIFFFHHHHJIIIIIHHHH|7953641820"
+  "GAAAAAAAABGGCCCCABBBGGCDCCAEEEGGDDHHEEEHGFFFFHEHHHGFFFFHHHHHGGFFFHHHHHGIIFHHHHHHIIIFFFHHHHJIIIIIHHHH|7953641820",
+  // だい2しょう: 小文字はいわのマス。列は 36 進数（11×11 の 10 は a）
+  "bAAaAAACbBDAAAACDDDACCCCFFDECCCCFFEEEECGFFFeEGGGHFHHGGHgHHHHHHHH|61724053",
+  "AaAAAAAAAAAEAbBBCCAEeEBBCCCEeEBDCCfEEEDDHCFEEEDDhHHHGGGDhhHHGGGG|06174253",
+  "EAAAABBBEACAABBBECCcBBDDECDcDDddEEDDDDDFEEHhDFFfEGHHHFFFggHhHFFF|37250614",
+  "BBBbAAAABBBBBAAACCBBBAAACDDdDEEEGGGFFEEeGGGGFFeeGGGHfHHHGgGHHHHh|73026415",
+  "AAAAABBBCAAAABBBCAAAdDBBCAEDDDDBCCEEGDFBCEEEGDFFCEEGGhFFCGGGGhHF|15042736",
+  "cBBbBAAAcCBBBAAAcCBBDDADcBBDDDDDCEEDDDFFhHHDDDGFhHHDDGGFHHHGGGGF|63142750",
+  "BBAAaCCCBBBBCCCCBBBbCCCCFDDdCCCCFFDHEEECFfHHHGGgFFHHhGGgHHHHHgGg|31725064",
+  "aAAEEBBBaAAAebBBACCcEEBBDDEEEEBBdDEEEEEBHFFfFFFFHHHHHGGGHHHhHHGG|16203574",
+  "AAAAAAAAAAAAAbBBCAADeEFFcADDDEFFCDDEEEFFHHHHEEFFHHHHHGGFHhHHHHHf|16024753",
+  "DFFFAAaADFFBBBCCdDFFBCCCDDFFCCcCGDfFECCCGGFFEECHGGfFEEChGGGFFEEH|53614207",
+  "AAAAABBbBAAAAAABBBDDDCAFFHBDdDEEFFHHDGGEEFFHHGGGGFFFHHGGIIIIfHHGgIIIiHhHGGGIIIIII|273046185",
+  "AAAAABBbDAAACCBBBDAACCCBBBDEEEECFBDDeEEeFFFFdEEEFFFFDdgGgFFFFFDGGIIIFHhDGGIiIIIhD|073825164",
+  "AAaAAAAAADDAAbBbBACDBBBBBBADDDDEEEBADDdDEEEEEGGGDIIEEFGGgDIIIEFGGIIIIIHHGgIIIIIhH|350268174",
+  "BBBBAaACCBBBCCaCCCBBBCCCCCCeBDDDCCCCEDDDDDCCCFFFDIIIHHFFFGGIIIHFGGggIIhHFGIIIIIHH|617302485",
+  "BBBBaAaAABbBAaAaAABBBFAAccCBBDFAEECEBBBFgEEEEBHBFGGEEEHHBFFGEEEHHHHIGgEEHHHIIIIIE|708263514",
+  "AAAAAAAAAAAABBBBBBACABBBBDBEEEBBDDDDEEeGBBFFFEEGGGFFfFGGgGGGIIIGGGHIIiiiGGGHIIIiI|241708536",
+  "CCCAAAAbbCCCDDABbbCCCdDAbIICFFDdADIIEEFDDDDIIFFFFdHGGIFFfFHHGGIFFfHHHHIIFHHHHHIII|461302758",
+  "CCCaAABBBCcCcCCBBbDcCCCBBBBDDDDCCEBBFDDDCCEBBFDDDCCEEBFFGHHHHIIFFgHhHHIiFFFHHHHHI|473160258",
+  "DAACBBBBBDDaCCBBBBDDDCCCbBBDDDFFEEGGDDDfEEEGGDDDFEEEGGDEEEEeEGIDHhEEGGGIDDhIiiiII|264053718",
+  "aACCCCCCCCCCbBCCCCCCcDDDEHHCCCDDDEEHDDddDEEEHFFFFFFGgHFFFFFIGgHFFFFFIHHHFFFFIIHHH|140372685",
+  "AAABbbbCCAAADDBBCCAAaFDDDCCFFFFdDECCFFFFFEEEEIHHFFFEEEIGHFFFEEEIHHHhFIEEIIIIIiIII|268574130",
+  "AAABBBEEEaAABbBEEeAAABBBCEEAIADDDCEEIIADDEEEEIIGFFFEEEIIGGGGHHEIIGGGHHHhiIIIGHHhh|036485271",
+  "AAAACCbBBAAACCCBBEAAADCCEEEADDDDCEEEAdDDDfEEEADGFfFEEEAgGFffEEEAAGIIIEEHAiIIIIIHH|064175283",
+  "AAAAABBBBAAAAABBDDACcEBBBDDECEEDDDDDeEEeFfDDDEEEGFFFDDIGGGGgFFFiIIIgFFFHiIIIiFFFH|051726483",
+  "AaaaAABBBCCDDDBBBBCCCDDBBBBCccDDEEBBCGDDFEeEEGGGDFFFEEGGGGFHFFiGGGGFHhIiGGGGGhHHI|061374258",
+  "HHHACCCCBDHHHaCCCCBDHHHaFFCDDDHHeFFFFDDDHHEEFfFgDDHHEEFFFGDDHHEEIGGGDDHheIiiGgGGHHHIIGGGGGJJJJJJGGGG|3869257041",
+  "BbbBbAAAAFBBBBAAAAFFDBBCAAFFFFDBBEEEFFFFdBbEeEeFFHGGgEIIIFFHGGGEEIIFFHGGGEJJIIHHGGgJJJJIHhJJJJJJJHHh|6130582974",
+  "CCCBBAaaFDBcBBBBFFFDBCBBBFFFDDBBBBFFFFdDGGEEEEFFFDGGEEeFfFFdGGEEeHHHIIGGjJHHHHIIGJjJHIhHIIGGJJIIIIII|5319470682",
+  "BBBBBbBAAABBCCCBBAaACCCCCBDDAACCCCCCDDAAEECCffDDIIEEEEFFFDIIEEEEFFFGgIhHEEFIFGGIJJEEIIFIiIjJJjIIIIII|8536047192",
+  "bbBBCcDDaABbCcCDDDAABBBCCDDDAAEEDDDDDDDFEEDDDDFDDFEEEEFfFffFEEGgFFFHJJEEGGFHHHJJEEEEIHHJJJEEEEiJJJJJ|9035162748",
+  "CCCEEAABBBCCCEEaBBBDCccEEEDDDDCCEEEEEDDDEEEeEEEEDdGgEEEFFFFDGGHhHFHDDDGGHHHHHIDDGJJjHHHIDDJJJjjJJIID|5809461372",
+  "aAAABbbDDDAAAABBCCDDAAAACCCCDDeEECCCCcDDEEECFFfDDDEECCGFFDDDEEhGGGggIIEEHGGGGIIIEJJGGgIIIIEEJJJJIIII|1579064283",
+  "bBBBBDaaAABBBBBDdAAABCCEEEDDDDBBEEeDdDDDeEEEEDDDDFEEEEJHHfFfJGEEJJHHHHJJEIIjHHHHJJJIJJHHHHJJJJJJHHHH|9027481635",
+  "BBDDAAaaaABEEDDDDDAAEEDDDDdDCCEEEEeDDDCCHHEEEEDDCCHHFEEEGGGCHHFFfEGGGGHHHFFFFgGGHHHFFIiGGGHHHJIIIIGG|9086427153",
+  "CAAAAAABBBcAaAAAbBBBCCAAAABBBBCCDDddGBBBCEDDDDGFFBCeDDDGGGfFCCCHGGGGIfCHhHHGGIIFCChHIIIiIICCHHJJIIII|2703196485",
+  "aAaAAAAAAACAAAABBBBBCCCDDBDDDBcCCdDDDDDBCCCDEEEEEHCCCFFFEEEHCFFFFggGHHCIIIFIggHHCIIIIIIJJJIIIIIjjJJJ|1504637928",
+  "CBBBBBBAAACDBBEEbBaaCDDDEEEEaGDDDEEEEEGGDFEEEeHGGGFFEHHHHggGFFFFHHgGgIJJFHHHJJIIJJJJJJJIiIJJJJJJJIII|8302417596",
+  "bBBBaAAaAABBBBAAAACABBeAAAAACcBBEFFDDACCBEEEFFFAACHGEEFFfAACHGGGJFFAIChHJJJJJiIIhHJJJJIIIIhJJJJJJJJJ|9086253174",
+  "BBBBBAAaAaBBBBBBAAAABcCBDBAADdBCCDDDDDDDCCEEGFFDDDCHGGGFFDDDHHGGGFFFDDHhHHgIIIIDHJHJIIIIIDJJJJJjIIID|8529364071",
+  "DDDAAAAAABDDDAAAAABBDdDDAcCBBbDDDDCCCBBbGgDDDCCEEBGGDFDhEEBBGFFFHhHEEBGGGIHJJJEBGGIIJJJJEBGGGJJJJjEB|7961830425",
+  "GGGGBBBCAaAGGGGbbBCCCCGGFGcCCCCCCGFFGDDDDCCCFFGGDDDDDCEFHGGGGGGGGKHHGGGGGGGGKHHHGGGGGGGKJJJJIiKkGKKJJJJIIKKKKKJJjJJIKKKKK|8695a031427",
+  "bAAAAACCCCCBAAAACCCCCCbAAAaCCCCCcGGDddKKCCCCGGIIIKKEEEeGGIIIKKFFEEGGGIIIKKKHeGGGGIIKKHHHGgJIIIkKHHhGGJJJIKKHHHGJJKKKKKkKH|4082971a536",
+  "AAaAACcBDDDAAAAAACBBDDAAAAcCCBDDDAAACcCCBDDDAHAACEEEeFFAhHgCEeFFfFHHGGKEFFFFFhHHJKKKFFFFJHJJKIKKFFFJJJJKKKKFFFJJJJKKKKKFF|08697a31524",
+  "CCBBBAAAAAACCCCBAaAAAACccCbAAdAAACCFFFAEDdAAHHFFeEEDGAAHHHFFFFdGGGHHHHHFFGGGGHHhHHHHGGGGHHHHKIiIIIjKKKKKKIIIJJKKKKKKKIIIj|640753918a2",
+  "BBCCAAAAAAABBCCADDAAaDbBCCCDDDDDDFBCcCDDEDDDFFfEEEEEEDDFFFGGGgGEDDHHFHGGGGEDDHHHhHGGGGGDJJHHHKiIGGDjJKKKkIKGGDJJKKKKkKGGD|903a8264715",
+  "BBBBBBBCCACBBBBBBBCCCCdDBBBBBCCCCdDDBBCCCCGGEDDdEFCCGGGeEEEEFFFfFgEhhEFFFFFGGEHHHHFJJFGGEEKIIJJJJJJEEKKKJJjjJJEKKkKkJJJJJ|958207a1364",
+  "AAAAABBcCEFDAABBBBCEEFDAAbBBcCEFFDAaAAFFcEFFDDaAAFFcEFIGGGGAFFFFFIGGGGGHHHHFiGGGGGhHHHIIGGGJJJJKKkIGGGjJJJJKKIGGGJJJJJJKI|13708526a49",
+  "IIIBBBDDAAAIIIBbBBDBBBIIIBBBDDBCCIIFFBBDdBECIIFFBBBBBECIIFFBHHBBHcIIfGGgHHHHHIIfGgGHHHHHIiJjJGHhHHHIKJJjKKHHHHKKKKKKKKKHH|85a69247031",
+  "BBBBCCCAAAABBBBEECCACABbBBEECCCCDIIIIeeEEDddIIIFFEEDDDDIfFfFFGGGGGIIIFHJJJGGJIIIIHHJJGJJIiIKKKJJJJJKKKKKKJjJJJKkKKKKJjJJj|716852940a3",
+  "DBBCCcCCAJJDBBFCcCAaJJDFFFFCCEAAJDFFFCCEEEHJDDFFCCEEEHJFFFgEeeIIhJFFKGIEEIIHJFFKIIIIIIHJFKKKIiiIIJJKKKKkIJJJJJKKKKKIJJJJJ|825061397a4"
 ];
 
-const COLORS = ['#ff9e9e','#ffd166','#a8e07a','#8fd3f4','#c3a6f5','#f9a8d4','#ffb870','#7fd8c4','#a5b4fc','#d9c2a3'];
+const COLORS = ['#ff9e9e','#ffd166','#a8e07a','#8fd3f4','#c3a6f5','#f9a8d4','#ffb870','#7fd8c4','#a5b4fc','#d9c2a3','#e6ee9c'];
+const CHAPTERS = [
+  {from:0, name:'だい1しょう　はらっぱ', icon:'#bunny'},
+  {from:100, name:'だい2しょう　いわのおか', icon:'#rock', note:'いわにはうさぎをおけない'},
+];
+const hasRock = i => /[a-z]/.test(PUZZLES[i].split('|')[0]);
 const SIZE_GROUPS = [];
 (function(){
-  let start = 0;
   for (let i = 0; i < PUZZLES.length; i++) {
-    const n = Math.round(Math.sqrt(PUZZLES[i].split('|')[0].length));
-    if (!SIZE_GROUPS.length || SIZE_GROUPS[SIZE_GROUPS.length-1].n !== n) SIZE_GROUPS.push({n, from:i, to:i});
-    else SIZE_GROUPS[SIZE_GROUPS.length-1].to = i;
+    const n = PUZZLES[i].split('|')[1].length, rock = hasRock(i);
+    const last = SIZE_GROUPS[SIZE_GROUPS.length-1];
+    if (!last || last.n !== n || last.rock !== rock) SIZE_GROUPS.push({n, rock, from:i, to:i});
+    else last.to = i;
   }
 })();
 
+// きせかえ: ★ の合計でふえる
+const ACCS = [
+  {id:'none', name:'なし', need:0},
+  {id:'ribbon', name:'リボン', need:30},
+  {id:'flower', name:'おはな', need:90},
+  {id:'tie', name:'ちょうネクタイ', need:160},
+  {id:'glasses', name:'めがね', need:250},
+  {id:'crown', name:'おうかん', need:360},
+];
+
 // ---------- セーブ ----------
 const SAVE_KEY = 'usagidoku-v1';
-let save = {stars:{}, auto:true, sound:true};
+let save = {stars:{}, auto:true, sound:true, acc:'none'};
 try {
   const raw = localStorage.getItem(SAVE_KEY);
   if (raw) save = Object.assign(save, JSON.parse(raw));
 } catch (e) {}
 function writeSave(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+function totalStars(){ let t = 0; for (const k in save.stars) t += save.stars[k]; return t; }
+function accHref(){ return '#acc-' + (ACCS.some(a => a.id === save.acc && a.need <= totalStars()) ? save.acc : 'none'); }
+function bunnyUse(){ return '<use href="#bunny"/><use href="' + accHref() + '"/>'; }
 function cleared(i){ return (save.stars[i] || 0) > 0; }
 function unlocked(i){ return i === 0 || cleared(i - 1) || cleared(i); }
 function nextStage(){
@@ -480,13 +595,18 @@ function buildSelect(){
   const list = $('stageList');
   list.innerHTML = '';
   const nx = nextStage();
-  let total = 0;
-  for (const k in save.stars) total += save.stars[k];
-  $('starTotal').textContent = '★' + total;
+  $('starTotal').textContent = '★' + totalStars();
   for (const grp of SIZE_GROUPS) {
+    const ch = CHAPTERS.find(c => c.from === grp.from);
+    if (ch) {
+      const c = document.createElement('div');
+      c.className = 'chap';
+      c.innerHTML = `<svg viewBox="0 0 100 100"><use href="${ch.icon}"/></svg><span>${ch.name}</span>${ch.note ? `<small>${ch.note}</small>` : ''}`;
+      list.appendChild(c);
+    }
     const h = document.createElement('div');
     h.className = 'size-head';
-    h.innerHTML = `${grp.n}×${grp.n} <small>ステージ ${grp.from+1}〜${grp.to+1}</small>`;
+    h.innerHTML = `${grp.n}×${grp.n} <small>ステージ ${grp.from+1}〜${grp.to+1}${grp.rock ? '・いわあり' : ''}</small>`;
     list.appendChild(h);
     const box = document.createElement('div');
     box.className = 'stages';
@@ -517,14 +637,17 @@ function startStage(i){
   const [r, s] = PUZZLES[i].split('|');
   const n = s.length;
   G.idx = i; G.n = n;
-  G.reg = [...r].map(ch => ch.charCodeAt(0) - 65);
-  G.sol = [...s].map(Number).map((c, row) => row * n + c);
-  G.st = new Array(n*n).fill(0); // 0 なし / 1 ✕ / 2 うさぎ
+  G.reg = [...r].map(ch => ch.toUpperCase().charCodeAt(0) - 65);
+  G.sol = [...s].map(ch => parseInt(ch, 36)).map((c, row) => row * n + c);
+  G.st = [...r].map(ch => ch === ch.toUpperCase() ? 0 : 3); // 0 なし / 1 ✕ / 2 うさぎ / 3 いわ
   G.lives = 3; G.mistakes = 0; G.hints = 0; G.history = []; G.done = false;
   G.elapsed = 0; G.start = performance.now();
   $('gTitle').textContent = `ステージ ${i+1}`;
-  setMsg(i === 0 ? 'ダブルタップでうさぎをおこう' : `${n}×${n}　うさぎは ${n} わ`);
+  setMsg(i === 0 ? 'ダブルタップでうさぎをおこう'
+    : i === 100 ? 'いわのマスには うさぎをおけないよ。✕ とおなじ'
+    : `${n}×${n}　うさぎは ${n} わ`);
   buildBoard();
+  for (let k = 0; k < n*n; k++) if (G.st[k] === 3) render(k);
   drawLives();
   clearInterval(G.timerId);
   G.timerId = setInterval(tick, 500);
@@ -600,7 +723,8 @@ function render(i){
   const d = G.cells[i], s = G.st[i];
   if (s === 0) d.innerHTML = '';
   else if (s === 1) d.innerHTML = '<svg class="x" viewBox="0 0 20 20"><use href="#xmark"/></svg>';
-  else d.innerHTML = '<svg class="bun" viewBox="0 0 100 100"><use href="#bunny"/></svg>';
+  else if (s === 3) d.innerHTML = '<svg class="rock" viewBox="0 0 100 100"><use href="#rock"/></svg>';
+  else d.innerHTML = '<svg class="bun" viewBox="0 0 100 100">' + bunnyUse() + '</svg>';
 }
 
 function setState(i, v, batch){
@@ -628,13 +752,13 @@ function blockedBy(i){
 }
 
 function toggleX(i, batch, forceTo){
-  if (G.st[i] === 2) return;
+  if (G.st[i] >= 2) return;
   const to = forceTo !== undefined ? forceTo : (G.st[i] === 1 ? 0 : 1);
   setState(i, to, batch);
 }
 
 function placeBunny(i){
-  if (G.done || G.st[i] === 2) return;
+  if (G.done || G.st[i] >= 2) return;
   clearHint();
   if (!G.sol.includes(i)) {
     // まちがい
@@ -673,7 +797,9 @@ function win(){
   const sec = Math.floor((performance.now() - G.start) / 1000);
   const stars = G.mistakes === 0 && G.hints === 0 ? 3 : (G.mistakes + G.hints <= 1 ? 2 : 1);
   const prev = save.stars[G.idx] || 0;
+  const before = totalStars();
   save.stars[G.idx] = Math.max(prev, stars);
+  const got = ACCS.filter(a => a.need > before && a.need <= totalStars());
   save.times = save.times || {};
   const best = save.times[G.idx];
   if (!best || sec < best) save.times[G.idx] = sec;
@@ -691,7 +817,9 @@ function win(){
     if (G.mistakes) info += `<br>まちがい ${G.mistakes} 回`;
     if (G.hints) info += `${G.mistakes ? '・' : '<br>'}ヒント ${G.hints} 回`;
     if (stars < 3) info += '<br>まちがい・ヒントなしで ★3';
+    for (const a of got) info += `<br><b style="color:var(--accent)">きせかえ「${a.name}」がふえた！</b>（せってい ⚙ から）`;
     $('clearInfo').innerHTML = info;
+    $('clearAcc').setAttribute('href', accHref());
     const last = G.idx >= PUZZLES.length - 1;
     $('cNext').textContent = last ? 'ぜんぶクリア！' : 'つぎのステージ';
     $('mClear').classList.remove('hidden');
@@ -726,7 +854,7 @@ $('board').addEventListener('pointerdown', e => {
     placeBunny(i);
     return;
   }
-  if (G.st[i] === 2) return;
+  if (G.st[i] >= 2) return;
   const batch = [];
   const to = G.st[i] === 1 ? 0 : 1;
   toggleX(i, batch, to);
@@ -770,7 +898,7 @@ function setMode(m){
   G.mode = m;
   $('tMode').classList.toggle('on', m === 'bunny');
   $('tMode').querySelector('.ic').innerHTML = m === 'bunny'
-    ? '<svg viewBox="0 0 100 100"><use href="#bunny"/></svg>'
+    ? '<svg viewBox="0 0 100 100">' + bunnyUse() + '</svg>'
     : '<svg viewBox="0 0 20 20"><use href="#xmark"/></svg>';
   $('tModeLabel').textContent = m === 'bunny' ? 'うさぎモード' : '✕ モード';
 }
@@ -885,6 +1013,25 @@ $('oSelect').addEventListener('click', () => { $('mOver').classList.add('hidden'
 function syncSwitches(){
   $('swAuto').classList.toggle('on', !!save.auto);
   $('swSound').classList.toggle('on', !!save.sound);
+  const box = $('accList'), total = totalStars(), cur = accHref().slice(5);
+  box.innerHTML = '';
+  for (const a of ACCS) {
+    const b = document.createElement('button');
+    const lock = a.need > total;
+    b.className = 'acc' + (lock ? ' lock' : '') + (a.id === cur ? ' on' : '');
+    b.innerHTML = `<svg viewBox="0 0 100 100"><use href="#bunny"/><use href="#acc-${a.id}"/></svg>${lock ? '🔒★' + a.need : a.name}`;
+    b.addEventListener('click', () => {
+      if (lock) return;
+      save.acc = a.id; writeSave(); syncSwitches(); applyAcc();
+    });
+    box.appendChild(b);
+  }
+}
+// きせかえをかえたら、盤のうさぎ・ボタン・タイトルもかえる
+function applyAcc(){
+  $('heroAcc').setAttribute('href', accHref());
+  if (G.cells.length) for (let i = 0; i < G.st.length; i++) if (G.st[i] === 2) render(i);
+  setMode(G.mode);
 }
 $('gMenu').addEventListener('click', () => { syncSwitches(); $('mMenu').classList.remove('hidden'); });
 $('swAuto').addEventListener('click', () => { save.auto = !save.auto; writeSave(); syncSwitches(); });
@@ -921,6 +1068,7 @@ function confetti(){
   })(t0);
 }
 
+applyAcc();
 show('title');
 if (Object.keys(save.stars).length) $('btnPlay').textContent = `つづきから（ステージ ${nextStage()+1}）`;
 </script>

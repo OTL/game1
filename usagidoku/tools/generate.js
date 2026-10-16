@@ -62,8 +62,9 @@ function countSolutions(n,g,limit=2){
   rec(0); return cnt;
 }
 // logical solver; returns {solved, score}
-function logicSolve(n,g){
-  const N=n*n; const st=new Array(N).fill(0); // 0 unknown, 1 X, 2 bunny
+function logicSolve(n,g){ return logicSolveFrom(n,g,new Array(n*n).fill(0)); }
+function logicSolveFrom(n,g,st0){
+  const N=n*n; const st=st0.slice(); // 0 unknown, 1 X, 2 bunny
   const units=[]; // rows, cols, regions
   for(let r=0;r<n;r++){ units.push([...Array(n).keys()].map(c=>r*n+c)); }
   for(let c=0;c<n;c++){ units.push([...Array(n).keys()].map(r=>r*n+c)); }
@@ -172,17 +173,78 @@ function gen(n){
     return {n,g,q,score:ls.score,level:ls.level,tries:t};
   }
 }
+// ---------- だい2しょう: いわ ----------
+// いわのマスにはうさぎをおけない。くぎりはそのままで、いわで答えを 1 とおりにしぼる
+function countRock(n,g,rock,limit,skip){
+  let cnt=0, alt=null; const usedC=new Array(n).fill(false), usedR=new Array(n).fill(false); const cols=[];
+  function rec(r){
+    if(cnt>=limit) return;
+    if(r===n){ if(!skip||cols.some((c,i)=>c!==skip[i])){ cnt++; alt=cols.slice(); } return; }
+    for(let c=0;c<n;c++){
+      const i=r*n+c; if(usedC[c]||rock[i]) continue; const reg=g[i]; if(usedR[reg]) continue;
+      if(r>0 && Math.abs(cols[r-1]-c)<=1) continue;
+      usedC[c]=usedR[reg]=true; cols[r]=c; rec(r+1); usedC[c]=usedR[reg]=false;
+    }
+  }
+  rec(0); return {cnt,alt};
+}
+function genRock(n){
+  for(let t=0;t<100000;t++){
+    const q=placeQueens(n); const g=growRegions(n,q);
+    if(g.includes(-1)) continue;
+    const qset=new Set(q.map((c,r)=>r*n+c));
+    const rock=new Array(n*n).fill(false);
+    let ok=false;
+    for(let step=0;step<3*n;step++){
+      const {alt}=countRock(n,g,rock,1,q);
+      if(!alt){ ok=true; break; }
+      const cells=alt.map((c,r)=>r*n+c).filter(i=>!qset.has(i));
+      rock[cells[ri(cells.length)]]=true;
+    }
+    if(!ok) continue;
+    // いらないいわをとりのぞく
+    for(const i of shuffle([...Array(n*n).keys()])){
+      if(!rock[i]) continue; rock[i]=false;
+      if(countRock(n,g,rock,1,q).alt) rock[i]=true;
+    }
+    const k=rock.filter(Boolean).length;
+    if(k<3||k>n+1) continue;
+    const ls=logicSolveFrom(n,g,rock.map(x=>x?1:0)); if(!ls.solved||ls.level<2) continue;
+    return {n,g,q,rock,score:ls.score,level:ls.level,tries:t};
+  }
+}
+function pickSpread(list,k){
+  list.sort((a,b)=>a.level-b.level||a.score-b.score);
+  const step=list.length/k; const pick=[]; for(let i=0;i<k;i++) pick.push(list[Math.floor(i*step+step/2)]);
+  return pick;
+}
+const A='ABCDEFGHIJK';
+if(process.argv[2]==='--rocks'){
+  // node tools/generate.js --rocks out.json
+  seed=20261016;
+  const plan=[[8,10],[9,15],[10,15],[11,10]];
+  const out=[];
+  for(const [n,k] of plan){
+    const list=[]; const t0=Date.now();
+    for(let i=0;i<k*2;i++) list.push(genRock(n));
+    const pick=pickSpread(list,k);
+    console.error(n, Date.now()-t0+'ms', pick.map(p=>p.level+':'+p.score+'/'+p.rock.filter(Boolean).length).join(' '));
+    out.push(...pick);
+  }
+  // いわのマスは小文字。列は 36 進数（11×11 の 10 は a）
+  const enc=out.map(p=>p.g.map((x,i)=>p.rock[i]?A[x].toLowerCase():A[x]).join('')+'|'+p.q.map(c=>c.toString(36)).join(''));
+  require('fs').writeFileSync(process.argv[3], JSON.stringify(enc));
+} else {
 const plan=[[5,10],[6,15],[7,20],[8,20],[9,20],[10,15]];
 const out=[];
 for(const [n,k] of plan){
   const list=[]; const t0=Date.now();
   for(let i=0;i<k*2;i++) list.push(i<2&&n===5?gen2(n,0):gen2(n,n<=5?0:2));
   // choose k spread by difficulty: sort and take evenly
-  list.sort((a,b)=>a.level-b.level||a.score-b.score);
-  const step=list.length/k; const pick=[]; for(let i=0;i<k;i++) pick.push(list[Math.floor(i*step+step/2)]);
+  const pick=pickSpread(list,k);
   console.error(n, Date.now()-t0+'ms', pick.map(p=>p.level+':'+p.score).join(' '));
   out.push(...pick);
 }
-const A='ABCDEFGHIJ';
 const enc=out.map(p=>p.g.map(x=>A[x]).join('')+'|'+p.q.join(''));
 require('fs').writeFileSync(process.argv[2], JSON.stringify(enc));
+}
