@@ -86,8 +86,9 @@
   .st{
     aspect-ratio:1;border-radius:14px;border:2px solid #f0d6c2;background:#fff;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    font-size:18px;font-weight:700;padding:0;
+    font-size:18px;font-weight:700;padding:0;position:relative;
   }
+  .st.mid::after{content:'💾';position:absolute;top:-6px;right:-6px;font-size:14px;}
   .st .stars{font-size:11px;letter-spacing:1px;color:#ffb020;min-height:14px;}
   .st .stars i{font-style:normal;color:#e8d8cc;}
   .st.clear{background:#fff3c9;border-color:#ffd166;}
@@ -138,10 +139,10 @@
   @keyframes pulse{50%{transform:scale(.85)}}
   @keyframes hop{0%{transform:translateY(0)}100%{transform:translateY(-14%)}}
 
-  .tools{width:min(560px,100%);display:flex;gap:8px;justify-content:center;padding:12px 0 max(14px,env(safe-area-inset-bottom));}
+  .tools{width:min(560px,100%);display:flex;gap:6px;justify-content:center;padding:12px 0 max(14px,env(safe-area-inset-bottom));}
   .tool{
     flex:1;max-width:120px;border:2px solid #f0d6c2;background:#fff;border-radius:16px;
-    padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:12px;
+    padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;white-space:nowrap;
   }
   .tool .ic{font-size:20px;line-height:1.2;height:26px;display:flex;align-items:center;}
   .tool .ic svg{width:26px;height:26px;}
@@ -308,6 +309,7 @@
     <button class="tool" id="tMode"><span class="ic"><svg><use href="#xmark"/></svg></span><span id="tModeLabel">✕ モード</span></button>
     <button class="tool" id="tHint"><span class="ic">💡</span>ヒント</button>
     <button class="tool" id="tReset"><span class="ic">⌫</span>✕ を消す</button>
+    <button class="tool" id="tSave"><span class="ic">💾</span>セーブ</button>
   </div>
 </section>
 
@@ -552,6 +554,14 @@ function accHref(){ return '#acc-' + (ACCS.some(a => a.id === save.acc && a.need
 function bunnyUse(){ return '<use href="#bunny"/><use href="' + accHref() + '"/>'; }
 function cleared(i){ return (save.stars[i] || 0) > 0; }
 function unlocked(i){ return i === 0 || cleared(i - 1) || cleared(i); }
+// とちゅうのセーブ（盤面・ニンジン・タイムなど）。1 ステージぶんだけ
+function writeMid(){
+  save.mid = {idx:G.idx, st:G.st, lives:G.lives, mistakes:G.mistakes, hints:G.hints,
+    elapsed:Math.floor((performance.now() - G.start) / 1000), history:G.history};
+  writeSave();
+}
+function clearMid(){ if (save.mid) { delete save.mid; writeSave(); } }
+function hasMid(){ return !!(save.mid && PUZZLES[save.mid.idx]); }
 function nextStage(){
   for (let i = 0; i < PUZZLES.length; i++) if (!cleared(i)) return i;
   return PUZZLES.length - 1;
@@ -616,6 +626,7 @@ function buildSelect(){
       if (cleared(i)) b.classList.add('clear');
       if (!unlocked(i)) b.classList.add('lock');
       if (i === nx && !cleared(i)) b.classList.add('next');
+      if (hasMid() && save.mid.idx === i) b.classList.add('mid');
       b.innerHTML = unlocked(i) ? `${i+1}<span class="stars">${cleared(i)?starHTML(save.stars[i]):''}</span>` : `🔒<span class="stars"></span>`;
       b.addEventListener('click', () => { if (unlocked(i)) startStage(i); });
       box.appendChild(b);
@@ -623,7 +634,7 @@ function buildSelect(){
     list.appendChild(box);
   }
   show('select');
-  const cur = list.querySelector('.next') || list.querySelector('.st');
+  const cur = list.querySelector('.mid') || list.querySelector('.next') || list.querySelector('.st');
   if (cur) cur.scrollIntoView({block:'center'});
 }
 
@@ -642,12 +653,17 @@ function startStage(i){
   G.st = [...r].map(ch => ch === ch.toUpperCase() ? 0 : 3); // 0 なし / 1 ✕ / 2 うさぎ / 3 いわ
   G.lives = 3; G.mistakes = 0; G.hints = 0; G.history = []; G.done = false;
   G.elapsed = 0; G.start = performance.now();
+  const mid = hasMid() && save.mid.idx === i && save.mid.st.length === n*n ? save.mid : null;
+  if (mid) {
+    G.st = mid.st.slice(); G.lives = mid.lives; G.mistakes = mid.mistakes; G.hints = mid.hints;
+    G.history = mid.history || []; G.start = performance.now() - mid.elapsed * 1000;
+  }
   $('gTitle').textContent = `ステージ ${i+1}`;
-  setMsg(i === 0 ? 'ダブルタップでうさぎをおこう'
+  if (mid) setMsg('セーブしたところから つづけるよ'); else setMsg(i === 0 ? 'ダブルタップでうさぎをおこう'
     : i === 100 ? 'いわのマスには うさぎをおけないよ。✕ とおなじ'
     : `${n}×${n}　うさぎは ${n} わ`);
   buildBoard();
-  for (let k = 0; k < n*n; k++) if (G.st[k] === 3) render(k);
+  for (let k = 0; k < n*n; k++) if (G.st[k]) render(k);
   drawLives();
   clearInterval(G.timerId);
   G.timerId = setInterval(tick, 500);
@@ -772,6 +788,7 @@ function placeBunny(i){
     drawLives();
     if (G.lives <= 0) {
       G.done = true;
+      if (hasMid() && save.mid.idx === G.idx) clearMid();
       setMsg('');
       setTimeout(() => { sfx.over(); $('mOver').classList.remove('hidden'); }, 500);
     } else {
@@ -793,6 +810,7 @@ function placeBunny(i){
 
 function win(){
   G.done = true;
+  if (hasMid() && save.mid.idx === G.idx) delete save.mid;
   clearInterval(G.timerId);
   const sec = Math.floor((performance.now() - G.start) / 1000);
   const stars = G.mistakes === 0 && G.hints === 0 ? 3 : (G.mistakes + G.hints <= 1 ? 2 : 1);
@@ -997,8 +1015,15 @@ $('tReset').addEventListener('click', () => {
   if (batch.length) { G.history.push(batch); setMsg('✕ をぜんぶ消したよ（もどすで元にもどせる）'); }
 });
 
+$('tSave').addEventListener('click', () => {
+  if (G.done) return;
+  const other = hasMid() && save.mid.idx !== G.idx ? save.mid.idx : -1;
+  writeMid();
+  sfx.x();
+  setMsg(other >= 0 ? `セーブしたよ（ステージ ${other+1} のセーブはうわがき）` : 'セーブしたよ');
+});
 // ---------- ボタン ----------
-$('btnPlay').addEventListener('click', () => startStage(nextStage()));
+$('btnPlay').addEventListener('click', () => startStage(hasMid() ? save.mid.idx : nextStage()));
 $('btnSelect').addEventListener('click', buildSelect);
 $('selBack').addEventListener('click', () => show('title'));
 $('gBack').addEventListener('click', () => { clearInterval(G.timerId); buildSelect(); });
@@ -1070,7 +1095,8 @@ function confetti(){
 
 applyAcc();
 show('title');
-if (Object.keys(save.stars).length) $('btnPlay').textContent = `つづきから（ステージ ${nextStage()+1}）`;
+if (hasMid()) $('btnPlay').textContent = `つづきから（ステージ ${save.mid.idx+1}・セーブ）`;
+else if (Object.keys(save.stars).length) $('btnPlay').textContent = `つづきから（ステージ ${nextStage()+1}）`;
 </script>
 </body>
 </html>
