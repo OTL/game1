@@ -6,6 +6,12 @@
 
 依存ライブラリなし。`index.html` をブラウザで開くだけで遊べます。
 
+## 言語（日本語 / English）
+
+ブラウザの言語設定で自動的に切りかわります。日本語のとき日本語版、それ以外は英語版（1 in a Million）になります。タイトル画面左上の「日本語 / English」ボタンや、URL の `?lang=ja` / `?lang=en` でも切りかえられ、選んだ言語はこのブラウザに保存されます。
+
+英語版では、名前はローマ字、お金はドル表示（日本語版は円表示）です。できごと・年表・大学名・会社名などはすべて英訳しています。
+
 ## 見た目
 
 原作『80億分の1』（https://1in8b.life/ja/）の画面に寄せています。
@@ -50,3 +56,9 @@
 - **できごと**：1961 年のユニメートから 2026 年の Unitree 上場までの年表と、2027 年以降は架空の予測。毎年のできごと（約 380 種、うちロボットの種類べつ 65 種）は業界あるあるの創作
 
 数字は公開データからの大まかな推計で、正確な統計ではありません。
+
+---
+
+## English
+
+**1 in a Million** — a parody of the life simulator *1 in 8 Billion*. Enter university as one of the world's ~1 million robotics engineers and live one life through to retirement. Your country and university are drawn from statistics; pick the kind of robot you build, make the big decisions (grad school, jobs, startups, going home), and watch your salary, assets, robot models and units sold change year by year. The language is chosen automatically from your browser settings (`?lang=en` / `?lang=ja` to switch).

@@ -80,6 +80,9 @@
   .hero{margin:-16px -16px 0;}
   .hero{position:relative;}
   .hero img{width:100%;height:auto;display:block;}
+  .langSw{position:absolute;top:10px;left:10px;display:flex;background:var(--card);border:1px solid var(--rule);border-radius:999px;padding:3px;box-shadow:var(--shadow);}
+  .langSw button{border:none;background:transparent;border-radius:999px;padding:5px 12px;font-size:13px;color:var(--ink2);}
+  .langSw button[aria-pressed="true"]{background:var(--ink);color:var(--paper);font-weight:700;}
   .themeBtn{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--rule);background:var(--card);font-size:18px;line-height:1;color:var(--ink);box-shadow:var(--shadow);}
   .meta{color:var(--stamp);font-family:var(--f-mono);font-size:12px;margin:14px 0 2px;}
   .logo{font-family:var(--f-display);font-weight:800;font-size:clamp(46px,14vw,72px);line-height:1.1;margin:0 0 14px;letter-spacing:-.01em;}
@@ -245,8 +248,8 @@
 
 <!-- ===== タイトル ===== -->
 <section id="title" class="wrap">
-  <div class="hero"><img id="titleScene" class="px" alt="キャンパスにならぶ 8 種類のロボットのピクセルアート"><button class="themeBtn" id="themeBtn" aria-label="明るい色と暗い色を切りかえる"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg></button></div>
-  <p class="meta">v1.3 · 無料のロボットエンジニア人生シミュレーション · 24か国の推計にもとづく</p>
+  <div class="hero"><img id="titleScene" class="px" alt="キャンパスにならぶ 8 種類のロボットのピクセルアート"><div class="langSw" id="langSw"><button data-lang="ja">日本語</button><button data-lang="en">English</button></div><button class="themeBtn" id="themeBtn" aria-label="明るい色と暗い色を切りかえる"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg></button></div>
+  <p class="meta">v1.4 · 無料のロボットエンジニア人生シミュレーション · 24か国の推計にもとづく</p>
   <h1 class="logo">100万分の<em>1</em></h1>
   <p class="lead">世界には、およそ100万人のロボットエンジニアがいます。そのひとりとして大学に入学し、たった一度のエンジニア人生を定年まで生きてみます。どの国の、どの大学に入るかは選べません。</p>
   <div class="counter"><b id="cSold">0</b><span>このページを開いてから、世界で売れたロボット</span></div>
@@ -374,6 +377,20 @@
 
 <script>
 'use strict';
+/* =========================================================
+   言語（ブラウザの言語で自動。?lang=ja / ?lang=en でも切りかえ）
+   ========================================================= */
+const LANG = (()=>{
+  if(typeof FORCE_LANG!=='undefined') return FORCE_LANG;
+  try{
+    const q=new URLSearchParams(location.search).get('lang');
+    if(q==='ja'||q==='en'){ localStorage.setItem('robolife.lang',q); return q; }
+    const v=localStorage.getItem('robolife.lang'); if(v==='ja'||v==='en') return v;
+  }catch(e){}
+  try{ const l=(navigator.languages&&navigator.languages[0])||navigator.language||''; return /^ja/i.test(l)?'ja':'en'; }catch(e){ return 'ja'; }
+})();
+const EN = LANG==='en';
+const T = (ja,en)=>EN?en:ja;
 /* =========================================================
    データ（推計）
    ========================================================= */
@@ -517,6 +534,41 @@ const NAMES = {
   PK:{s:['カーン','アフマド','フセイン'],m:['ビラル','ハムザ','ウスマン'],f:['アイシャ','ザイナブ','サナ']},
 };
 NAMES.CA = NAMES.US; NAMES.AU = NAMES.GB;
+// 英語版の名前（ローマ字）
+const NAMES_EN = {
+  JP:{s:['Sato','Suzuki','Takahashi','Tanaka','Ito','Watanabe','Yamamoto','Nakamura','Kobayashi','Kato','Yoshida','Yamada'],m:['Shota','Daisuke','Takuya','Kenta','Yuto','Makoto','Koji','Ryo','Ren','Yamato','Wataru','Takashi'],f:['Misaki','Aya','Hina','Yumi','Yui','Mao','Ai','Sakura','Aoi','Megumi']},
+  CN:{s:['Wang','Li','Zhang','Liu','Chen','Yang','Zhao','Huang','Zhou','Wu','Sun','Hu'],m:['Haoran','Yuxuan','Junjie','Zihao','Wei','Qiang','Lei','Ming','Zhiyuan','Bowen'],f:['Xinyi','Zixuan','Yutong','Siyu','Jing','Li','Jiaqi','Fang']},
+  KR:{s:['Kim','Lee','Park','Choi','Jung','Kang','Cho','Yoon'],m:['Minjun','Jihoon','Hyunwoo','Donghyun','Seongmin','Junho'],f:['Jiwoo','Seoyeon','Minji','Haeun','Sua','Yuna']},
+  TW:{s:['Chen','Lin','Huang','Chang','Lee','Wang','Wu','Liu'],m:['Kuan-yu','Cheng-en','Chia-hao','Chih-ming','Chien-hung'],f:['Yi-chun','Ya-ting','Chia-ying','Shih-han','Hsin-yu']},
+  HK:{s:['Chan','Lee','Wong','Cheung','Leung','Ho'],m:['Tsz-hin','Ka-lok','Chun-kit','Cheuk-yin'],f:['Hoi-lam','Wing-kei','Hiu-tung','Ka-yan']},
+  US:{s:['Smith','Johnson','Brown','Miller','Davis','Wilson','Moore','Taylor','Anderson','Thomas'],m:['James','Michael','John','David','Chris','Ryan','Tyler','Kevin'],f:['Emily','Sarah','Jessica','Ashley','Lauren','Megan','Kate']},
+  GB:{s:['Smith','Jones','Williams','Taylor','Evans','Davies'],m:['Oliver','Harry','Jack','Tom','George'],f:['Emily','Sophie','Charlotte','Lucy','Amy']},
+  DE:{s:['Müller','Schmidt','Schneider','Fischer','Weber','Meyer','Wagner','Becker'],m:['Lukas','Jonas','Felix','Max','Tobias','Stefan'],f:['Anna','Lena','Julia','Laura','Sarah','Katharina']},
+  FR:{s:['Martin','Bernard','Dubois','Thomas','Robert','Petit'],m:['Lucas','Hugo','Thomas','Antoine','Nicolas'],f:['Camille','Léa','Manon','Chloé','Julie']},
+  IT:{s:['Rossi','Russo','Ferrari','Esposito','Bianchi','Romano'],m:['Marco','Luca','Alessandro','Lorenzo','Matteo'],f:['Giulia','Chiara','Francesca','Sara','Martina']},
+  ES:{s:['García','Rodríguez','Martínez','López','Sánchez'],m:['Pablo','Alejandro','Javier','Daniel'],f:['Lucía','María','Paula','Laura']},
+  IN:{s:['Sharma','Patel','Singh','Kumar','Gupta','Reddy','Iyer','Nair'],m:['Arjun','Rahul','Vikram','Aditya','Rohan','Karan'],f:['Priya','Ananya','Divya','Sneha','Neha','Kavya']},
+  CH:{s:['Müller','Meier','Schmid','Keller','Huber','Russo'],m:['Luca','Noah','David','Marco'],f:['Laura','Sara','Lea','Nina']},
+  NL:{s:['de Jong','Jansen','de Vries','van Dijk','Bakker'],m:['Daan','Lars','Tim','Bram'],f:['Emma','Sanne','Lisa','Fleur']},
+  DK:{s:['Nielsen','Jensen','Hansen','Pedersen'],m:['Magnus','Rasmus','Frederik'],f:['Ida','Freja','Mathilde']},
+  SE:{s:['Andersson','Johansson','Karlsson','Nilsson'],m:['Erik','Oskar','Gustav'],f:['Elsa','Astrid','Linnea']},
+  IL:{s:['Cohen','Levi','Mizrahi','Peretz'],m:['Noam','Itai','Yonatan'],f:['Noa','Tamar','Maya']},
+  MX:{s:['Hernández','García','López','Martínez'],m:['Diego','Luis','Carlos','José'],f:['Valeria','Daniela','Fernanda']},
+  BR:{s:['Silva','Santos','Oliveira','Souza'],m:['Lucas','Gabriel','Mateus'],f:['Júlia','Beatriz','Larissa']},
+  AE:{s:['Al Hashimi','Al Mansouri','Al Zaabi'],m:['Ahmed','Khalifa','Omar'],f:['Fatima','Maryam','Noura']},
+  SG:{s:['Tan','Lim','Lee','Ng','Wong'],m:['Wei Jie','Jun Hao','Darryl'],f:['Hui Min','Jia Yi','Rachel']},
+  CZ:{s:['Novák','Svoboda','Dvořák','Černý'],m:['Jan','Tomáš','Jakub'],f:['Tereza','Eliška','Kateřina']},
+  IR:{s:['Hosseini','Ahmadi','Mohammadi','Rahmani'],m:['Ali','Reza','Mohammad','Amir'],f:['Sara','Maryam','Niloufar']},
+  TR:{s:['Yılmaz','Kaya','Demir','Çelik'],m:['Mehmet','Emre','Burak'],f:['Elif','Zeynep','Merve']},
+  VN:{s:['Nguyen','Tran','Le','Pham'],m:['Minh','Hung','Duc'],f:['Linh','Phuong','Thuy']},
+  ID:{s:['Pratama','Saputra','Wijaya'],m:['Adi','Rizki','Bayu'],f:['Putri','Dewi','Siti']},
+  MY:{s:['Lim','Abdullah','Tan'],m:['Afiq','Jun Wei','Aiman'],f:['Nurul','Mei Ling','Aisyah']},
+  GR:{s:['Papadopoulos','Georgiou','Nikolaou'],m:['Nikos','Giannis','Dimitris'],f:['Maria','Eleni','Katerina']},
+  EG:{s:['Hassan','Mohamed','Ibrahim'],m:['Ahmed','Omar','Youssef'],f:['Nour','Yasmin','Salma']},
+  PK:{s:['Khan','Ahmad','Hussain'],m:['Bilal','Hamza','Usman'],f:['Ayesha','Zainab','Sana']},
+};
+NAMES_EN.CA = NAMES_EN.US; NAMES_EN.AU = NAMES_EN.GB;
+
 const ASIAN_ORDER = {JP:1,CN:1,TW:1,HK:1}; // 姓→名の順で、間をつめる
 
 // 世界のできごと
@@ -588,7 +640,8 @@ const cInfo = c=>COUNTRIES[c]||HOMES[c];
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function uniName(raw, y){ const p=raw.split('|'); if(p.length===3) return y>=+p[1]?p[2]:p[0]; return raw; }
 function yen(usd){ const man=Math.round(usd*150/10000), a=Math.abs(man), sg=man<0?'−':''; return a>=10000?sg+(a/10000).toFixed(1)+'億円':sg+a.toLocaleString()+'万円'; }
-function usd(v){ return '$'+Math.round(v).toLocaleString('en-US'); }
+function usd(v){ const a=Math.abs(v), sg=v<0?'−':''; if(a>=1e6) return sg+'$'+(a/1e6).toFixed(a>=1e7?0:1)+'M'; if(a>=1e3) return sg+'$'+Math.round(a/1e3)+'k'; return sg+'$'+Math.round(a); }
+function money(v){ return EN ? usd(v) : yen(v); }
 
 /* =========================================================
    人生の生成
@@ -598,7 +651,8 @@ function pickCountry(y){ return wpick(Object.keys(COUNTRIES), c=>countryWeight(c
 function countryProb(c,y){ const t=Object.keys(COUNTRIES).reduce((a,k)=>a+countryWeight(k,y),0); return countryWeight(c,y)/t; }
 
 function makeName(home, g){
-  const N = NAMES[home]||NAMES.US;
+  const N = (EN ? (NAMES_EN[home]||NAMES_EN.US) : (NAMES[home]||NAMES.US));
+  if(EN){ const s=pick(N.s), f=pick(g==='f'?N.f:N.m); return (home==='CN'||home==='TW'||home==='HK'||home==='KR'||home==='VN')? s+' '+f : f+' '+s; }
   const s=pick(N.s), f=pick(g==='f'?N.f:N.m);
   if(home==='KR') return s+'・'+f;
   return ASIAN_ORDER[home] ? s+' '+f : f+'・'+s;
@@ -651,7 +705,7 @@ function newLife(entryYear){
   const b0 = baseSal(c,y);
   s.assets = b0*({'ふつうの家庭':.05,'ゆたかな家庭':.8,'きびしい家計':-.15,'エンジニア一家':.25})[fam];
   s.rt = pickRType(y);
-  pushPath(s, s.uni+'（'+y+'年入学）', 'uni'+tier);
+  pushPath(s, T(s.uni+'（'+y+'年入学）', s.uni+' (entered '+y+')'), 'uni'+tier);
   return s;
 }
 
@@ -754,9 +808,10 @@ function placeIcon(s){
 function dSwitch(s){
   const opts = RT_KEYS.filter(k=>k!==s.rt && rtOK(k,s.year));
   const t2 = wpick(opts, k=>kf(RTYPES[k].w,s.year));
-  return {decide:{title:'新しいロボットへの挑戦', text:'新しい事業で、'+RTYPES[t2].n+'をつくることになった。そっちにうつる？', rt:t2, opts:[
-    {l:RTYPES[t2].n+'にうつる', d:'年収 約'+yen(calcSal(s))+' のまま。技術は少しだけ下がる（新しい分野なので）', p:35, run:s=>{s.rt=t2;s.st.sk=clamp(s.st.sk-4,0,100);pushPath(s,RTYPES[t2].n+'に転向','rt:'+t2);return RTYPES[t2].n+'の開発にうつった';}},
-    {l:RTYPES[s.rt].n+'をつづける', d:'年収 約'+yen(calcSal(s))+' のまま。いまのロボットをきわめる', p:65, run:s=>{s.st.sk=clamp(s.st.sk+1,0,100);return RTYPES[s.rt].n+'をつづけることにした';}},
+  const n2=RTYPES[t2].n, n1=RTYPES[s.rt].n, keep=payKeep(s);
+  return {decide:{title:T('新しいロボットへの挑戦','A new kind of robot'), text:T('新しい事業で、'+n2+'をつくることになった。そっちにうつる？','A new business will build a '+n2.toLowerCase()+'. Move over to it?'), rt:t2, opts:[
+    {l:T(n2+'にうつる','Switch to '+n2), d:T(keep+'。技術は少しだけ下がる（新しい分野なので）',keep+'. Skill drops a little (new field).'), p:35, run:s=>{s.rt=t2;s.st.sk=clamp(s.st.sk-4,0,100);pushPath(s,T(n2+'に転向','Switched to '+n2),'rt:'+t2);return T(n2+'の開発にうつった','Moved to '+n2+' development');}},
+    {l:T(n1+'をつづける','Stay with '+n1), d:T(keep+'。いまのロボットをきわめる',keep+'. Master the robot you know.'), p:65, run:s=>{s.st.sk=clamp(s.st.sk+1,0,100);return T(n1+'をつづけることにした','Decided to stay with '+n1);}},
   ]}};
 }
 
@@ -769,35 +824,37 @@ function pickCompany(s, c, types, avoid){
   if(avoid) list = list.filter(x=>x[0]!==avoid);
   if(!list.length) list = companiesAt(c, s.year);
   if(!list.length) list = companiesAt('US', s.year, ['si','big']);
-  if(!list.length) return ['地元の工場',1900,0,'si',1];
-  return wpick(list, x=>{ const rts=compRT(x[0]); return x[4]*(x[3]==='si'?(s.tier===1?.3:1):1)*(x[3]==='lab'&&s.deg==='博士'?3:1)*((x[3]==='start')&&s.year>=2023?1.6:1)*(rts&&s.rt?(rts.includes(s.rt)?4:.4):1); });
+  if(!list.length) return [T('地元の工場','A local factory'),1900,0,'si',1];
+  return wpick(list, x=>{ const rts=x[5]!==undefined?x[5]:compRT(x[0]); return x[4]*(x[3]==='si'?(s.tier===1?.3:1):1)*(x[3]==='lab'&&s.deg==='博士'?3:1)*((x[3]==='start')&&s.year>=2023?1.6:1)*(rts&&s.rt?(rts.includes(s.rt)?4:.4):1); });
 }
 function setJob(s, comp, c, pm){
   const same = s.job && s.job.n===comp[0];
   s.stage='work'; s.jc=c||s.jc;
   s.job={n:comp[0], t:comp[3], until:comp[2], since:s.year, pm:pm||1};
-  if(!same) pushPath(s, comp[0]+(s.jc!==s.c && s.jc!==s.home?'（'+COUNTRIES[s.jc].n+'）':''), CT_ICON[comp[3]]);
+  if(!same) pushPath(s, comp[0]+(s.jc!==s.c && s.jc!==s.home?T('（'+COUNTRIES[s.jc].n+'）',' ('+COUNTRIES[s.jc].n+')'):''), CT_ICON[comp[3]]);
 }
 function abroadCountry(s){
   return wpick(['US','DE','CH','JP','SG','CN','GB','CA','KR','NL','DK'].filter(x=>x!==s.jc), k=>({US:10,DE:4,CH:3,JP:2,SG:2,CN:3,GB:2,CA:2,KR:1,NL:1,DK:1})[k]);
 }
 function startupName(){
+  if(EN) return pick(['Neo','Atom','Sora','Mirai','Tetsu','Halo','Kai','Servo','Kinetic','Tensor','Gear','Atlas','Nova','Root'])+' '+pick(['Robotics','Dynamics','Automation','Labs','AI','Mechanics','Works']);
   return pick(['ネオ','アトム','ソラ','ミライ','テツ','ハル','カイ','Servo','Kinetic','Tensor','Gear','Atlas','Nova','Root'])+
     pick(['ロボティクス','ダイナミクス','オートメーション',' Labs',' AI','メカ','ワークス']);
 }
 
 /* ---------- ラベル ---------- */
+const RANKS = ()=>T(['助教','准教授','教授'],['Assistant Professor','Associate Professor','Professor']);
 function stageLabel(s){
   switch(s.stage){
-    case 'ug': return s.uni+' '+s.sy+'年生';
-    case 'ms': return s.uni+' 修士'+s.sy+'年';
-    case 'phd': return s.uni+' 博士'+s.sy+'年';
-    case 'postdoc': return s.uni+' ポスドク';
-    case 'prof': return s.uni+' '+['助教','准教授','教授'][s.rank];
-    case 'work': return s.job.n+'（'+(s.flags.mgr?'部長':s.flags.expert?'エキスパート':s.exp<3?'新人':s.exp<10?'エンジニア':'シニアエンジニア')+'）';
-    case 'startup': return s.own+'（創業者）';
-    case 'left': return 'ロボット業界の外';
-    case 'retired': return '引退';
+    case 'ug': return T(s.uni+' '+s.sy+'年生', s.uni+', year '+s.sy);
+    case 'ms': return T(s.uni+' 修士'+s.sy+'年', s.uni+', master\'s year '+s.sy);
+    case 'phd': return T(s.uni+' 博士'+s.sy+'年', s.uni+', PhD year '+s.sy);
+    case 'postdoc': return T(s.uni+' ポスドク', s.uni+', postdoc');
+    case 'prof': return s.uni+' '+RANKS()[s.rank];
+    case 'work': { const r = s.flags.mgr?T('部長','Director'):s.flags.expert?T('エキスパート','Principal Engineer'):s.exp<3?T('新人','Junior Engineer'):s.exp<10?T('エンジニア','Engineer'):T('シニアエンジニア','Senior Engineer'); return T(s.job.n+'（'+r+'）', r+', '+s.job.n); }
+    case 'startup': return T(s.own+'（創業者）', 'Founder, '+s.own);
+    case 'left': return T('ロボット業界の外','Outside the robot industry');
+    case 'retired': return T('引退','Retired');
   }
   return '';
 }
@@ -807,35 +864,35 @@ function stageLabel(s){
    ========================================================= */
 function conf(s){
   const y=s.year, l=[];
-  if(y<1984) l.push('国内のロボット学会'); else { l.push('ICRA'); }
+  if(y<1984) l.push(T('国内のロボット学会','a national robotics conference')); else { l.push('ICRA'); }
   if(y>=1988) l.push('IROS'); if(y>=2005) l.push('RSS'); if(y>=2017) l.push('CoRL');
   return pick(l);
 }
 function tool(s){
   const y=s.year;
-  if(y<1985) return 'アセンブラ';
-  if(y<1998) return 'C 言語';
-  if(y<2010) return 'MATLAB と C++';
+  if(y<1985) return T('アセンブラ','the assembler');
+  if(y<1998) return T('C 言語','the C compiler');
+  if(y<2010) return T('MATLAB と C++','MATLAB and C++');
   if(y<2018) return 'ROS';
   if(y<2023) return 'ROS 2';
-  return 'ROS 2 と Python';
+  return T('ROS 2 と Python','ROS 2 and Python');
 }
 function contest(s){
   const y=s.year, c=s.c;
   const l=[];
-  if(c==='JP' && y>=1991) l.push('NHK 学生ロボコン');
-  if(c==='JP' && y<1991) l.push('ロボット研究会');
+  if(c==='JP' && y>=1991) l.push(T('NHK 学生ロボコン','NHK Student Robocon'));
+  if(c==='JP' && y<1991) l.push(T('ロボット研究会','robotics club'));
   if(c==='CN' && y>=2015) l.push('RoboMaster');
-  if(['CN','KR','IN','TW','HK','SG'].includes(c) && y>=2002) l.push('ABU ロボコン');
+  if(['CN','KR','IN','TW','HK','SG'].includes(c) && y>=2002) l.push(T('ABU ロボコン','ABU Robocon'));
   if(y>=1997) l.push('RoboCup');
-  if(['US','CA'].includes(c) && y>=1992) l.push('FIRST ロボットの高校生チームのメンター');
-  if(['DE','GB','NL','CH','IT','ES','CZ','SE','DK'].includes(c) && y>=2017) l.push('学生フォーミュラ（自動運転部門）');
+  if(['US','CA'].includes(c) && y>=1992) l.push(T('FIRST ロボットの高校生チームのメンター','FIRST Robotics mentoring'));
+  if(['DE','GB','NL','CH','IT','ES','CZ','SE','DK'].includes(c) && y>=2017) l.push(T('学生フォーミュラ（自動運転部門）','Formula Student Driverless'));
   if(['FR','DE','CH','CZ'].includes(c) && y>=1998) l.push('Eurobot');
-  if(!l.length) l.push('ロボットサークル');
+  if(!l.length) l.push(T('ロボットサークル','robotics club'));
   return pick(l);
 }
 function expo(s){
-  return ({JP:'国際ロボット展',DE:'automatica',CN:'世界ロボット大会（北京）',US:s.year>=1990?'CES':'工作機械見本市',KR:'ロボワールド'})[s.jc]||'展示会';
+  return ({JP:T('国際ロボット展','iREX'),DE:'automatica',CN:T('世界ロボット大会（北京）','World Robot Conference (Beijing)'),US:s.year>=1990?'CES':T('工作機械見本市','a machine tool show'),KR:T('ロボワールド','RoboWorld')})[s.jc]||T('展示会','a trade show');
 }
 let THEME_KW = null; // 今日のテーマ（このことばをふくむできごとが出やすい）
 const LAB=['ms','phd','postdoc','prof'];
@@ -844,7 +901,7 @@ const ALL=['ug','ms','phd','postdoc','work','startup','prof'];
 // st=ステージ, y=[開始,終了], c=国, f=条件, e={sk,he,ha,ne}, r=ロボット数, p=論文, k=見た目
 const EVENTS = [
   // ---- 学部
-  {st:['ug'],t:s=>contest(s)+'のチームに入った。部室に住みはじめる',e:{sk:4,he:-2,ne:3},once:'club',w:3,f:s=>s.sy<=2},
+  {st:['ug'],t:s=>T(contest(s)+'のチームに入った。部室に住みはじめる','Joined the '+contest(s)+' team. Practically moved into the club room'),e:{sk:4,he:-2,ne:3},once:'club',w:3,f:s=>s.sy<=2},
   {st:['ug'],t:'はんだごてで指をやけどした。ロボット屋の勲章だ',e:{sk:1,he:-1}},
   {st:['ug'],t:'線形代数の単位をギリギリでとった',e:{ha:1}},
   {st:['ug'],t:'ライントレーサーがコースアウトして、先生の足に激突した',e:{sk:2},r:1},
@@ -854,9 +911,9 @@ const EVENTS = [
   {st:['ug'],t:'研究室配属ガチャで、第一志望に入れた！',e:{ha:6,sk:2},f:s=>s.sy===4,once:'lab',k:'good',w:2},
   {st:['ug'],t:'研究室配属ガチャで、第三志望に回された。そこで一生の師に出会う…かもしれない',e:{ha:-4},f:s=>s.sy===4,once:'lab',w:1.5},
   {st:['ug','ms'],t:'発表の前日にロボットが動かなくなった。原因はコネクタの半ざし',e:{sk:2,he:-2},f:s=>s.sy>=2},
-  {st:['ug'],t:s=>s.c==='JP'?'親せきに「ロボットやってるの？ ガンダム作れる？」と聞かれた':'親せきに「ロボットやってるの？ トランスフォーマー作れる？」と聞かれた',e:{}},
-  {st:['ug'],t:s=>contest(s)+'の本番でロボットが動かず、会場がしずまりかえった',e:{ha:-5,sk:2},f:s=>s.flags.club},
-  {st:['ug'],t:s=>contest(s)+'で優勝した！ 部室で朝までさわいだ',e:{ha:10,ne:5,sk:3},f:s=>s.flags.club,w:.35,k:'big',r:1},
+  {st:['ug'],t:s=>s.c==='JP'?T('親せきに「ロボットやってるの？ ガンダム作れる？」と聞かれた','A relative asked, “You do robots? Can you build a Gundam?”'):T('親せきに「ロボットやってるの？ トランスフォーマー作れる？」と聞かれた','A relative asked, “You do robots? Can you build a Transformer?”'),e:{}},
+  {st:['ug'],t:s=>T(contest(s)+'の本番でロボットが動かず、会場がしずまりかえった','At the '+contest(s)+' finals the robot did not move. The hall went silent'),e:{ha:-5,sk:2},f:s=>s.flags.club},
+  {st:['ug'],t:s=>T(contest(s)+'で優勝した！ 部室で朝までさわいだ','Won the '+contest(s)+'! Partied in the club room till dawn'),e:{ha:10,ne:5,sk:3},f:s=>s.flags.club,w:.35,k:'big',r:1},
   {st:['ug','ms'],t:'モーターを逆につないだら煙が出た。いいにおいがした',e:{sk:1}},
   {st:['ug'],t:'バイト代がすべてサーボモーターに消えた',e:{ha:2,sk:1},m:-.01},
   {st:['ug','ms'],y:[2010,9999],t:'ROS のチュートリアルで、画面の中のカメを動かした',e:{sk:2}},
@@ -864,12 +921,12 @@ const EVENTS = [
   {st:['ug','ms'],y:[2008,9999],t:'ハッカソンで徹夜した。できたのは動かないロボットと友だち',e:{ne:4,he:-2}},
   {st:['ug'],t:'就活しているほかの学部の友だちが、急に大人に見えた',e:{ha:-1},f:s=>s.sy===3},
   // ---- 研究室
-  {st:['ms','phd','postdoc'],y:[2008,9999],t:s=>tool(s)+'のアップデートで、きのうまで通っていたビルドが通らなくなった',e:{sk:1,ha:-3},w:2},
+  {st:['ms','phd','postdoc'],y:[2008,9999],t:s=>T(tool(s)+'のアップデートで、きのうまで通っていたビルドが通らなくなった','An update to '+tool(s)+' broke a build that worked yesterday'),e:{sk:1,ha:-3},w:2},
   {st:['ms','phd','postdoc','work','startup'],y:[1995,9999],t:'シミュレーションでは完ぺきに歩いた。実機は 3 歩で転んだ',e:{sk:3,ha:-2},w:2},
   {st:['ms','phd','postdoc','work'],t:'カメラのキャリブレーションだけで 1 週間がとけた',e:{sk:1,ha:-2}},
-  {st:['ms','phd','postdoc'],t:s=>conf(s)+'の締め切り前夜、研究室の電気が朝まで消えなかった',e:{he:-4,sk:2},w:2},
-  {st:['ms','phd','postdoc','prof'],t:s=>conf(s)+'に論文が通った！',e:{ha:7,ne:3},p:1,k:'good',w:2},
-  {st:['ms','phd','postdoc','prof'],t:s=>conf(s)+'にリジェクトされた。査読者 2 がきびしい',e:{ha:-5},w:1.5},
+  {st:['ms','phd','postdoc'],t:s=>T(conf(s)+'の締め切り前夜、研究室の電気が朝まで消えなかった','The night before the '+conf(s)+' deadline, the lab lights stayed on till morning'),e:{he:-4,sk:2},w:2},
+  {st:['ms','phd','postdoc','prof'],t:s=>T(conf(s)+'に論文が通った！','Got a paper accepted at '+conf(s)+'!'),e:{ha:7,ne:3},p:1,k:'good',w:2},
+  {st:['ms','phd','postdoc','prof'],t:s=>T(conf(s)+'にリジェクトされた。査読者 2 がきびしい','Rejected from '+conf(s)+'. Reviewer 2 was brutal'),e:{ha:-5},w:1.5},
   {st:['ms','phd','postdoc','work'],t:'実験中にロボットが壁に穴をあけた',e:{ha:-2,sk:1}},
   {st:['ms','phd','postdoc','work','startup'],y:[2005,9999],t:'リポバッテリーがパンパンにふくらんでいた。そっと耐火バッグに入れた',e:{}},
   {st:['ms','phd'],t:'指導教員が海外出張中で、1 か月つかまらない',e:{ha:-1}},
@@ -878,7 +935,7 @@ const EVENTS = [
   {st:['ms','phd'],y:[2010,2015],t:'Kinect を分解して研究に使った。みんなそうしていた',e:{sk:2}},
   {st:['ms','phd','postdoc','work','prof'],y:[2015,9999],t:'えらい人に「それ、深層学習でできない？」と言われた',e:{ha:-1}},
   {st:['ms','phd','postdoc','prof'],y:[2023,9999],t:'大規模言語モデルの登場で、研究テーマが半分消えた',e:{ha:-4,sk:2},once:'llm'},
-  {st:['ms','phd','postdoc','prof'],t:s=>conf(s)+'の発表で海外へ。時差ボケのまま英語で発表した',e:{ne:5,he:-1,sk:1}},
+  {st:['ms','phd','postdoc','prof'],t:s=>T(conf(s)+'の発表で海外へ。時差ボケのまま英語で発表した','Flew abroad to present at '+conf(s)+'. Gave the talk through jet lag'),e:{ne:5,he:-1,sk:1}},
   {st:['ms','phd','postdoc','work'],t:'なぞのノイズの原因は、アースがとれていないことだった',e:{sk:3}},
   {st:['ms','phd','postdoc','work','startup'],t:'ケーブルがロボットの関節にからまった。3 回目だ',e:{}},
   {st:['ms','phd','postdoc','prof'],t:'共同研究先の企業に「来年までに実用化を」と言われた',e:{ha:-1,ne:2}},
@@ -891,10 +948,10 @@ const EVENTS = [
   {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'客先でロボットの立ち上げ。工場の床で夜明けをむかえた',e:{sk:3,he:-3},r:ri.bind(null,5,30),w:2},
   {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'安全柵の中に入って、班長にめちゃくちゃ怒られた',e:{ha:-2,sk:1}},
   {st:['work','startup','prof'],t:'飲み会で「ロボットって人の仕事うばうんですか？」と聞かれた',e:{}},
-  {st:['work','startup'],t:s=>expo(s)+'でデモ。100 回中 99 回成功した。えらい人が見ていたのは、失敗した 1 回だった',e:{ha:-3,ne:4},w:1.5},
+  {st:['work','startup'],t:s=>T(expo(s)+'でデモ。100 回中 99 回成功した。えらい人が見ていたのは、失敗した 1 回だった','Demo at '+expo(s)+'. It worked 99 times out of 100. The VIP watched the one failure'),e:{ha:-3,ne:4},w:1.5},
   {st:['work'],f:s=>s.job.t!=='lab',t:'量産立ち上げ地獄。夢の中でも歩留まりを計算している',e:{he:-4,sk:3},r:ri.bind(null,10,60)},
   {st:['work'],y:[2022,9999],t:'上司に「テスラの Optimus みたいなの、うちでも作れない？」と言われた',e:{ha:-1}},
-  {st:['work','startup','prof','left'],t:s=>s.c==='JP'||s.home==='JP'?'子どもに「ドラえもんはいつできるの？」と聞かれた':'子どもに「ロボットの友だちはいつできるの？」と聞かれた',e:{ha:3},f:s=>s.kids>0},
+  {st:['work','startup','prof','left'],t:s=>s.c==='JP'||s.home==='JP'?T('子どもに「ドラえもんはいつできるの？」と聞かれた','Your kid asked, “When will Doraemon be ready?”'):T('子どもに「ロボットの友だちはいつできるの？」と聞かれた','Your kid asked, “When can I have a robot friend?”'),e:{ha:3},f:s=>s.kids>0},
   {st:['work','startup','ms','phd'],t:'ロボットを持ちあげて腰をやった',e:{he:-7},w:1.2},
   {st:['work','startup'],t:'深夜の倉庫でフィールドテスト。元気なのはロボットだけだった',e:{he:-2,sk:2},r:1},
   {st:['work'],t:'減速機が焼きついた。ハーモニックドライブにいのった',e:{sk:2}},
@@ -922,7 +979,7 @@ const EVENTS = [
   {st:['prof'],t:'学生の論文を、真夜中に赤ペンでまっかにした',e:{he:-2},p:1},
   {st:['prof'],t:'大型の研究費がとれた！',e:{ha:6,ne:3},k:'good',w:.8},
   {st:['prof'],t:'研究費の申請書を書くのに、研究よりも時間を使った',e:{ha:-3}},
-  {st:['prof'],t:s=>'学生チームが'+contest(s)+'で優勝した',e:{ha:6,ne:3},w:.5,k:'good'},
+  {st:['prof'],t:s=>T('学生チームが'+contest(s)+'で優勝した','Your student team won the '+contest(s)),e:{ha:6,ne:3},w:.5,k:'good'},
   {st:['prof'],f:s=>s.age>=50,t:'教え子が有名ロボット企業の CTO になった',e:{ha:6,ne:4},w:.5,k:'good'},
   {st:['prof'],t:'会議が多すぎて、ロボットにさわれない',e:{ha:-3}},
   {st:['prof'],t:'オープンキャンパスでロボットが子どもに大人気だった',e:{ha:3}},
@@ -1243,7 +1300,7 @@ const EVENTS = [
   {st:RS,rt:['surgical'],t:'承認がおりるまで、5 年かかった',e:{ha:-3}},
   {st:RS,rt:['surgical'],t:'病院で白衣を着て説明していたら、お医者さんにまちがわれた',e:{}},
   {st:RS,rt:['surgical'],t:'触覚を伝える研究をしていて、自分の手がしびれた',e:{}},
-  {st:['work','startup'],t:s=>'自分の関わった'+RTYPES[s.rt].n+'が、街で動いているのを見かけた',e:{ha:6},f:s=>s.sold>500,k:'good'},
+  {st:['work','startup'],t:s=>T('自分の関わった'+RTYPES[s.rt].n+'が、街で動いているのを見かけた','Spotted a '+RTYPES[s.rt].n.toLowerCase()+' you worked on, out in the world'),e:{ha:6},f:s=>s.sold>500,k:'good'},
 ];
 
 /* ---------- 選択 ---------- */
@@ -1255,19 +1312,21 @@ function pv(s, fn){ const t={...s, st:{...s.st}, flags:{...s.flags}, job:s.job?{
 function payNow(s){ return calcSal(s)*s.payF; }
 function payTo(s, fn){
   const a=calcSal(s), b=pv(s,fn);
-  if(!b) return '給料なし';
-  return a>0 ? '年収 約'+yen(a)+' → 約'+yen(b) : '年収 約'+yen(b);
+  if(!b) return T('給料なし','No salary');
+  return a>0 ? T('年収 約'+money(a)+' → 約'+money(b), 'Salary ~'+money(a)+' → ~'+money(b)) : T('年収 約'+money(b), 'Salary ~'+money(b));
 }
+function payKeep(s){ return T('年収 約'+money(calcSal(s))+' のまま', 'Salary stays ~'+money(calcSal(s))); }
+function joined(co, pay){ return T(co+'に就職した。初任給は年収 約'+money(pay), 'Joined '+co+'. Starting salary ~'+money(pay)); }
 
 function dAfterUG(s){
   const msP = COUNTRIES[s.c].ms;
   const co = pickCompany(s,s.c);
   const job = t=>{t.deg='学部卒';setJob(t,co,s.c);};
   const out = t=>{t.deg='学部卒';t.stage='left';};
-  return D('卒業後の進路', s.uni+'を卒業する。どうする？', [
-    {l:'修士に進む', d:'研究室でもう 2 年（給料なし）。ロボット企業の研究開発職につきやすくなる', p:msP*100, run:s=>{s.stage='ms';s.sy=0;s.deg='学部卒';return '修士課程に進んだ';}},
-    {l:co[0]+'に就職する', d:'初任給 '+payTo(s,job)+'。現場で手を動かしてロボットをつくる', p:(1-msP)*85, run:s=>{job(s);return co[0]+'に就職した。初任給は年収 約'+yen(calcSal(s));}},
-    {l:'ロボットと関係ない会社に就職する', d:payTo(s,out)+'。ここで人生のルートが大きく変わる', p:(1-msP)*15, run:s=>{out(s);pushPath(s,'ロボット以外の会社','office');return 'ロボットとは関係のない会社に就職した';}},
+  return D(T('卒業後の進路','After graduation'), T(s.uni+'を卒業する。どうする？','Graduating from '+s.uni+'. What next?'), [
+    {l:T('修士に進む','Go on to a master\'s'), d:T('研究室でもう 2 年（給料なし）。ロボット企業の研究開発職につきやすくなる','Two more years in the lab (no salary). Opens the door to R&D jobs.'), p:msP*100, run:s=>{s.stage='ms';s.sy=0;s.deg='学部卒';return T('修士課程に進んだ','Started a master\'s program');}},
+    {l:T(co[0]+'に就職する','Join '+co[0]), d:T('初任給 '+payTo(s,job)+'。現場で手を動かしてロボットをつくる','Starting '+payTo(s,job)+'. Build robots hands-on.'), p:(1-msP)*85, run:s=>{job(s);return joined(co[0],calcSal(s));}},
+    {l:T('ロボットと関係ない会社に就職する','Take a job outside robotics'), d:T(payTo(s,out)+'。ここで人生のルートが大きく変わる',payTo(s,out)+'. Your life takes a very different route.'), p:(1-msP)*15, run:s=>{out(s);pushPath(s,T('ロボット以外の会社','A non-robotics company'),'office');return T('ロボットとは関係のない会社に就職した','Took a job that has nothing to do with robots');}},
   ]);
 }
 function dAfterMS(s){
@@ -1277,13 +1336,13 @@ function dAfterMS(s){
   const job = t=>{t.deg='修士';setJob(t,co,s.c);};
   const phd = t=>{t.deg='修士';t.stage='phd';};
   const phdA = t=>{t.deg='修士';t.stage='phd';t.jc=abroad;};
-  return D('修士修了', '修士論文を出した。この先は？', [
-    {l:co[0]+'に就職する', d:'初任給 '+payTo(s,job)+'。研究開発職として採用される', p:(1-phdP)*90, run:s=>{job(s);return co[0]+'に就職した。初任給は年収 約'+yen(calcSal(s));}},
-    {l:'博士課程に進む', d:'給付 '+payTo(s,phd)+'。3〜6 年かけて博士号をめざす', p:phdP*100, run:s=>{phd(s);s.sy=0;return '博士課程に進んだ。もう後もどりはできない';}},
-    {l:COUNTRIES[abroad].n+'の大学で博士をとる', d:'給付 '+payTo(s,phdA)+'。海外に出る。人脈と英語が鍛えられる', p:phdP*30, run:s=>{
+  return D(T('修士修了','Master\'s done'), T('修士論文を出した。この先は？','Thesis submitted. What now?'), [
+    {l:T(co[0]+'に就職する','Join '+co[0]), d:T('初任給 '+payTo(s,job)+'。研究開発職として採用される','Starting '+payTo(s,job)+'. Hired into R&D.'), p:(1-phdP)*90, run:s=>{job(s);return joined(co[0],calcSal(s));}},
+    {l:T('博士課程に進む','Start a PhD'), d:T('給付 '+payTo(s,phd)+'。3〜6 年かけて博士号をめざす','Stipend: '+payTo(s,phd)+'. 3–6 years toward a doctorate.'), p:phdP*100, run:s=>{phd(s);s.sy=0;return T('博士課程に進んだ。もう後もどりはできない','Started a PhD. No turning back now');}},
+    {l:T(COUNTRIES[abroad].n+'の大学で博士をとる','Do a PhD in '+COUNTRIES[abroad].n), d:T('給付 '+payTo(s,phdA)+'。海外に出る。人脈と英語が鍛えられる','Stipend: '+payTo(s,phdA)+'. Go abroad and grow your network.'), p:phdP*30, run:s=>{
       phdA(s);s.sy=0;
       const u=wpick(UNIS[abroad].filter(x=>x[2]<=2),x=>x[1]); s.uni=uniName(u[0],s.year); s.tier=Math.min(s.tier,u[2]);
-      pushPath(s,s.uni+'（博士）','uni'+u[2]); s.st.ne=clamp(s.st.ne+6,0,100); return s.uni+'の博士課程に留学した';}},
+      pushPath(s,T(s.uni+'（博士）',s.uni+' (PhD)'),'uni'+u[2]); s.st.ne=clamp(s.st.ne+6,0,100); return T(s.uni+'の博士課程に留学した','Moved abroad for a PhD at '+s.uni);}},
   ]);
 }
 function dAfterPhD(s){
@@ -1292,10 +1351,12 @@ function dAfterPhD(s){
   const pd = t=>{t.deg='博士';t.stage='postdoc';};
   const j1 = t=>{t.deg='博士';setJob(t,co1,s.jc);};
   const j2 = t=>{t.deg='博士';setJob(t,co2,s.jc);};
-  return D('博士号をとった！', '博士論文「'+pick(['不整地における脚ロボットの','柔らかいグリッパによる','人とロボットの協調における','視覚と触覚を使った','学習ベースの','少ないデータでの'])+pick(['歩行制御','把持計画','動作生成','自己位置推定','遠隔操作','物体操作'])+'に関する研究」が通った。', [
-    {l:'大学に残る（ポスドク）', d:payTo(s,pd)+'。研究をつづける。いつか先生に。でも任期つき', p:35, run:s=>{pd(s);s.sy=0;pushPath(s,'ポスドク');return 'ポスドクになった';}},
-    {l:co1[0]+'の研究部門へ', d:payTo(s,j1)+'。ロボットの予算も大きい', p:50, run:s=>{j1(s);return co1[0]+'の研究部門に入った';}},
-    {l:co2[0]+'に飛びこむ', d:payTo(s,j2)+'。スタートアップ。うまくいけば株で大きく増える', p:15+(s.year>=2023?20:0), run:s=>{j2(s);return co2[0]+'に入った';}},
+  const th = EN ? pick(['Gait control','Grasp planning','Motion generation','Self-localization','Teleoperation','Object manipulation'])+' '+pick(['for legged robots on rough terrain','with soft grippers','in human-robot collaboration','using vision and touch','via learning','from little data'])
+               : pick(['不整地における脚ロボットの','柔らかいグリッパによる','人とロボットの協調における','視覚と触覚を使った','学習ベースの','少ないデータでの'])+pick(['歩行制御','把持計画','動作生成','自己位置推定','遠隔操作','物体操作']);
+  return D(T('博士号をとった！','You earned your PhD!'), T('博士論文「'+th+'に関する研究」が通った。','Your thesis, "'+th+'", was accepted.'), [
+    {l:T('大学に残る（ポスドク）','Stay in academia (postdoc)'), d:T(payTo(s,pd)+'。研究をつづける。いつか先生に。でも任期つき',payTo(s,pd)+'. Keep researching and aim for a faculty job. Fixed-term.'), p:35, run:s=>{pd(s);s.sy=0;pushPath(s,T('ポスドク','Postdoc'));return T('ポスドクになった','Became a postdoc');}},
+    {l:T(co1[0]+'の研究部門へ','R&D at '+co1[0]), d:T(payTo(s,j1)+'。ロボットの予算も大きい',payTo(s,j1)+'. Big robot budgets.'), p:50, run:s=>{j1(s);return T(co1[0]+'の研究部門に入った','Joined the R&D division of '+co1[0]);}},
+    {l:T(co2[0]+'に飛びこむ','Jump into '+co2[0]), d:T(payTo(s,j2)+'。スタートアップ。うまくいけば株で大きく増える',payTo(s,j2)+'. A startup — equity could pay off big.'), p:15+(s.year>=2023?20:0), run:s=>{j2(s);return T(co2[0]+'に入った','Joined '+co2[0]);}},
   ], 'big');
 }
 function dOffer(s){
@@ -1311,70 +1372,71 @@ function dOffer(s){
   const pm = clamp(cur*raise/nat, 1, 2);
   const move = t=>{setJob(t,co,c,pm); if(hot) t.flags.humanoid=true;};
   const up = Math.round((pv(s,move)/cur-1)*100);
-  return D('転職のさそい', (hot?'ヒューマノイドブームで、':'')+co[0]+(abroad?'（'+COUNTRIES[c].n+'）':'')+'から声がかかった。年収は '+(up>=0?up+'% アップ':-up+'% ダウン')+'の提示。', [
-    {l:'うつる', d:payTo(s,move)+'。'+(abroad?'海外に引っ越す':'新しい職場でやりなおす'), p:30, run:s=>{const old=s.job.n;move(s);s.st.ne=clamp(s.st.ne+4,0,100);return old+'をやめて、'+co[0]+'に転職した。年収は 約'+yen(calcSal(s));}},
-    {l:'いまの会社にのこる', d:'年収 約'+yen(cur)+' のまま。作りかけのロボットがある', p:65, run:s=>{s.st.ha=clamp(s.st.ha+1,0,100);return 'さそいをことわった。作りかけのロボットを完成させたい';}},
+  const where = co[0]+(abroad?T('（'+COUNTRIES[c].n+'）',' ('+COUNTRIES[c].n+')'):'');
+  return D(T('転職のさそい','A job offer'), T((hot?'ヒューマノイドブームで、':'')+where+'から声がかかった。年収は '+(up>=0?up+'% アップ':-up+'% ダウン')+'の提示。', (hot?'The humanoid boom brings a call from ':'A call from ')+where+'. They offer '+(up>=0?up+'% more':-up+'% less')+' salary.'), [
+    {l:T('うつる','Take it'), d:T(payTo(s,move)+'。'+(abroad?'海外に引っ越す':'新しい職場でやりなおす'),payTo(s,move)+'. '+(abroad?'Move abroad.':'A fresh start.')), p:30, run:s=>{const old=s.job.n;move(s);s.st.ne=clamp(s.st.ne+4,0,100);return T(old+'をやめて、'+co[0]+'に転職した。年収は 約'+money(calcSal(s)),'Left '+old+' for '+co[0]+'. Salary ~'+money(calcSal(s)));}},
+    {l:T('いまの会社にのこる','Stay where you are'), d:T('年収 約'+money(cur)+' のまま。作りかけのロボットがある','Salary stays ~'+money(cur)+'. There\'s a robot to finish.'), p:65, run:s=>{s.st.ha=clamp(s.st.ha+1,0,100);return T('さそいをことわった。作りかけのロボットを完成させたい','Turned it down. That half-built robot needs finishing');}},
   ]);
 }
 function dMgr(s){
   const m = t=>{t.flags.mgr=true;}, x = t=>{t.flags.expert=true;t.st.sk=clamp(t.st.sk+5,0,100);};
-  return D('昇進の話', '部長にならないか、と言われた。', [
-    {l:'マネージャーになる', d:payTo(s,m)+'。ロボットにさわる時間は減る', p:55, run:s=>{m(s);pushPath(s,'部長');return '部長になった。会議が 1 日 6 本になった';}},
-    {l:'技術一筋でいく', d:payTo(s,x)+'。エキスパート職として手を動かしつづける', p:45, run:s=>{x(s);return '技術一筋でいくことにした';}},
+  return D(T('昇進の話','A promotion'), T('部長にならないか、と言われた。','You\'re asked to become a director.'), [
+    {l:T('マネージャーになる','Become a manager'), d:T(payTo(s,m)+'。ロボットにさわる時間は減る',payTo(s,m)+'. Less time with robots.'), p:55, run:s=>{m(s);pushPath(s,T('部長','Director'));return T('部長になった。会議が 1 日 6 本になった','Became a director. Six meetings a day now');}},
+    {l:T('技術一筋でいく','Stay technical'), d:T(payTo(s,x)+'。エキスパート職として手を動かしつづける',payTo(s,x)+'. Keep building as a principal engineer.'), p:45, run:s=>{x(s);return T('技術一筋でいくことにした','Chose the technical track');}},
   ]);
 }
 function dFound(s){
   const f = t=>{t.stage='startup';t.flags.exitRich=false;};
-  return D('起業のチャンス', '仲間から「いっしょに会社を作らないか」とさそわれた。', [
-    {l:'起業する', d:payTo(s,f)+'（創業者の給料は安い）。うまくいけば株で大きく増える', p:30, run:s=>{f(s);s.own=startupName();s.sy=0;s.flags.founded=true;pushPath(s,s.own+'を創業','own');return s.own+'を創業した！ 自分の給料は 約'+yen(calcSal(s));}},
-    {l:'やめておく', d:'年収 約'+yen(calcSal(s))+' のまま。安定もだいじ', p:70, run:s=>'起業の話はことわった。少しだけ夜ねむれなかった'},
+  return D(T('起業のチャンス','A chance to start a company'), T('仲間から「いっしょに会社を作らないか」とさそわれた。','A friend asks: "Want to start a company together?"'), [
+    {l:T('起業する','Start it'), d:T(payTo(s,f)+'（創業者の給料は安い）。うまくいけば株で大きく増える',payTo(s,f)+' (founders pay themselves little). Equity could pay off big.'), p:30, run:s=>{f(s);s.own=startupName();s.sy=0;s.flags.founded=true;pushPath(s,T(s.own+'を創業','Founded '+s.own),'own');return T(s.own+'を創業した！ 自分の給料は 約'+money(calcSal(s)),'Founded '+s.own+'! Your own salary: ~'+money(calcSal(s)));}},
+    {l:T('やめておく','Pass'), d:T('年収 約'+money(calcSal(s))+' のまま。安定もだいじ','Salary stays ~'+money(calcSal(s))+'. Stability matters too.'), p:70, run:s=>T('起業の話はことわった。少しだけ夜ねむれなかった','Said no to the startup. Lost a little sleep over it')},
   ], 'big');
 }
 function dBurnout(s){
   const out = t=>{t.stage='left';};
-  return D('もう限界かも', '燃えつきてしまった。どうする？', [
-    {l:'休職して休む', d:'半年休む。今年の年収は半分（約'+yen(calcSal(s)*.5)+'）。健康と幸福がもどる', p:55, run:s=>{s.flags.burnout=false;s.payF=Math.min(s.payF,.5);s.st.he=clamp(s.st.he+18,0,100);s.st.ha=clamp(s.st.ha+15,0,100);s.st.sk=clamp(s.st.sk-3,0,100);return '半年休んだ。ロボットのことを少しずつ好きにもどれた';}},
-    {l:'ロボットの仕事をやめる', d:payTo(s,out)+'。ほかの業界にうつる', p:15, run:s=>{s.flags.burnout=false;out(s);pushPath(s,pick(['Web 業界','金融業界','実家の商売','IT コンサル']),'office');return 'ロボットの仕事をやめた';}},
-    {l:'走りつづける', d:'年収 約'+yen(calcSal(s))+' のまま。健康がさらにへる', p:30, run:s=>{s.flags.burnout=false;s.st.he=clamp(s.st.he-6,0,100);return 'そのまま走りつづけた'; }},
+  return D(T('もう限界かも','At your limit'), T('燃えつきてしまった。どうする？','You\'re burned out. What now?'), [
+    {l:T('休職して休む','Take leave'), d:T('半年休む。今年の年収は半分（約'+money(calcSal(s)*.5)+'）。健康と幸福がもどる','Six months off. Half pay this year (~'+money(calcSal(s)*.5)+'). Health and happiness recover.'), p:55, run:s=>{s.flags.burnout=false;s.payF=Math.min(s.payF,.5);s.st.he=clamp(s.st.he+18,0,100);s.st.ha=clamp(s.st.ha+15,0,100);s.st.sk=clamp(s.st.sk-3,0,100);return T('半年休んだ。ロボットのことを少しずつ好きにもどれた','Took six months off. Slowly fell back in love with robots');}},
+    {l:T('ロボットの仕事をやめる','Quit robotics'), d:T(payTo(s,out)+'。ほかの業界にうつる',payTo(s,out)+'. Move to another industry.'), p:15, run:s=>{s.flags.burnout=false;out(s);pushPath(s,pick(T(['Web 業界','金融業界','実家の商売','IT コンサル'],['Web industry','Finance','The family business','IT consulting'])),'office');return T('ロボットの仕事をやめた','Left the robot business');}},
+    {l:T('走りつづける','Keep pushing'), d:T('年収 約'+money(calcSal(s))+' のまま。健康がさらにへる','Salary stays ~'+money(calcSal(s))+'. Health drops further.'), p:30, run:s=>{s.flags.burnout=false;s.st.he=clamp(s.st.he-6,0,100);return T('そのまま走りつづけた','Kept on pushing'); }},
   ], 'bad');
 }
 function dReturn(s){
   const co = pickCompany(s,s.home);
   const back = t=>setJob(t,co,s.home);
-  return D('母国に帰る？', COUNTRIES[s.jc].n+'で働いて '+(s.year-s.job.since)+' 年。'+cInfo(s.home).n+'の'+co[0]+'から声がかかった。', [
-    {l:'帰国する', d:payTo(s,back)+'。家族の近くで働く', p:40, run:s=>{back(s);return cInfo(s.home).n+'に帰り、'+co[0]+'に入った';}},
-    {l:'のこる', d:'年収 約'+yen(calcSal(s))+' のまま。ここが自分の場所だ', p:60, run:s=>'このまま'+COUNTRIES[s.jc].n+'でがんばることにした'},
+  return D(T('母国に帰る？','Go home?'), T(COUNTRIES[s.jc].n+'で働いて '+(s.year-s.job.since)+' 年。'+cInfo(s.home).n+'の'+co[0]+'から声がかかった。', (s.year-s.job.since)+' years working in '+COUNTRIES[s.jc].n+'. '+co[0]+' in '+cInfo(s.home).n+' calls.'), [
+    {l:T('帰国する','Go home'), d:T(payTo(s,back)+'。家族の近くで働く',payTo(s,back)+'. Work near family.'), p:40, run:s=>{back(s);return T(cInfo(s.home).n+'に帰り、'+co[0]+'に入った','Moved back to '+cInfo(s.home).n+' and joined '+co[0]);}},
+    {l:T('のこる','Stay'), d:T('年収 約'+money(calcSal(s))+' のまま。ここが自分の場所だ','Salary stays ~'+money(calcSal(s))+'. This is home now.'), p:60, run:s=>T('このまま'+COUNTRIES[s.jc].n+'でがんばることにした','Decided to stay in '+COUNTRIES[s.jc].n)},
   ]);
 }
 function dFaculty(s){
   const co = pickCompany(s,s.jc,['big','lab','it','start']);
   const fac = t=>{t.stage='prof';t.rank=0;}, job = t=>setJob(t,co,s.jc);
-  return D('教員のポスト', s.uni+'で助教の公募に通った！', [
-    {l:'助教になる', d:payTo(s,fac)+'。研究室をもてる。学生と研究費の世界へ', p:70, run:s=>{fac(s);s.sy=0;pushPath(s,s.uni+' 助教','uni'+s.tier);return '助教になった';}},
-    {l:co[0]+'に行く', d:payTo(s,job)+'。任期のない仕事', p:30, run:s=>{job(s);return co[0]+'に入った';}},
+  return D(T('教員のポスト','A faculty position'), T(s.uni+'で助教の公募に通った！','You got an assistant professorship at '+s.uni+'!'), [
+    {l:T('助教になる','Become an assistant professor'), d:T(payTo(s,fac)+'。研究室をもてる。学生と研究費の世界へ',payTo(s,fac)+'. Your own lab — students and grants.'), p:70, run:s=>{fac(s);s.sy=0;pushPath(s,T(s.uni+' 助教',s.uni+' (Asst. Prof.)'),'uni'+s.tier);return T('助教になった','Became an assistant professor');}},
+    {l:T(co[0]+'に行く','Go to '+co[0]), d:T(payTo(s,job)+'。任期のない仕事',payTo(s,job)+'. A permanent job.'), p:30, run:s=>{job(s);return T(co[0]+'に入った','Joined '+co[0]);}},
   ], 'big');
 }
 function dPostdocEnd(s){
   const co = pickCompany(s,s.jc,['big','lab','it','start']);
   const job = t=>setJob(t,co,s.jc);
-  return D('ポスドク '+s.sy+' 年目', '任期が切れる。次のポストはまだない。', [
-    {l:co[0]+'に行く', d:payTo(s,job)+'。博士の経験を生かす', p:65, run:s=>{job(s);return co[0]+'に入った';}},
-    {l:'もう 1 回ポスドク', d:'年収 約'+yen(calcSal(s))+' のまま。別の研究室で任期つき', p:35, run:s=>{s.sy=0;s.st.ha=clamp(s.st.ha-4,0,100);return '別の研究室でポスドクをつづけることにした';}},
+  return D(T('ポスドク '+s.sy+' 年目','Postdoc, year '+s.sy), T('任期が切れる。次のポストはまだない。','Your contract is ending, and there\'s no next position yet.'), [
+    {l:T(co[0]+'に行く','Go to '+co[0]), d:T(payTo(s,job)+'。博士の経験を生かす',payTo(s,job)+'. Put the PhD to work.'), p:65, run:s=>{job(s);return T(co[0]+'に入った','Joined '+co[0]);}},
+    {l:T('もう 1 回ポスドク','One more postdoc'), d:T('年収 約'+money(calcSal(s))+' のまま。別の研究室で任期つき','Salary stays ~'+money(calcSal(s))+'. Another fixed-term lab.'), p:35, run:s=>{s.sy=0;s.st.ha=clamp(s.st.ha-4,0,100);return T('別の研究室でポスドクをつづけることにした','Took another postdoc in a different lab');}},
   ]);
 }
 function dStartupFail(s){
   const co = pickCompany(s,s.jc,['big','it','start']);
   const job = t=>setJob(t,co,s.jc);
-  return D(s.own+'がたおれた', '資金がつきて、会社をたたむことになった。', [
-    {l:'もう一度起業する', d:'年収 約'+yen(calcSal(s))+'（創業者の給料）。失敗は経験だ', p:30, run:s=>{s.own=startupName();s.sy=0;pushPath(s,s.own+'を創業','own');s.st.sk=clamp(s.st.sk+3,0,100);return '懲りずに'+s.own+'を作った';}},
-    {l:co[0]+'に入る', d:payTo(s,job)+'。経験を買ってくれる', p:70, run:s=>{job(s);return co[0]+'に入った';}},
+  return D(T(s.own+'がたおれた',s.own+' went under'), T('資金がつきて、会社をたたむことになった。','The money ran out and the company is closing.'), [
+    {l:T('もう一度起業する','Start another one'), d:T('年収 約'+money(calcSal(s))+'（創業者の給料）。失敗は経験だ','Salary ~'+money(calcSal(s))+' (founder pay). Failure is experience.'), p:30, run:s=>{s.own=startupName();s.sy=0;pushPath(s,T(s.own+'を創業','Founded '+s.own),'own');s.st.sk=clamp(s.st.sk+3,0,100);return T('懲りずに'+s.own+'を作った','Undeterred, founded '+s.own);}},
+    {l:T(co[0]+'に入る','Join '+co[0]), d:T(payTo(s,job)+'。経験を買ってくれる',payTo(s,job)+'. They value your experience.'), p:70, run:s=>{job(s);return T(co[0]+'に入った','Joined '+co[0]);}},
   ], 'bad');
 }
 
 /* ---------- 1 年の組み立て ---------- */
 function buildYear(s){
   const steps = [];
-  steps.push(s=>L(s.year+'年　'+s.age+'歳　'+stageLabel(s),'year'));
+  steps.push(s=>L(T(s.year+'年　'+s.age+'歳　',s.year+' · age '+s.age+' · ')+stageLabel(s),'year'));
   if(WORLD[s.year]) steps.push(s=>L('🌐 '+WORLD[s.year],'world'));
   steps.push(stageStep);
   const n = 1 + (R()<.6?1:0) + (R()<.25?1:0);
@@ -1403,17 +1465,17 @@ function stageStep(s){
       break;
     }
     case 'prof': {
-      if(s.rank===0 && s.sy>=4 && s.papers>=12 && R()<.3){ s.rank=1; s.sy=0; pushPath(s,'准教授'); return L('准教授に昇進した！','big',{ha:6}); }
-      if(s.rank===1 && s.sy>=4 && s.papers>=28 && R()<.25){ s.rank=2; s.sy=0; pushPath(s,'教授'); return L('教授になった！ 研究室の名前が自分の名前になった','big',{ha:8,ne:5}); }
+      if(s.rank===0 && s.sy>=4 && s.papers>=12 && R()<.3){ s.rank=1; s.sy=0; pushPath(s,RANKS()[1]); return L(T('准教授に昇進した！','Promoted to associate professor!'),'big',{ha:6}); }
+      if(s.rank===1 && s.sy>=4 && s.papers>=28 && R()<.25){ s.rank=2; s.sy=0; pushPath(s,RANKS()[2]); return L(T('教授になった！ 研究室の名前が自分の名前になった','Became a full professor! The lab now bears your name'),'big',{ha:8,ne:5}); }
       break;
     }
     case 'work': {
       if(s.job.until && s.year>=s.job.until-1 && !s.flags['closed_'+s.job.n]){
         s.flags['closed_'+s.job.n]=true;
         const old=s.job.n;
-        if(old==='スマイルロボティクス'){ setJob(s,COMPANIES.JP.find(x=>x[0].startsWith('シンクロボ')),'JP',s.job.pm); return L('スマイルロボティクスがアイリスグループの一員になり、社名がシンクロボになった','big',{ne:2}); }
+        if(old===SMILE_NAME){ setJob(s,COMPANIES.JP.find(x=>x[0]===SYNC_NAME),'JP',s.job.pm); return L(T('スマイルロボティクスがアイリスグループの一員になり、社名がシンクロボになった','Smile Robotics joined the IRIS Group and was renamed SyncRobo'),'big',{ne:2}); }
         const co=pickCompany(s,s.jc,null,old);
-        if(co){ setJob(s,co,s.jc); return L(old+'がなくなった。'+co[0]+'にうつった','bad',{ha:-6}); }
+        if(co){ setJob(s,co,s.jc); return L(T(old+'がなくなった。'+co[0]+'にうつった',old+' shut down. Moved to '+co[0]),'bad',{ha:-6}); }
       }
       if(s.flags.burnout) return dBurnout(s);
       if(!s.flags.mgr && !s.flags.expert && s.age>=35 && s.age<=52 && R()<.14) return dMgr(s);
@@ -1431,14 +1493,14 @@ function stageStep(s){
         const buyer = pickCompany(s,s.jc,['big','it']) || ['大手メーカー',0,0,'big',1];
         s.flags.exit='acq'; const money=Math.round(baseSal(s.jc,s.year)*ri(5,60));
         setJob(s,buyer,s.jc,1.2);
-        return L(buyer[0]+'に会社を買収された！ 株を売って、資産が 約'+yen(money)+' ふえた。年収は 約'+yen(calcSal(s)),'big',{ha:12,as:money});
+        return L(T(buyer[0]+'に会社を買収された！ 株を売って、資産が 約'+yen(money)+' ふえた。年収は 約'+yen(calcSal(s)),buyer[0]+' acquired your company! Your shares added ~'+usd(money)+' to your assets. New salary ~'+usd(calcSal(s))),'big',{ha:12,as:money});
       }
       if(s.sy>=5 && r < .16-good*.08 + .03 + good*.03 + (s.year>=2024?.02:0) + .008 + good*.015){
         s.flags.exit='ipo'; s.flags.exitRich=true; const money=Math.round(baseSal(s.jc,s.year)*ri(40,400));
-        pushPath(s,'上場');
-        return L(s.own+'が上場した！ 鐘を鳴らした。持ち株の価値で資産が 約'+yen(money)+' ふえた','big',{ha:15,ne:10,as:money});
+        pushPath(s,T('上場','IPO'));
+        return L(T(s.own+'が上場した！ 鐘を鳴らした。持ち株の価値で資産が 約'+yen(money)+' ふえた',s.own+' went public! You rang the bell. Your shares added ~'+usd(money)+' to your assets'),'big',{ha:15,ne:10,as:money});
       }
-      if(R()<.4) return L(pick([s.own+'が資金調達に成功した（会社のお金で、自分の給料は変わらない）','顧客が 1 社ふえた',s.own+'の社員が '+ri(5,40)+' 人になった','事業をピボットした。3 回目だ','オフィスが少し広くなった']),'');
+      if(R()<.4) return L(pick(T([s.own+'が資金調達に成功した（会社のお金で、自分の給料は変わらない）','顧客が 1 社ふえた',s.own+'の社員が '+ri(5,40)+' 人になった','事業をピボットした。3 回目だ','オフィスが少し広くなった'],[s.own+' closed a funding round (company money — your salary stays the same)','Landed one more customer',s.own+' grew to '+ri(5,40)+' employees','Pivoted the business. Third time','Moved to a slightly bigger office'])),'');
       break;
     }
   }
@@ -1459,7 +1521,7 @@ function randomEvent(s){
   const ev = wpick(cand, e=>{
     let w=e.w||1;
     if(s.recent.includes(e)) w*=.04; // 最近出たできごとは出にくい
-    if(THEME_KW && typeof e.t==='string' && e.t.includes(THEME_KW)) w*=3;
+    if(THEME_KW && typeof e.t==='string' && e.t.toLowerCase().includes(THEME_KW)) w*=3;
     if(e.p && s.focus==='paper') w*=1.8;
     if(e.r && s.focus==='make') w*=1.5;
     if(e.e && e.e.ne>0 && s.focus==='people') w*=1.4;
@@ -1496,7 +1558,7 @@ function endYear(s){
   s.sold += yearSales(s);
   // 体調
   let out = null;
-  if(s.st.he<=0){ s.st.he=30; s.st.ha=clamp(s.st.ha-10,0,100); s.payF=Math.min(s.payF,.5); out=L('体をこわして、半年休んだ。今年の年収は半分になった','bad'); }
+  if(s.st.he<=0){ s.st.he=30; s.st.ha=clamp(s.st.ha-10,0,100); s.payF=Math.min(s.payF,.5); out=L(T('体をこわして、半年休んだ。今年の年収は半分になった','Your health gave out; took six months off. Half pay this year'),'bad'); }
   // 給料（画面に出している年収と同じ calcSal を使う）
   const full = calcSal(s);
   s.sal = full*s.payF;
@@ -1510,7 +1572,7 @@ function endYear(s){
   if(R()<q){
     s.ended=true; s.endWhy='death';
     s.snaps[s.age]=snap(s);
-    return L(s.age+'歳、病気のため、この世を去った。','big');
+    return L(T(s.age+'歳、病気のため、この世を去った。','Passed away from illness at '+s.age+'.'),'big');
   }
   s.snaps[s.age]=snap(s);
   s.year++; s.age++; s.sy++;
@@ -1518,9 +1580,9 @@ function endYear(s){
     s.ended=true; s.endWhy='retire';
     if(['work','prof'].includes(s.stage) && ['JP','KR','TW'].includes(s.jc)){
       const sev = Math.round(baseSal(s.jc,s.year)*Math.min(30,s.year-(s.job?s.job.since:s.year))*.07);
-      if(sev>0){ s.assets += sev; return L('定年退職。退職金で資産が 約'+yen(sev)+' ふえた','big',null,s.year-1,s.age-1); }
+      if(sev>0){ s.assets += sev; return L(T('定年退職。退職金で資産が 約'+yen(sev)+' ふえた','Retired. The retirement allowance added ~'+usd(sev)+' to your assets'),'big',null,s.year-1,s.age-1); }
     }
-    return L('定年退職の日。'+pick(['花束をもらった','最後にロボットの電源を自分で切った','後輩たちがロボットで見送ってくれた']),'big',null,s.year-1,s.age-1);
+    return L(T('定年退職の日。'+pick(['花束をもらった','最後にロボットの電源を自分で切った','後輩たちがロボットで見送ってくれた']),'Retirement day. '+pick(['Got a bouquet of flowers.','Powered down the robot one last time, yourself.','The juniors saw you off — with a robot.'])),'big',null,s.year-1,s.age-1);
   }
   else if(s.stage==='left'){
     // ロボット業界の外でのくらしは、まとめて早送りする
@@ -1530,7 +1592,7 @@ function endYear(s){
     s.robots += hobby;
     s.age += yrs;
     s.ended=true; s.endWhy='left';
-    return L('その後 '+(s.ret)+' 歳まで、'+s.path[s.path.length-1]+'で働いた。'+(hobby?'週末には趣味のロボットを '+hobby+' 機種つくった。':'ロボットのことは、ときどき思い出した。'),'big');
+    return L(T('その後 '+(s.ret)+' 歳まで、'+s.path[s.path.length-1]+'で働いた。'+(hobby?'週末には趣味のロボットを '+hobby+' 機種つくった。':'ロボットのことは、ときどき思い出した。'),'Worked in '+s.path[s.path.length-1]+' until '+s.ret+'. '+(hobby?'Built '+hobby+' hobby robot'+(hobby>1?'s':'')+' on weekends.':'Thought about robots now and then.')),'big');
   }
   return out;
 }
@@ -1550,7 +1612,7 @@ function updateAssets(s){
   if(s.assets>0){
     const d = s.assets*.5*mk;
     s.assets += d;
-    if(mk<-.15 && d < -base*.05) note = '株価が大きく下がり、資産が 約'+yen(-d)+' へった';
+    if(mk<-.15 && d < -base*.05) note = T('株価が大きく下がり、資産が 約'+yen(-d)+' へった','A stock market crash wiped ~'+usd(-d)+' off your assets');
   } else s.assets *= 1.04; // 借金の利息
   s.assets += flow;
   return note;
@@ -1566,25 +1628,45 @@ const ASKS = {
 
 /* ---------- おわりの称号 ---------- */
 function lifeTitle(s){
-  if(s.endWhy==='death' && s.age<45) return '短く、でも濃いロボット人生';
-  if(s.sold>=1000000) return '100万台のロボットを売った人';
-  if(s.flags.exit==='ipo') return '上場ロボット企業の創業者';
-  if(s.stage==='prof' && s.rank===2 && s.papers>=120) return 'ロボット学の世界的権威';
-  if(s.stage==='prof' && s.rank===2) return 'ロボット学の教授';
-  if(s.flags.exit==='acq') return '会社を売ったエンジニア';
-  if(s.stage==='left') return s.robots>3?'ロボットを忘れられない元エンジニア':'ロボットの道を降りた人';
-  if(s.stage==='postdoc') return '永遠のポスドク';
-  if(s.stage==='startup') return '最後まで起業家';
-  if(s.sold>=100000) return '10万台のロボットを世に出した人';
-  if(s.robots>=15) return '15機種以上に携わった名エンジニア';
-  if(s.papers>=40) return '論文を書きまくる企業研究者';
-  if(s.flags.mgr) return 'ロボット部門の部長';
-  if(s.flags.expert && s.st.sk>=90) return '現場のレジェンド';
-  if(s.flags.humanoid && s.job && s.job.t==='start') return 'ヒューマノイドブームの立役者';
-  if(s.home!==s.jc) return '海をわたったロボット屋';
-  return 'ふつうの、でもたしかなロボットエンジニア';
+  if(s.endWhy==='death' && s.age<45) return T('短く、でも濃いロボット人生','A short but intense robot life');
+  if(s.sold>=1000000) return T('100万台のロボットを売った人','Sold a million robots');
+  if(s.flags.exit==='ipo') return T('上場ロボット企業の創業者','Founder of a public robot company');
+  if(s.stage==='prof' && s.rank===2 && s.papers>=120) return T('ロボット学の世界的権威','World authority in robotics');
+  if(s.stage==='prof' && s.rank===2) return T('ロボット学の教授','Professor of robotics');
+  if(s.flags.exit==='acq') return T('会社を売ったエンジニア','The engineer who sold the company');
+  if(s.stage==='left') return s.robots>3?T('ロボットを忘れられない元エンジニア','Ex-engineer who never forgot robots'):T('ロボットの道を降りた人','Left the robot road');
+  if(s.stage==='postdoc') return T('永遠のポスドク','The eternal postdoc');
+  if(s.stage==='startup') return T('最後まで起業家','A founder to the end');
+  if(s.sold>=100000) return T('10万台のロボットを世に出した人','Shipped 100,000 robots');
+  if(s.robots>=15) return T('15機種以上に携わった名エンジニア','Master engineer of 15+ robot models');
+  if(s.papers>=40) return T('論文を書きまくる企業研究者','The prolific industry researcher');
+  if(s.flags.mgr) return T('ロボット部門の部長','Director of robotics');
+  if(s.flags.expert && s.st.sk>=90) return T('現場のレジェンド','A legend on the shop floor');
+  if(s.flags.humanoid && s.job && s.job.t==='start') return T('ヒューマノイドブームの立役者','A driving force of the humanoid boom');
+  if(s.home!==s.jc) return T('海をわたったロボット屋','The roboticist who crossed the sea');
+  return T('ふつうの、でもたしかなロボットエンジニア','An ordinary, solid robotics engineer');
 }
 
+
+/* =========================================================
+   英語版：データの文章を英語にする
+   ========================================================= */
+const DICT_EN = {"はんだごてで指をやけどした。ロボット屋の勲章だ": "Burned your finger with a soldering iron — a roboticist's badge of honor.", "線形代数の単位をギリギリでとった": "Scraped a pass in linear algebra by the skin of your teeth.", "ライントレーサーがコースアウトして、先生の足に激突した": "The line follower ran off the course and crashed into the professor's foot.", "3D プリンタを夜通し回したら、朝には立派なスパゲッティができていた": "Left the 3D printer running overnight. By morning it had made a lovely plate of spaghetti.", "Arduino で LED をチカチカさせた。感動した": "Made an LED blink with an Arduino. Deeply moved.", "秋葉原（か、それに近い電気街）でモーターを買いあさった": "Bought motors in bulk in Akihabara (or the nearest electronics district).", "研究室配属ガチャで、第一志望に入れた！": "Won the lab-assignment lottery and got your first choice!", "研究室配属ガチャで、第三志望に回された。そこで一生の師に出会う…かもしれない": "Lost the lab-assignment lottery and landed in your third choice. You might meet your lifelong mentor there… maybe.", "発表の前日にロボットが動かなくなった。原因はコネクタの半ざし": "The robot died the day before the presentation. Cause: a half-seated connector.", "モーターを逆につないだら煙が出た。いいにおいがした": "Wired a motor backwards and it smoked. Smelled kind of nice.", "バイト代がすべてサーボモーターに消えた": "Every paycheck from your part-time job went to servo motors.", "ROS のチュートリアルで、画面の中のカメを動かした": "Moved a turtle around the screen in the ROS tutorial.", "MATLAB のライセンスが切れて途方にくれた": "The MATLAB license expired. Utterly lost.", "ハッカソンで徹夜した。できたのは動かないロボットと友だち": "Pulled an all-nighter at a hackathon. Came away with a robot that didn't work, and friends.", "就活しているほかの学部の友だちが、急に大人に見えた": "Friends in other majors started job hunting and suddenly looked like grown-ups.", "シミュレーションでは完ぺきに歩いた。実機は 3 歩で転んだ": "It walked perfectly in simulation. The real robot fell after 3 steps.", "カメラのキャリブレーションだけで 1 週間がとけた": "Lost an entire week to camera calibration alone.", "実験中にロボットが壁に穴をあけた": "The robot punched a hole in the wall during an experiment.", "リポバッテリーがパンパンにふくらんでいた。そっと耐火バッグに入れた": "Found a LiPo battery puffed up like a pillow. Gently placed it in a fireproof bag.", "指導教員が海外出張中で、1 か月つかまらない": "Your advisor is on an overseas trip and unreachable for a month.", "実験動画を SNS にあげたらバズった。コメント欄は「ターミネーター」でうまった": "Posted an experiment video and it went viral. The comments were all “Terminator.”", "研究室の先輩が、ロボットのとなりで寝ていた": "Found a senior labmate asleep next to the robot.", "Kinect を分解して研究に使った。みんなそうしていた": "Took apart a Kinect for research. Everyone was doing it.", "えらい人に「それ、深層学習でできない？」と言われた": "Someone important asked, “Can't you just do that with deep learning?”", "大規模言語モデルの登場で、研究テーマが半分消えた": "Large language models arrived, and half your research topic vanished.", "なぞのノイズの原因は、アースがとれていないことだった": "The mysterious noise turned out to be a missing ground.", "ケーブルがロボットの関節にからまった。3 回目だ": "A cable got tangled in the robot's joint. Third time now.", "共同研究先の企業に「来年までに実用化を」と言われた": "The partner company said, “We'd like this commercialized by next year.”", "学振の特別研究員に採用された。お金の心配が少し減った": "Got a JSPS research fellowship. Money worries shrank a little.", "ロボットに名前をつけたら、愛着がわいて分解できなくなった": "Named the robot, grew attached, and now can't bring yourself to take it apart.", "GPU を買う予算が通った。研究室が少しあたたかくなった": "The GPU budget got approved. The lab got a little warmer.", "同期が就職してボーナスの話をしている。こちらは論文の話しかない": "Classmates who took jobs are talking about bonuses. All you can talk about is papers.", "博士論文の章立てだけが、なぜか何度も変わる": "For some reason, only the chapter outline of the dissertation keeps changing.", "客先でロボットの立ち上げ。工場の床で夜明けをむかえた": "Commissioning a robot at a customer site. Watched the sunrise from the factory floor.", "安全柵の中に入って、班長にめちゃくちゃ怒られた": "Stepped inside the safety fence and got chewed out by the line foreman.", "飲み会で「ロボットって人の仕事うばうんですか？」と聞かれた": "At a drinking party, someone asked, “So are robots going to steal people's jobs?”", "量産立ち上げ地獄。夢の中でも歩留まりを計算している": "Mass-production ramp-up hell. Calculating yield rates even in your dreams.", "上司に「テスラの Optimus みたいなの、うちでも作れない？」と言われた": "Your boss asked, “Can't we build something like Tesla's Optimus here?”", "ロボットを持ちあげて腰をやった": "Threw out your back lifting a robot.", "深夜の倉庫でフィールドテスト。元気なのはロボットだけだった": "Field test in a warehouse at midnight. The only one with any energy was the robot.", "減速機が焼きついた。ハーモニックドライブにいのった": "A gearbox seized up. Prayed to the harmonic drive.", "PLC のラダー図と 1 日にらめっこした": "Spent a whole day staring down PLC ladder logic.", "特許を出した": "Filed a patent.", "後輩が自分より優秀で、うれしくてちょっとくやしい": "Your junior is better than you. Happy, and a little bit jealous.", "10 年前の自分のコードに再会した。だれが書いたんだこれ": "Reunited with your own code from 10 years ago. Who wrote this?", "納品前日、ロボットが逆に動いた。座標系が右手系と左手系でずれていた": "The day before delivery, the robot moved backwards. Right-handed vs. left-handed coordinate frames.", "取材で「未来のロボットは？」と聞かれ、とりあえず「人と共存」と答えた": "An interviewer asked, “What's the future of robots?” Answered “coexistence with humans,” for lack of anything better.", "海外工場の立ち上げで 3 か月出張した": "Spent 3 months abroad setting up an overseas factory.", "作ったロボットが、現場の人の重労働を代わりにやっていた。ちょっと泣いた": "The robot you built was taking over the heavy labor from the workers on site. Cried a little.", "AI にロボットのコードを書かせたら、それっぽいけど動かなかった": "Had AI write the robot code. Looked plausible, didn't run.", "競合がかっこいい動画を出した。よく見たら遠隔操作だった": "A competitor released a slick video. On closer look, it was teleoperated.", "自分の仕事の一部をロボットにやらせた。ちょっと楽になった": "Handed part of your own job to a robot. Life got a little easier.", "自分が作ったロボットがテレビに映った。家族に自慢した": "A robot you built appeared on TV. Bragged to the family.", "「あと 0.3 秒サイクルタイムをちぢめて」と言われた": "Got told, “Shave another 0.3 seconds off the cycle time.”", "社内ハッカソンで作った変なロボットが、なぜか製品化された": "A weird robot from the internal hackathon somehow became a product.", "投資家に「で、いつ人型にするの？」と聞かれた": "Investor asked, “So when are you making it humanoid?”", "資金調達のピッチで、デモロボットがバッテリー切れ": "During the funding pitch, the demo robot's battery died.", "ガレージで作った試作機が、はじめて客先で動いた": "The prototype built in a garage worked at a customer site for the first time.", "会社のお金が足りず、今年の自分の給料をゼロにした": "The company ran short on cash, so you cut your own salary to zero this year.", "採用面接で「ロボットの会社って、ほんとうに動くんですか？」と聞かれた": "In a job interview, a candidate asked, “Do robot companies' robots actually work?”", "学生の論文を、真夜中に赤ペンでまっかにした": "Bled red ink all over a student's paper in the middle of the night.", "大型の研究費がとれた！": "Landed a major research grant!", "研究費の申請書を書くのに、研究よりも時間を使った": "Spent more time writing grant proposals than doing research.", "教え子が有名ロボット企業の CTO になった": "A former student became CTO of a famous robotics company.", "会議が多すぎて、ロボットにさわれない": "Too many meetings to touch a robot.", "オープンキャンパスでロボットが子どもに大人気だった": "At the open campus, the robot was a huge hit with kids.", "結婚した。相手はロボットの話を 3 割くらい聞いてくれる": "Got married. Your spouse listens to about 30% of your robot talk.", "子どもが生まれた": "Had a child.", "子どもがロボットのおもちゃを分解した。才能かもしれない": "Your kid took apart a robot toy. Might be talent.", "親の介護で、実家に通う日々がはじまった": "Began making regular trips home to care for a parent.", "週末に自宅のロボット掃除機を改造した。家族にあきれられた": "Modded the robot vacuum at home over the weekend. The family was not impressed.", "健康診断でひっかかった": "Got flagged at the annual health checkup.", "燃えつきた。しばらく何も作りたくない": "Burned out. Don't want to build anything for a while.", "ランニングをはじめた": "Took up running.", "ふと、はじめてロボットを動かした日のことを思い出した": "Suddenly remembered the day you first made a robot move.", "昔の仲間と飲んで、むかしのロボットの話で 3 時間もりあがった": "Drinks with old teammates. Spent 3 hours reminiscing about old robots.", "引っ越した。荷物の半分は基板と工具だった": "Moved house. Half the boxes were circuit boards and tools.", "子ども向けロボット教室の講師をした": "Taught a robotics class for kids.", "母国の親から「いつ帰ってくるの」と電話があった": "Got a call from your parents back home: “When are you coming home?”", "ロボットのニュースを見るたびに、少しだけ胸がさわぐ": "Every robot news story still makes your heart flutter a little.", "週末に、こっそりロボットを作っている": "Secretly building robots on the weekends.", "入学式の日、サークル勧誘のロボットに手をふられた": "On entrance ceremony day, a club-recruitment robot waved at you.", "「機械工学科って、なにするの？」と聞かれて、うまく答えられなかった": "Asked “What do mechanical engineers actually do?” and couldn't really answer.", "製図の課題で、ひと晩中ドラフターに向かった": "Spent all night hunched over the drafting board for a drawing assignment.", "CAD の課題で、アセンブリが画面の中で爆発した": "In a CAD assignment, the assembly exploded on screen.", "材料力学の試験で、はりがたわみすぎた（答案の中で）": "On the mechanics of materials exam, the beam deflected way too much (on paper).", "サークルの先輩に「まずは LED を光らせよう」と言われて半年がすぎた": "A club senior said, “First, let's light up an LED.” Six months went by.", "モータードライバを 3 つ燃やした。部費がとけた": "Fried 3 motor drivers. There went the club budget.", "学園祭でロボットを展示した。子どもに大人気、親にはふしぎがられた": "Exhibited a robot at the school festival. Kids loved it; parents were puzzled.", "はじめて自分で設計した部品が、0.2 mm ずれて入らなかった": "The first part you ever designed was off by 0.2 mm and didn't fit.", "ヤスリがけの腕だけは、プロ級になった": "Your filing skills, at least, reached pro level.", "オシロスコープの使い方を覚えて、世界が少しわかった": "Learned to use an oscilloscope and understood the world a little better.", "工作センターの職人さんに弟子入りした": "Became an apprentice to the machinist at the workshop.", "夜中の部室で食べるカップ麺が、人生でいちばんおいしかった": "Cup noodles in the club room at midnight: the best meal of your life.", "大会前日、ロボットが重量制限を 50 g オーバーしていることが発覚した": "The day before the competition, the robot turned out to be 50 g over the weight limit.", "ボール盤で、机に穴をあけた": "Drilled a hole through the desk with the drill press.", "ロボット工学の授業でヤコビ行列に出会った。仲良くなれる気がしない": "Met the Jacobian in robotics class. Doesn't feel like you'll ever be friends.", "フーリエ変換の意味が、3 年目にやっとわかった": "Finally understood the Fourier transform in your third year.", "プログラミングの授業で、無限ループからぬけられなくなった（コードも自分も）": "Got stuck in an infinite loop in programming class (both the code and you).", "ライバル校のロボットがかっこよすぎて、眠れなかった": "A rival school's robot was so cool you couldn't sleep.", "サークルの同期がやめて、部員が 3 人になった": "Club members quit; down to 3 people.", "部品代のために、奨学金に手をつけてしまった": "Dipped into your scholarship to pay for parts.", "電子部品の店で、店員さんに顔を覚えられた": "The staff at the electronics parts shop now know your face.", "はじめてのロボットに「1 号」と名づけた。いまでも 1 号のことを思い出す": "Named your first robot “Unit 1.” You still think about Unit 1.", "テスト前なのに、ロボットの動画ばかり見ていた": "Exams coming up, yet you watched nothing but robot videos.", "インターンでロボットメーカーの工場を見学した。ロボットが 24 時間はたらいていた": "Toured a robot maker's factory on an internship. Robots were working 24 hours a day.", "海外のロボット動画に感動して、英語を勉強しはじめた": "Inspired by robot videos from abroad, started studying English.", "教授に「ガンダムは作れないけど、ガンダムの指なら作れる」と言われた": "A professor said, “We can't build a Gundam, but we can build a Gundam's finger.”", "ロボコンのルールブックを、教科書よりも読みこんだ": "Read the robot contest rulebook more thoroughly than any textbook.", "大会の遠征費を、みんなのカンパで集めた": "Raised the competition travel money by passing the hat.", "大会で他チームに部品を借りた。お礼にはんだごてを貸した": "Borrowed parts from another team at the competition. Lent them a soldering iron in return.", "試験期間中、ロボットは分解されたまま放置された": "During exam season, the robot sat disassembled and abandoned.", "恋人に「わたしとロボット、どっちが大事？」と聞かれた": "Your partner asked, “Who matters more, me or the robot?”", "「ロボットの学生」というだけで、家電の修理をたのまれる": "Just for being “the robot student,” people ask you to fix their appliances.", "パソコンを自作した。ロボットより先にパソコンが動いた": "Built your own PC. The PC worked before the robot did.", "バイト先にロボットが入って、自分の仕事がひとつへった": "A robot arrived at your part-time job and took over one of your tasks.", "留学生の友だちと、深夜までロボットの話をした": "Talked robots with an international student friend until late at night.", "卒業研究のテーマが決まらず、教授の部屋の前を 3 往復した": "Couldn't decide on a thesis topic; paced past the professor's door 3 times.", "バイトで家庭教師をした。生徒にロボットの話をしたら、成績が上がった": "Worked as a tutor. Told the student about robots, and their grades went up.", "研究室の冷蔵庫に、だれのかわからないプリンが 3 年前から入っている": "The lab fridge has held a pudding of unknown ownership for 3 years.", "ゼミの発表スライドが 80 枚になった。持ち時間は 15 分だった": "Seminar slides hit 80 pages. Time slot: 15 minutes.", "論文の図を 1 ピクセル単位で直していたら、朝になった": "Tweaked paper figures pixel by pixel until dawn.", "LaTeX のエラーで、表が 2 ページ先に飛んでいった": "A LaTeX error sent the table flying two pages ahead.", "締め切りの時差をまちがえていた。AoE（地球のどこかでまだ締め切り前）に救われた": "Got the deadline time zone wrong. Saved by AoE (still before the deadline somewhere on Earth).", "査読で「関連研究が足りない」と言われ、関連研究を 40 本足した": "Reviewer said “related work is insufficient,” so you added 40 references.", "学会のポスター発表で、2 時間ずっと同じ人に話しかけられていた": "At the conference poster session, the same person talked at you for 2 straight hours.", "国際会議の懇親会で、論文で名前を見ていた有名人と話せた": "At an international conference banquet, got to chat with a big name from the papers.", "研究室のロボットに、先輩の名前がついていた": "The lab's robot was named after a senior student.", "ロボットアームが暴走。非常停止ボタンがどこにあるか、みんなが一瞬わすれた": "The robot arm went haywire. For a moment, everyone forgot where the E-stop was.", "非常停止ボタンを押したら、全員が静かにふりかえった": "Hit the E-stop. Everyone turned around in silence.", "データ集めのために、同じ動作を 1000 回くりかえした": "Repeated the same motion 1000 times to collect data.", "モーションキャプチャのマーカーを全身につけて、研究室を歩きまわった": "Wore mocap markers head to toe and wandered around the lab.", "実験の参加者を集めるために、学食でチラシを配った": "Handed out flyers in the cafeteria to recruit study participants.", "研究室の大掃除で、20 年前のロボットが出てきた。まだ動いた": "Lab cleanup unearthed a 20-year-old robot. It still worked.", "年度末、研究費の締め日直前に部品を大量に注文した": "Fiscal year-end: ordered a mountain of parts right before the grant deadline.", "論文の英語を直してもらったら、ほぼ全部が赤くなって返ってきた": "Got the paper's English proofread. It came back almost entirely red.", "先生の「ちょっといい？」が、2 時間になった": "The professor's “Got a minute?” turned into 2 hours.", "デモのため、ロボットをハイエースに積んで運んだ": "Loaded the robot into a van and drove it to the demo.", "学会会場で、コンセントの近くはロボット屋の取り合いになる": "At conference venues, roboticists fight over the power outlets.", "デモを見た子どもに「中に人いるの？」と聞かれた": "Kid at the demo asked, “Is there a person inside?”", "研究室の GPU の空きを待つ行列ができた": "A queue formed for the lab's free GPUs.", "強化学習のロボットが、ズルい動きを覚えた": "The RL robot learned to cheat.", "3 週間学習させたモデルが、照明が変わっただけで動かなくなった": "A model trained for 3 weeks stopped working because the lighting changed.", "データのラベル付けを、研究室総出でやった": "The whole lab pitched in on data labeling.", "arXiv に投稿した翌日、ほぼ同じ論文が出ていた": "The day after posting to arXiv, a nearly identical paper appeared.", "公開したコードの GitHub スターが 100 をこえた": "Released code passed 100 GitHub stars.", "オープンソースのライブラリにバグを見つけて、修正を送った": "Found a bug in an open-source library and sent a fix.", "自分のコードに「TODO: あとで直す」が 200 個あった": "Found 200 “TODO: fix later” comments in your own code.", "博士論文の謝辞を書いていて、ちょっと泣いた": "Teared up a little writing the PhD thesis acknowledgments.", "公聴会で想定外の質問が来て、「今後の課題です」と答えた": "Got an unexpected question at the defense. Answered, “That's future work.”", "研究室の後輩に ROS の使い方を教えた": "Taught a junior labmate how to use ROS.", "ロボットの関節を 1 つ増やしたら、計算が 10 倍重くなった": "Added one joint to the robot; computation got 10x heavier.", "逆運動学が解けず、ロボットの腕がありえない方向に曲がった": "Inverse kinematics failed; the arm bent in an impossible direction.", "「歩く」研究をして 3 年。ロボットはまだ「立つ」ことに集中している": "3 years into “walking” research. The robot is still focused on “standing.”", "SLAM の地図が、ぐにゃぐにゃに曲がった": "The SLAM map came out all warped and wobbly.", "ロボットが鏡に映った自分を障害物だと思って止まった": "The robot saw itself in a mirror, decided it was an obstacle, and stopped.", "ロボット掃除機が、実験用のケーブルを食べた": "The robot vacuum ate the experiment cables.", "学会で「それ 1990 年代にやられてるよ」と言われた": "At a conference, someone said, “That was done in the 1990s.”", "締め切り前にギアが欠けた。替えの部品は 3 週間後": "A gear chipped right before the deadline. Replacement: 3 weeks out.", "発表の練習を、ロボットに聞いてもらった（聞いていない）": "Rehearsed the talk to the robot (it wasn't listening).", "お世話になった先生が定年退職した": "A beloved mentor professor retired.", "任期の残りを、指で数えた": "Counted the remaining months of the contract on your fingers.", "海外の研究仲間と時差を使って、24 時間リレーで実験した": "Ran a 24-hour relay experiment with overseas collaborators across time zones.", "研究費の書類で、「消耗品」と「備品」の区別に 1 日かかった": "Spent a whole day figuring out “consumables” vs. “equipment” on grant paperwork.", "企業との共同研究に守秘義務があり、論文に書けなくなった": "An industry collaboration's NDA meant none of it could be published.", "研究補助の仕事で、少しだけ臨時収入があった": "A research assistant gig brought in a little extra cash.", "ロボットの充電を忘れていて、デモ開始 1 分で止まった": "Forgot to charge the robot. It died 1 minute into the demo.", "学会帰りの飛行機で、論文のアイデアを思いついた": "Came up with a paper idea on the flight home from a conference.", "ほかの研究室の実験に、参加者としてかり出された": "Got roped in as a participant in another lab's experiment.", "実験室の床に、テープで謎の線がたくさん引かれている": "The lab floor is covered in mysterious lines of tape.", "ロボットの指先に、毎日ちがうものをつかませた": "Had the robot's fingertips grasp something different every day.", "学会の参加費を自腹で払った": "Paid the conference registration fee out of pocket.", "新人研修で、まず安全教育を 3 日間受けた": "New-hire training kicked off with 3 days of safety education.", "配属先は、希望とちがう部署だった": "Got assigned to a different department than requested.", "先輩のコードを読んだら、コメントが一行もなかった": "Read a senior's code. Not a single comment.", "「動いているものにはさわるな」が職場の合言葉だった": "“Don't touch anything that's moving” was the office motto.", "工場の朝礼で、ラジオ体操をした": "Did morning radio calisthenics at the factory assembly.", "安全靴にも、だんだん慣れてきた": "Gradually got used to the safety boots.", "ティーチングペンダントを持つ手つきが、プロっぽくなってきた": "Started holding the teach pendant like a pro.", "客先の工場長に缶コーヒーをもらった。それだけで報われた": "The client's plant manager handed you a can of coffee. That alone made it worth it.", "据え付けの日、床にアンカーボルトの穴があいていなかった": "Installation day: the anchor bolt holes hadn't been drilled.", "休日に「ロボットが止まった」と電話が来た": "Got a call on a day off: “The robot stopped.”", "トラブルの原因は、だれかがケーブルを足でひっかけたことだった": "Root cause of the trouble: someone tripped over a cable.", "仕様書に「いい感じに動くこと」と書いてあった": "The spec sheet said: “Should move nicely.”", "見積もりをしたら、ロボットより安全柵のほうが高かった": "Ran the quote: the safety fence cost more than the robot.", "ロボットより、ロボットを置く台の設計に時間がかかった": "Designing the robot's stand took longer than the robot.", "お客さんに「人間がやったほうが早いね」と言われた": "Customer said, “A human would be faster.”", "1 年かけて自動化したら、その製品が生産終了になった": "Spent a year automating a product. Then it was discontinued.", "ロボットが 1 万時間ノンストップで動いた。ちょっと誇らしい": "The robot ran 10,000 hours nonstop. A little proud.", "展示会で、ロボットがお菓子を配る係になっていた": "At the trade show, the robot ended up on snack-handout duty.", "えらい人に「AI でなんとかならないの？」と言われた": "Higher-up asked, “Can't AI just handle it?”", "ロボットの製品名を決める会議が 3 時間つづいた": "The meeting to name the robot product ran 3 hours.", "マニュアルを書いた。だれにも読まれなかった": "Wrote the manual. Nobody read it.", "保証期間がすぎた翌日に、故障の連絡が来た": "A breakdown report came in the day after the warranty expired.", "海外の展示会で、競合のロボットをじっくり観察した": "Studied a competitor's robot closely at an overseas trade show.", "中国の工場の立ち上げスピードに、目を見はった": "Was stunned by how fast factories in China ramp up.", "展示会でほかの会社のエンジニアと名刺交換して、なぜか仲良くなった": "Swapped business cards with another company's engineer at a trade show and somehow became friends.", "品質保証の部署と、仕様の読み方でもめた": "Argued with Quality Assurance over how to read the spec.", "大型連休中に、工場のロボットを総入れかえした": "Replaced every robot in the factory over the long holiday.", "社内表彰された。賞金で家族とごはんを食べた": "Won a company award. Spent the prize on dinner with family.", "ボーナスが思ったより多かった。そのまま貯金した": "Bonus was bigger than expected. Saved all of it.", "ボーナスが思ったより少なかった": "Bonus was smaller than expected.", "営業についていったら、技術の質問にぜんぶ答えることになった": "Tagged along with sales and ended up answering every technical question.", "ロボットの不具合で、全国の客先をまわった": "A robot defect meant touring clients nationwide.", "新人のころ作ったロボットが、まだ工場で動いていた": "A robot built as a new hire was still running at the factory.", "会社の合併で、使うソフトがぜんぶ変わった": "A company merger changed every piece of software in use.", "在宅勤務になった。でもロボットは家に持って帰れなかった": "Went remote. Couldn't take the robot home, though.", "工場の人たちが、導入したロボットに名前をつけてかわいがってくれた": "The factory staff named the new robot and doted on it.", "後輩の設計レビューで、むかしの自分と同じ失敗を見つけた": "In a junior's design review, spotted the exact mistake you used to make.", "部下が「やめたい」と相談してきた": "Team member came to say, “I want to quit.”", "予算会議で、ロボットのよさを数字で説明するのに苦労した": "Struggled to justify the robot in numbers at the budget meeting.", "採用面接で、学生のロボコン話に聞き入ってしまった": "Got totally absorbed in a student's robot-contest story during an interview.", "会社のロゴ入りロボットのぬいぐるみが届いた": "A company-logo robot plushie arrived.", "客先で、自分よりロボットにくわしい工場のベテランに出会った": "Met a factory veteran at a client who knew robots better than you.", "品質トラブルの報告書を 30 枚書いた": "Wrote a 30-page quality incident report.", "海外の顧客から、深夜にビデオ会議の招待が来た": "An overseas customer sent a video call invite for the middle of the night.", "ロボットの耐久試験を、一日中見守るだけの日があった": "Spent a whole day just watching a robot endurance test.", "部品メーカーが倒産して、部品が手に入らなくなった": "A parts supplier went bankrupt. The part became unobtainable.", "半導体不足で、ロボットのコントローラーが届かない": "Chip shortage: the robot controllers won't arrive.", "協働ロボットが、作業者の人とハイタッチできるようになった": "The cobot learned to high-five the workers.", "倉庫のロボットが、床のシールのはがれで迷子になった": "A warehouse robot got lost because a floor sticker peeled off.", "物流倉庫で、ロボットが通路で渋滞した": "Robots got into a traffic jam in the logistics warehouse aisle.", "自動運転のテスト中、カラスに道をゆずられた": "During an autonomous driving test, a crow yielded the right of way.", "ヒューマノイドのデモで、ロボットが冷蔵庫をあけるのに 5 分かかった": "At the humanoid demo, the robot took 5 minutes to open a fridge.", "ヒューマノイドの指が 1 本動かなくなり、ピースしかできなくなった": "One humanoid finger died. Now it can only make a peace sign.", "デモ動画を 10 倍速にしていいか、社内でもめた": "Internal debate: is it OK to play the demo video at 10x speed?", "遠隔操作用の VR ゴーグルで酔った": "Got motion-sick in the teleoperation VR headset.", "学習データが足りず、自分で 1000 回遠隔操作した": "Not enough training data, so teleoperated it 1000 times personally.", "会社の株価が上がって、持ち株会の分がふえた": "Company stock rose; the employee stock plan grew.", "株式報酬が入った。税金の計算がむずかしい": "Received stock compensation. The taxes are confusing.", "勤めているスタートアップが買収され、ストックオプションが現金になった": "The startup got acquired; stock options turned into cash.", "Unitree が上場した！ 持っていた株が大化けした": "Unitree went public! The shares held skyrocketed.", "同期が転職して、年収が上がったという話を聞いた": "Heard a peer from the same intake changed jobs and got a raise.", "社員旅行の旅館で、配膳ロボットをじっくり観察した": "Studied the serving robot closely at the company-trip ryokan.", "朝、工場に着くと、ロボットだけが夜通し働いた成果がならんでいた": "Arrived at the factory in the morning to find the robots' overnight output lined up.", "研究所の成果発表会で、役員に「で、いくらもうかるの？」と聞かれた": "At the lab's results showcase, an executive asked, “So, how much money does it make?”", "出張の経費精算をため込んで、3 か月分まとめてやった": "Let travel expenses pile up and filed 3 months' worth at once.", "ロボットの安全規格の文書を、端から端まで読んだ": "Read the robot safety standard cover to cover.", "オフィスは、だれかの家のガレージだった": "The office was someone's garage.", "社長と開発と営業と掃除係を、全部ひとりでやっている": "CEO, engineering, sales, and janitor — all handled solo.", "最初の社員が入った。給料を払えることに感動した": "First employee hired. Moved to tears at being able to make payroll.", "デモの前日、部品を電気街に買いに走った": "Day before the demo, rushed to the electronics district for parts.", "ピッチイベントで、ロボットが審査員にむかって走りだした": "At a pitch event, the robot charged straight at the judges.", "投資家に「市場規模は？」と聞かれ、とりあえず大きな数字を言った": "An investor asked, “Market size?” Blurted out a big number.", "資金調達が決まった日、みんなでピザを食べた（会社のお金で、自分の給料はそのまま）": "Funding closed! Everyone ate pizza (on the company; own salary unchanged).", "大企業との実証実験が 3 年つづいている。実証実験地獄だ": "A proof of concept with a big corporation is in year 3. PoC hell.", "ロボットの量産見積もりが、想定の 3 倍だった": "The mass-production quote for the robot came in at 3x the estimate.", "SNS で「すごいけど何に使うの？」と言われた": "On social media: “Impressive, but what's it for?”", "共同創業者とケンカした。翌日、ふつうに話した": "Fought with the co-founder. Next day, talked like normal.", "国の補助金に採択された。会社の口座が少しだけ太った": "Won a government grant. The company account got a little fatter.", "給料日の前に、会社の資金が尽きそうになった": "The company nearly ran out of cash right before payday", "最初の顧客は、創業者の知り合いだった": "The first customer was a friend of the founder", "ロボットの名前を商標登録しようとしたら、もう取られていた": "Tried to trademark the robot's name. Already taken", "自分の貯金を会社に貸した": "Lent personal savings to the company", "研究室の学生が 20 人をこえ、名前と顔が一致しなくなった": "The lab passed 20 students. Can no longer match names to faces", "授業で学生の半分が寝ていた。ロボットを出したら全員起きた": "Half the class was asleep. Brought out a robot and everyone woke up", "入試の監督の間、ずっとロボットのことを考えていた": "Proctored the entrance exam while thinking about robots the whole time", "学科長になってしまった": "Somehow ended up as department chair", "テレビ番組の監修をした。ロボットの描き方がまちがっていたが、言えなかった": "Supervised a TV show. The robots were portrayed all wrong, but couldn't say so", "学生が国際会議で最優秀論文賞をとった": "Student won Best Paper at an international conference", "研究室の OB 会。みんな立派になっていた": "Lab alumni reunion. Everyone has done so well", "大学の予算削減で、ロボットの修理ができない": "University budget cuts. No money to repair the robots", "高校に出張授業に行った。目をかがやかせる生徒がいた": "Gave a guest lecture at a high school. Some students' eyes lit up", "学会の委員長を引き受けた。メールが 1 日 200 通くる": "Agreed to chair a society committee. 200 emails a day", "査読の依頼が 1 週間で 6 本来た": "Got 6 review requests in one week", "書いた教科書が出版された。印税は少しだけ": "Wrote a textbook and it got published. Royalties: modest", "講演会によばれた。謝礼でロボットの部品を買った": "Invited to give a talk. Spent the honorarium on robot parts", "家を買った。頭金を払って、ローンは 35 年": "Bought a house. Down payment made; a 35-year mortgage", "車を買った。トランクにロボットが入る大きさにした": "Bought a car. Picked one with a trunk big enough for a robot", "つみたて投資をはじめた": "Started a monthly index-fund investment plan", "親から、少しだけ遺産を相続した": "Inherited a small amount from a parent", "ロボットの部品に散財した。後悔はしていない": "Splurged on robot parts. No regrets", "子どもの学費がかさむ": "The kids' tuition keeps piling up", "子どもが自由研究でロボットを作った。手伝いすぎた": "Kid built a robot for a science project. Helped way too much", "子どもに仕事の内容を聞かれ、説明に 30 分かかった": "Kid asked what the job is. The explanation took 30 minutes", "家族旅行の行き先が、なぜかロボットの博物館になった": "Somehow the family vacation ended up at a robot museum", "家電量販店のロボット掃除機売り場で、10 分立ちどまった": "Stood frozen for 10 minutes at the robot vacuum aisle of an electronics store", "映画のロボットの動きに、ついツッコミを入れてしまう": "Can't stop nitpicking how robots move in movies", "ロボットアニメを見て、ひさしぶりに泣いた": "Watched a mecha anime and cried for the first time in ages", "メガネの度が強くなった": "Glasses prescription got stronger", "肩こりがひどくなった": "Shoulder stiffness got worse", "昔の同級生の集まりで「まだロボットやってるの？」と言われた": "At a class reunion: “You're still doing robots?”", "友だちの結婚式で、ロボットの余興をたのまれた": "Asked to do a robot act at a friend's wedding", "腰痛のため、アシストスーツを自分でためした": "Bad back, so tested an assist suit on myself", "ロボットが動かない夢を見て、夜中に目がさめた": "Woke up in the middle of the night from a dream that the robot wouldn't move", "ふるさとの町工場に、自分が関わったロボットが入っていた": "Robot you'd worked on turned up in a small factory back home", "休みにキャンプに行った。電波がなくて最高だった": "Went camping on a day off. No signal. Bliss", "貯金が、はじめて年収をこえた": "Savings exceeded annual income for the first time", "ジムに通いはじめた（3 か月で行かなくなった）": "Joined a gym (stopped going after 3 months)", "ペットを飼いはじめた。ロボット犬ではない": "Got a pet. Not a robot dog", "定年後のことを考えはじめた": "Started thinking about life after retirement", "年金の書類が届いた。ロボットにも年金はあるのだろうか": "Pension paperwork arrived. Do robots get pensions too?", "奨学金とローンの返済が、ずしりと重い": "Student loan and mortgage payments weigh heavily", "スマホを落として画面を割った。自分で修理した": "Dropped the phone and cracked the screen. Fixed it myself", "旅行先のホテルで、受付がロボットだった。思わず型番を確認した": "The hotel front desk was a robot. Instinctively checked the model number", "人間ドックで「運動してください」と言われた": "At a health checkup: “Please get some exercise.”", "パートナーの誕生日を、ロボットの納期と同じ日にしてしまい怒られた": "Scheduled a robot delivery deadline on the partner's birthday. Got scolded", "新幹線の中で、ロボットのプログラムを直した": "Fixed robot code on the Shinkansen bullet train", "国際ロボット展の人ごみで、同僚とはぐれた": "Lost coworkers in the crowds at the International Robot Exhibition", "深圳の華強北で、1 日で部品をそろえた": "Sourced every part in one day at Huaqiangbei, Shenzhen", "朝 9 時から夜 9 時、週 6 日の働き方につかれた": "Worn out by the 996 schedule (9am–9pm, six days a week)", "旧正月の帰省で、親せきにロボットの動画を見せた": "Home for Lunar New Year. Showed relatives robot videos", "ベイエリアの家賃の高さに、めまいがした": "Bay Area rent prices made the head spin", "感謝祭の夕食で、家族にロボットの話をしすぎて引かれた": "Talked robots too much at Thanksgiving dinner. The family backed away", "終業時間になったら、人もロボットもきっちり帰った": "At quitting time, humans and robots alike went home right on time", "ハノーバーメッセで、ソーセージとロボットを見てまわった": "Toured sausages and robots at Hannover Messe", "徹夜明けにトッポッキを食べた": "Ate tteokbokki after an all-nighter", "ベンガルールの渋滞で、自動運転の難しさを思い知った": "Bengaluru traffic drove home just how hard self-driving is", "物価が高すぎて、外食はほとんどしなくなった": "Prices so high that eating out nearly stopped", "二足歩行のロボットが、はじめて 10 歩あるいた。みんなで拍手した": "The biped took its first 10 steps. Everyone applauded", "ヒューマノイドがころんだ。転び方の研究をはじめた": "The humanoid fell over. Started researching how to fall", "ヒューマノイドの手で卵をつかもうとして、12 個わった": "Tried grasping eggs with the humanoid hand. Broke 12", "ロボットの顔のデザインで、「こわい」派と「かわいい」派に分かれた": "The robot's face design split the team: “creepy” vs. “cute”", "ヒューマノイドに服を着せたら、関節にからまった": "Dressed the humanoid in clothes. They got tangled in the joints", "展示会でヒューマノイドがダンスをした。ダンスの練習のほうが大変だった": "The humanoid danced at a trade show. Rehearsing the dance was the hard part", "モーターが熱くなりすぎて、ヒューマノイドがデモの途中でしゃがみこんだ": "Motors overheated and the humanoid squatted down mid-demo", "「人の形である必要ある？」と聞かれた。10 回目だ": "“Does it really need to be humanoid?” Asked for the 10th time", "犬型ロボットの散歩中、本物の犬にほえられた": "Walking the robot dog, got barked at by a real dog", "四足ロボットが階段をのぼれた！ くだりはまだこわい": "The quadruped climbed stairs! Going down is still scary", "犬型ロボットに「おすわり」を教えた。お客さんにいちばんウケた": "Taught the robot dog to “sit.” Biggest hit with customers", "四足ロボットを雪の上で歩かせたら、すべって大の字になった": "Walked the quadruped on snow. It slipped and sprawled spread-eagle", "子どもたちが、犬型ロボットに勝手に名前をつけた": "The kids gave the robot dog a name without asking", "点検のため、犬型ロボットといっしょに夜のプラントを歩いた": "Patrolled a plant at night with the robot dog for inspections", "脚を 1 本外しても歩けるか、ためしてみた。なんとか歩いた": "Removed one leg to see if it could still walk. It somehow did", "しっぽをふる機能に、開発費のかなりの部分を使った": "Big chunk of the dev budget went into the tail-wagging feature", "移動ロボットが、ひとりでエレベーターに乗れるようになった": "The mobile robot learned to ride the elevator alone", "移動ロボットが、廊下の 5 mm の段差で止まった": "The mobile robot got stuck on a 5 mm bump in the hallway", "配膳ロボットが、お客さんのカバンの前で立ち往生した": "The serving robot stalled in front of a customer's bag", "ガラス張りの壁を、ロボットのセンサーが見落とした": "The robot's sensors missed a glass wall", "棚を運ぶロボットが、棚ごと迷子になった": "The shelf-carrying robot got lost, shelf and all", "ロボットが充電ステーションにもどれず、廊下で力つきていた": "The robot couldn't find its charging dock and died in the hallway", "自動ドアが、ロボットを人だと認めてくれない": "The automatic door refuses to recognize the robot as a person", "経路計画のバグで、ロボットがその場でひたすら回りつづけた": "Path-planning bug left the robot spinning in place forever", "アームの先に何をつけるかで、1 週間会議した": "Spent a week in meetings deciding what to put on the end of the arm", "ロボットアームが特異点に入って、ぐるんと回った": "The robot arm hit a singularity and whipped around", "バラ積みピッキングで、最後の 1 個がどうしても取れない": "Bin picking: the very last part just won't come out", "吸着パッドが、段ボールのテープにはりついて離れない": "The suction cup stuck to the box tape and won't let go", "可搬重量ギリギリの荷物を持たせて、全員で息をのんだ": "Loaded it right at its payload limit. Everyone held their breath", "教えた動きが、ミリ単位でずれていた": "The taught motion was off by millimeters", "アームの速さを上げたら、床ごとゆれた": "Sped up the arm. The floor shook with it", "溶接ロボットの火花をずっと見ていたら、時間を忘れた": "Watched the welding robot's sparks and lost track of time", "テスト飛行中、ドローンが風にあおられて木に引っかかった": "During a test flight, a gust blew the drone into a tree", "ドローンの飛行許可の書類を書いた。飛ばすより大変だった": "Filled out drone flight permit paperwork. Harder than flying", "ドローンが、カラスとにらみあった": "The drone had a staredown with a crow", "プロペラガードをつけ忘れて、指をかすった": "Forgot the propeller guards. Grazed a finger", "雨の日はドローンが飛べず、ひたすらシミュレーション": "Rainy day, drones grounded. Simulation all day", "空撮した映像がきれいすぎて、本来の目的を忘れた": "The aerial footage was so pretty the actual goal was forgotten", "バッテリーの持ち時間が、デモの長さに 1 分足りなかった": "Battery life came up 1 minute short of the demo", "ドローンの群れが、夜空にきれいなハートをえがいた": "The drone swarm drew a beautiful heart in the night sky", "自動運転のテストで、横断歩道のハトにいつまでも道をゆずった": "In self-driving tests, the car yielded to pigeons on the crosswalk forever", "センサーの汚れ対策に、小さなワイパーを開発した": "Developed a tiny wiper to keep the sensors clean", "雪道で白線が見えず、自動運転が「お手上げ」と表示した": "Lane lines hidden by snow; the self-driving system displayed “I give up”", "自動運転車の運転席で、ずっと手に汗をにぎっていた": "Sat in the driver's seat of the self-driving car with sweaty palms the whole time", "テストコースを 1 日 300 周した": "Did 300 laps of the test track in a day", "走行データが 1 日で何テラバイトもたまった": "Driving data piled up by the terabytes every day", "国によって信号機や標識がちがうことに、あらためて気づいた": "Realized anew that traffic lights and signs differ by country", "自動運転のタクシーに、はじめてお客さんが乗った": "The robotaxi carried its first passenger", "おそうじロボットが、ペットのおもちゃを飲みこんだ": "The robot vacuum swallowed a pet toy", "おそうじロボットが、ソファの下から出てこなくなった": "The robot vacuum wouldn't come out from under the sofa", "レビューに「うちの猫が乗っています」と書かれた": "Review said: “My cat rides on it.”", "靴下をよける機能の開発に、1 年かかった": "Developing the sock-avoidance feature took a year", "おそうじロボットの音を、さらに 3 dB 静かにした": "Made the robot vacuum another 3 dB quieter", "いろいろな家の間取りデータを 1 万件集めた": "Collected floor plan data from 10,000 homes", "どうしても充電台にもどれない家があった": "There was one house where it just could never get back to the dock", "自分の家のおそうじロボットだけ、なぜか言うことを聞かない": "Only the robot vacuum at home refuses to listen", "安全審査の書類が、電話帳くらいの厚さになった": "The safety review paperwork got as thick as a phone book", "お医者さんに使ってもらったら、「思ったより重い」と言われた": "Surgeon tried it and said, “Heavier than I expected.”", "鉗子の先の動きを、0.1 mm 単位で調整した": "Tuned the forceps tip motion in 0.1 mm steps", "手術の練習用の模型を、何十個も使った": "Went through dozens of surgical practice models", "手術ロボットで手術を受けた患者さんから、お礼の手紙が届いた": "Patient who had robotic surgery sent a thank-you letter", "承認がおりるまで、5 年かかった": "Regulatory approval took 5 years", "病院で白衣を着て説明していたら、お医者さんにまちがわれた": "Explaining in a white coat at the hospital, got mistaken for a doctor", "触覚を伝える研究をしていて、自分の手がしびれた": "Researching haptic feedback, and now your own hands are numb", "GM の工場で世界初の産業用ロボット「ユニメート」が働きはじめた": "The world's first industrial robot, \"Unimate,\" started work at a GM plant", "スタンフォード研究所で、考えて動くロボット「Shakey」の開発がはじまった": "Stanford Research Institute began building Shakey, a robot that thinks before it moves", "川崎重工がユニメートをライセンス生産。日本のロボット産業がはじまる": "Kawasaki Heavy Industries began building Unimates under license. Japan's robot industry was born", "早稲田大学の WABOT-1 が歩いた。世界初の本格的な人間型ロボット": "Waseda University's WABOT-1 walked: the world's first full-scale humanoid robot", "PUMA アームが登場。研究室のロボットアームの定番になる": "The PUMA arm arrived and became the standard robot arm in research labs", "日本で「ロボット普及元年」。工場にロボットがどんどん入る": "Japan's \"Year One of Robot Adoption.\" Robots poured into factories", "ロボット学会 ICRA がはじめて開かれた": "The robotics conference ICRA was held for the first time", "ブルックスの「サブサンプション・アーキテクチャ」が話題に。ホンダはひそかに二足歩行の研究をはじめる": "Brooks's \"subsumption architecture\" made waves. Honda quietly began researching bipedal walking", "ホンダが人間型ロボット P2 を発表。世界中のロボット屋がのけぞった": "Honda unveiled the humanoid P2. Roboticists everywhere were floored", "火星探査車ソジャーナが火星を走った。第 1 回 RoboCup も開催": "The Sojourner rover drove on Mars. The first RoboCup was held", "ソニーの AIBO 発売。25 万円が 20 分で売り切れる": "Sony launched AIBO. ¥250,000 a pop, sold out in 20 minutes", "ASIMO 登場。手術ロボット da Vinci がアメリカで承認される": "ASIMO debuted. The da Vinci surgical robot was approved in the US", "ロボット掃除機ルンバ発売。いちばん売れたロボットはこれになる": "The Roomba robot vacuum launched. It would become the best-selling robot ever", "DARPA グランドチャレンジ。砂漠を走る自動運転車は 1 台もゴールできなかった": "DARPA Grand Challenge: not a single self-driving car made it across the desert to the finish", "DARPA グランドチャレンジで、スタンフォードの Stanley が優勝": "Stanford's Stanley won the DARPA Grand Challenge", "DARPA アーバンチャレンジ開催。Willow Garage で ROS の開発がはじまる": "The DARPA Urban Challenge was held. Willow Garage began developing ROS", "ユニバーサルロボットが協働ロボット UR5 を発売": "Universal Robots released the UR5 collaborative robot", "ROS 1.0 リリース。研究者が Kinect を買いあさる": "ROS 1.0 was released. Researchers bought up every Kinect they could find", "東日本大震災と原発事故。すぐに投入できる日本製ロボットがなく、議論になった": "The Great East Japan Earthquake and nuclear accident. Japan had no robots ready to deploy, sparking debate", "Amazon が Kiva を買収。画像認識に深層学習の波がくる": "Amazon acquired Kiva. The deep-learning wave hit image recognition", "Google がボストン・ダイナミクスや SCHAFT を次々に買収": "Google bought Boston Dynamics, SCHAFT, and more in quick succession", "DARPA ロボティクスチャレンジ決勝で KAIST が優勝。転ぶロボット動画が世界でバズる": "KAIST won the DARPA Robotics Challenge Finals. Videos of falling robots went viral worldwide", "中国の美的集団が KUKA を買収。AlphaGo が囲碁で人間に勝つ": "China's Midea acquired KUKA. AlphaGo beat a human at Go", "ROS 2 の最初のリリース。Atlas のバク転動画が話題に": "The first ROS 2 release. Atlas's backflip video made headlines", "コロナ禍。配送ロボットや遠隔操作ロボットに注目が集まる": "COVID-19. Delivery and teleoperated robots got the spotlight", "現代自動車がボストン・ダイナミクスを買収。Tesla が人型ロボットを発表（中身は人だった）": "Hyundai acquired Boston Dynamics. Tesla announced a humanoid robot (it was a person in a suit)", "ChatGPT が公開された。Tesla Optimus の試作機がお披露目": "ChatGPT was released. A Tesla Optimus prototype was unveiled", "ロボットを言葉で動かす VLA モデルが登場。「ロボットの基盤モデル」が流行語に": "VLA models that let you command robots in plain language appeared. \"Robot foundation model\" became a buzzword", "ヒューマノイドブーム。Figure、電動 Atlas、Unitree G1 が次々に登場": "Humanoid boom: Figure, the electric Atlas, and Unitree G1 arrived one after another", "北京でヒューマノイドのハーフマラソン大会。ロボットがゴール後にこけた": "Beijing hosted a humanoid half marathon. The robot fell over after the finish", "Unitree が上場。人生シミュレーター『80億分の1』が流行り、なぜかこのゲームもできる": "Unitree went public. The life sim \"1 in 8 Billion\" took off, and somehow this game exists too", "（予測）家庭用ヒューマノイドが、軽自動車くらいの値段で買えるようになる": "(Forecast) Home humanoids cost about as much as a compact car", "（予測）ロボットがロボットを組み立てる工場が、あたりまえになる": "(Forecast) Factories where robots build robots become the norm", "（予測）月面で建設ロボットが基地を作りはじめる": "(Forecast) Construction robots begin building a base on the Moon", "（予測）ROS 4 リリース。やはりビルドは通らない": "(Forecast) ROS 4 is released. The build still fails", "（予測）「ロボット税」がいくつかの国で導入される": "(Forecast) Several countries introduce a \"robot tax\"", "（予測）介護ロボットが、人間の介護職より多い国が出てくる": "(Forecast) A country has more care robots than human caregivers", "（予測）RoboCup の目標の年。ロボットチームが W 杯優勝チームと試合をする": "(Forecast) RoboCup's target year: a robot team plays the World Cup champions", "（予測）ロボットが書いたロボットの論文が、ICRA の最優秀賞をとる": "(Forecast) A robotics paper written by a robot wins ICRA's Best Paper Award", "（予測）火星でロボットだけの町が稼働": "(Forecast) A robots-only town starts operating on Mars", "（予測）ロボットエンジニアの半分は、ロボットになった": "(Forecast) Half of all robotics engineers are now robots", "中国": "China", "アメリカ": "United States", "日本": "Japan", "ドイツ": "Germany", "韓国": "South Korea", "インド": "India", "イギリス": "United Kingdom", "フランス": "France", "イタリア": "Italy", "カナダ": "Canada", "台湾": "Taiwan", "スイス": "Switzerland", "シンガポール": "Singapore", "オーストラリア": "Australia", "オランダ": "Netherlands", "スペイン": "Spain", "デンマーク": "Denmark", "スウェーデン": "Sweden", "イスラエル": "Israel", "メキシコ": "Mexico", "ブラジル": "Brazil", "アラブ首長国連邦": "UAE", "香港": "Hong Kong", "チェコ": "Czech Republic", "イラン": "Iran", "トルコ": "Turkey", "ベトナム": "Vietnam", "インドネシア": "Indonesia", "マレーシア": "Malaysia", "ギリシャ": "Greece", "エジプト": "Egypt", "パキスタン": "Pakistan", "カーネギーメロン大学": "Carnegie Mellon University", "マサチューセッツ工科大学（MIT）": "Massachusetts Institute of Technology (MIT)", "スタンフォード大学": "Stanford University", "カリフォルニア大学バークレー校": "UC Berkeley", "ペンシルベニア大学（GRASP研）": "University of Pennsylvania (GRASP Lab)", "ジョージア工科大学": "Georgia Institute of Technology", "ミシガン大学": "University of Michigan", "テキサス大学オースティン校": "The University of Texas at Austin", "カリフォルニア大学サンディエゴ校": "UC San Diego", "メリーランド大学": "University of Maryland", "カリフォルニア工科大学": "Caltech", "イリノイ大学": "University of Illinois", "コーネル大学": "Cornell University", "ジョンズ・ホプキンス大学": "Johns Hopkins University", "ノースイースタン大学": "Northeastern University", "南カリフォルニア大学": "University of Southern California", "ワシントン大学": "University of Washington", "ウースター工科大学": "Worcester Polytechnic Institute", "パデュー大学": "Purdue University", "州立大学の機械工学科": "State university's mechanical engineering dept.", "地元の工科大学": "Local institute of technology", "清華大学": "Tsinghua University", "浙江大学": "Zhejiang University", "上海交通大学": "Shanghai Jiao Tong University", "ハルビン工業大学": "Harbin Institute of Technology", "北京大学": "Peking University", "北京航空航天大学": "Beihang University", "南開大学": "Nankai University", "華中科技大学": "Huazhong University of Science and Technology", "中国科学技術大学": "University of Science and Technology of China", "南方科技大学": "Southern University of Science and Technology", "ハルビン工程大学": "Harbin Engineering University", "東北大学（瀋陽）": "Northeastern University (Shenyang)", "省の理工系大学": "Provincial science and engineering university", "地方の工業大学": "Regional university of technology", "東京大学": "The University of Tokyo", "東京工業大学": "Tokyo Institute of Technology", "東京科学大学": "Institute of Science Tokyo", "早稲田大学": "Waseda University", "京都大学": "Kyoto University", "大阪大学": "Osaka University", "東北大学": "Tohoku University", "名古屋大学": "Nagoya University", "九州工業大学": "Kyushu Institute of Technology", "千葉工業大学": "Chiba Institute of Technology", "慶應義塾大学": "Keio University", "筑波大学": "University of Tsukuba", "電気通信大学": "The University of Electro-Communications", "立命館大学": "Ritsumeikan University", "芝浦工業大学": "Shibaura Institute of Technology", "豊橋技術科学大学（高専から編入）": "Toyohashi University of Technology (transfer from a technical college)", "長岡技術科学大学（高専から編入）": "Nagaoka University of Technology (transfer from a technical college)", "地方国立大学の工学部": "Regional national university (engineering)", "私立大学の機械工学科": "Private university's mechanical engineering dept.", "ミュンヘン工科大学": "Technical University of Munich", "カールスルーエ工科大学": "Karlsruhe Institute of Technology", "ダルムシュタット工科大学": "TU Darmstadt", "ベルリン工科大学": "TU Berlin", "ボン大学": "University of Bonn", "アーヘン工科大学": "RWTH Aachen University", "シュトゥットガルト大学": "University of Stuttgart", "ドレスデン工科大学": "TU Dresden", "工業系の専門大学（Hochschule）": "University of applied sciences (Hochschule)", "ソウル大学校": "Seoul National University", "漢陽大学校": "Hanyang University", "高麗大学校": "Korea University", "成均館大学校": "Sungkyunkwan University", "地方の国立大学": "Regional national university", "インド工科大学ボンベイ校": "IIT Bombay", "インド工科大学デリー校": "IIT Delhi", "インド工科大学マドラス校": "IIT Madras", "インド工科大学カーンプル校": "IIT Kanpur", "IIIT ハイデラバード": "IIIT Hyderabad", "インド理科大学院": "Indian Institute of Science", "州立の工科大学": "State engineering college", "私立の工科大学": "Private engineering college", "インペリアル・カレッジ・ロンドン": "Imperial College London", "オックスフォード大学": "University of Oxford", "エディンバラ大学": "University of Edinburgh", "ケンブリッジ大学": "University of Cambridge", "ブリストル大学": "University of Bristol", "地方の大学": "Regional university", "ソルボンヌ大学（ISIR）": "Sorbonne University (ISIR)", "エコール・ポリテクニーク": "École Polytechnique", "トゥールーズの大学（LAAS）": "University in Toulouse (LAAS)", "グランゼコールの工学系": "Grande école of engineering", "ミラノ工科大学": "Politecnico di Milano", "ピサ聖アンナ大学院大学": "Sant'Anna School of Advanced Studies, Pisa", "ジェノヴァ大学": "University of Genoa", "トリノ工科大学": "Politecnico di Torino", "ローマ・ラ・サピエンツァ大学": "Sapienza University of Rome", "トロント大学": "University of Toronto", "ブリティッシュコロンビア大学": "University of British Columbia", "マギル大学": "McGill University", "ウォータールー大学": "University of Waterloo", "国立台湾大学": "National Taiwan University", "国立清華大学": "National Tsing Hua University", "国立陽明交通大学": "National Yang Ming Chiao Tung University", "国立成功大学": "National Cheng Kung University", "科技大学": "University of science and technology", "チューリッヒ工科大学（ETH）": "ETH Zurich", "ローザンヌ工科大学（EPFL）": "EPFL", "チューリッヒ大学": "University of Zurich", "応用科学大学": "University of applied sciences", "シンガポール国立大学": "National University of Singapore", "南洋理工大学": "Nanyang Technological University", "シンガポール工科デザイン大学": "Singapore University of Technology and Design", "クイーンズランド工科大学": "Queensland University of Technology", "シドニー大学": "The University of Sydney", "オーストラリア国立大学": "Australian National University", "州の大学": "State university", "デルフト工科大学": "Delft University of Technology", "アイントホーフェン工科大学": "Eindhoven University of Technology", "トゥウェンテ大学": "University of Twente", "カタルーニャ工科大学": "Polytechnic University of Catalonia", "マドリード工科大学": "Technical University of Madrid", "デンマーク工科大学": "Technical University of Denmark", "南デンマーク大学（オーデンセ）": "University of Southern Denmark (Odense)", "オールボー大学": "Aalborg University", "KTH王立工科大学": "KTH Royal Institute of Technology", "チャルマース工科大学": "Chalmers University of Technology", "リンショーピング大学": "Linköping University", "ルンド大学": "Lund University", "テクニオン・イスラエル工科大学": "Technion – Israel Institute of Technology", "テルアビブ大学": "Tel Aviv University", "ベン・グリオン大学": "Ben-Gurion University", "メキシコ国立自治大学": "National Autonomous University of Mexico (UNAM)", "モンテレイ工科大学": "Tecnológico de Monterrey", "州の工科大学": "State institute of technology", "サンパウロ大学": "University of São Paulo", "カンピーナス州立大学": "University of Campinas", "州の連邦大学": "Federal university", "MBZUAI（ムハンマド・ビン・ザーイド人工知能大学）": "MBZUAI (Mohamed bin Zayed University of Artificial Intelligence)", "ハリファ大学": "Khalifa University", "香港中文大学": "The Chinese University of Hong Kong", "香港科技大学": "The Hong Kong University of Science and Technology", "香港大学": "The University of Hong Kong", "チェコ工科大学": "Czech Technical University in Prague", "ブルノ工科大学": "Brno University of Technology", "ファナック": "FANUC", "安川電機": "Yaskawa Electric", "川崎重工": "Kawasaki Heavy Industries", "デンソー": "Denso", "トヨタ自動車": "Toyota", "ホンダ": "Honda", "ソニー": "Sony", "オムロン": "OMRON", "三菱電機": "Mitsubishi Electric", "パナソニック": "Panasonic", "不二越": "Nachi-Fujikoshi", "日立製作所": "Hitachi", "スマイルロボティクス": "Smile Robotics", "シンクロボ（アイリスグループ）": "SyncRobo (IRIS Group)", "テレイグジスタンス": "Telexistence", "サイバーダイン": "Cyberdyne", "産業技術総合研究所": "AIST", "電子技術総合研究所": "Electrotechnical Laboratory (ETL)", "理化学研究所": "RIKEN", "地元の FA 系 SIer": "Local factory-automation integrator", "ユニメーション": "Unimation", "GM の生産技術部": "GM Manufacturing Engineering", "シンシナティ・ミラクロン": "Cincinnati Milacron", "ボストン・ダイナミクス": "Boston Dynamics", "インテュイティブ・サージカル": "Intuitive Surgical", "NASA ジェット推進研究所": "NASA Jet Propulsion Laboratory", "Google（自動運転）": "Google (self-driving)", "NVIDIA（ロボティクス）": "NVIDIA (robotics)", "Google DeepMind（ロボティクス）": "Google DeepMind (robotics)", "中堅の自動化インテグレーター": "Mid-sized automation integrator", "瀋陽新松（Siasun）": "Siasun", "埃斯頓（Estun）": "Estun", "匯川技術（Inovance）": "Inovance", "エコバックス": "Ecovacs", "石頭科技（Roborock）": "Roborock", "UBTech（優必選）": "UBTech", "Unitree（宇樹科技）": "Unitree", "Fourier（傅利葉）": "Fourier", "AgiBot（智元機器人）": "AgiBot", "Galbot（銀河通用）": "Galbot", "シャオミ（ロボティクス）": "Xiaomi (robotics)", "ファーウェイ": "Huawei", "中国科学院 瀋陽自動化研究所": "Shenyang Institute of Automation, CAS", "国有工場の自動化部門": "State-owned factory's automation dept.", "深圳の自動化メーカー": "Shenzhen automation maker", "シーメンス": "Siemens", "ボッシュ": "Bosch", "フェスト": "Festo", "フォルクスワーゲンの生産技術": "Volkswagen Manufacturing Engineering", "BMW の生産技術": "BMW Manufacturing Engineering", "ドイツ航空宇宙センター（DLR）": "German Aerospace Center (DLR)", "フラウンホーファー研究所": "Fraunhofer Institute", "中堅のロボット SIer": "Mid-sized robot integrator", "現代自動車グループ": "Hyundai Motor Group", "サムスン電子": "Samsung Electronics", "LG電子": "LG Electronics", "斗山ロボティクス": "Doosan Robotics", "韓国科学技術研究院（KIST）": "Korea Institute of Science and Technology (KIST)", "自動化設備メーカー": "Automation equipment maker", "タタ・コンサルタンシー・サービシズ": "Tata Consultancy Services", "ラーセン&トゥブロ": "Larsen & Toubro", "インド宇宙研究機関（ISRO）": "Indian Space Research Organisation (ISRO)", "自動車部品メーカーの生産技術": "Auto-parts maker's manufacturing engineering", "ロボット教育スタートアップ": "Robotics education startup", "自動化インテグレーター": "Automation integrator", "Ocado（倉庫ロボット）": "Ocado (warehouse robots)", "ダイソン（ロボティクス）": "Dyson (robotics)", "BAE システムズ": "BAE Systems", "Oxa（自動運転）": "Oxa (self-driving)", "アルデバラン": "Aldebaran", "ルノーの生産技術": "Renault Manufacturing Engineering", "ダッソー": "Dassault", "フランス国立科学研究センター（CNRS）": "French National Centre for Scientific Research (CNRS)", "コマウ": "Comau", "イタリア技術研究所（IIT）": "Italian Institute of Technology (IIT)", "レオナルド": "Leonardo", "フェラーリの生産技術": "Ferrari Manufacturing Engineering", "包装機械メーカー": "Packaging machinery maker", "MDA（カナダアーム）": "MDA (Canadarm)", "鴻海（フォックスコン）": "Hon Hai (Foxconn)", "上銀科技（HIWIN）": "HIWIN", "台達電子（デルタ）": "Delta Electronics", "TSMC の工場自動化": "TSMC Factory Automation", "工研院（ITRI）": "ITRI", "自動化メーカー": "Automation maker", "ストーブリ": "Stäubli", "ディズニー・リサーチ チューリッヒ": "Disney Research Zurich", "ST エンジニアリング": "ST Engineering", "物流ロボットのスタートアップ": "Logistics robotics startup", "半導体工場の自動化部門": "Semiconductor fab's automation dept.", "鉱山自動化の会社": "Mining automation company", "農業ロボットのスタートアップ": "Agricultural robotics startup", "フィリップス": "Philips", "Lely（搾乳ロボット）": "Lely (milking robots)", "自動車工場の生産技術": "Auto plant's manufacturing engineering", "ユニバーサルロボット": "Universal Robots", "オーデンセのロボット企業": "Odense robotics company", "ABB ロボティクス（ヴェステロース）": "ABB Robotics (Västerås)", "ハスクバーナ（ロボット芝刈り機）": "Husqvarna (robotic mowers)", "ボルボの生産技術": "Volvo Manufacturing Engineering", "モービルアイ": "Mobileye", "エルビット・システムズ": "Elbit Systems", "ロボット系スタートアップ": "Robotics startup", "エンブラエル": "Embraer", "技術革新研究所（TII）": "Technology Innovation Institute (TII)", "ドバイの物流自動化": "Dubai logistics automation firm", "ロボットのスタートアップ": "Robot startup", "物流ロボットの会社": "Logistics robotics company", "香港の自動化メーカー": "Hong Kong automation maker", "深圳の工場（越境勤務）": "Shenzhen factory (cross-border commute)", "シュコダの生産技術": "Škoda Manufacturing Engineering", "チェコ情報・ロボティクス研究所（CIIRC）": "Czech Institute of Informatics, Robotics and Cybernetics (CIIRC)", "ヒューマノイド": "Humanoid", "人の形をしたロボット。2024年から大ブーム": "Robots shaped like people. A huge boom since 2024", "犬型（四足歩行）": "Quadruped (dog)", "4 本足で歩く。点検や警備、ペットにも": "Walks on four legs. Inspection, security, even pets", "車輪型（移動ロボット）": "Wheeled mobile robot", "工場・倉庫・お店を走りまわる": "Zips around factories, warehouses, and stores", "アーム（産業用）": "Industrial arm", "工場で溶接・組み立て・ピッキング": "Welding, assembly, and picking in factories", "ドローン": "Drone", "空を飛ぶ。空撮・点検・配送": "Flies. Aerial filming, inspection, delivery", "自動運転車": "Self-driving car", "人を乗せて、自分で走るクルマ": "Car that carries people and drives itself", "おそうじロボット": "Robot vacuum", "家の床をそうじする。いちばん売れたロボット": "Cleans your floors. The best-selling robot ever", "手術ロボット": "Surgical robot", "お医者さんの手術を助ける": "Helps doctors perform surgery", "ロボットをつくろうと思ったきっかけは？": "What made you want to build robots?", "いま、つくっているものをひとことで言うと？": "In a word, what are you building right now?", "若いころの自分に、ひとこと言うなら？": "If you could say one thing to your younger self, what would it be?", "ロボットは、人を幸せにしたと思う？": "Do you think robots have made people happier?"};
+const tr = t=>EN ? (DICT_EN[t] || String(t).replace(/（/g,' (').replace(/）/g,')')) : t;
+const SMILE_NAME = tr('スマイルロボティクス'), SYNC_NAME = tr('シンクロボ（アイリスグループ）');
+(function localizeData(){
+  // 会社の得意なロボットは、名前を訳す前に決めておく
+  for(const c in COMPANIES) for(const x of COMPANIES[c]) x[5]=compRT(x[0]);
+  if(!EN) return;
+  for(const k in COUNTRIES) COUNTRIES[k].n=tr(COUNTRIES[k].n);
+  for(const k in HOMES) HOMES[k].n=tr(HOMES[k].n);
+  for(const c in UNIS) for(const u of UNIS[c]) u[0]=u[0].split('|').map((x,i)=>i===1?x:tr(x)).join('|');
+  for(const c in COMPANIES) for(const x of COMPANIES[c]) x[0]=tr(x[0]);
+  for(const k in WORLD) WORLD[k]=tr(WORLD[k]);
+  for(const k in RTYPES){ RTYPES[k].n=tr(RTYPES[k].n); RTYPES[k].d=tr(RTYPES[k].d); }
+  for(const k in ASKS) ASKS[k]=tr(ASKS[k]);
+  for(const e of EVENTS) if(typeof e.t==='string') e.t=tr(e.t);
+})();
 /* =========================================================
    自動で 1 人生を走らせる（同期の 4 人とおまかせ用）
    ========================================================= */
@@ -1799,20 +1881,100 @@ function titleSceneURL(){
 const $ = id=>document.getElementById(id);
 let ERA='any', AUTO=false, SPEED=1, SKIP=false, PAUSED=false;
 let S=null, PEERS=[], Q=[], timer=null, waiting=false;
+/* ---------- 英語版：HTML に書いた文言 ---------- */
+const HTML_EN = {
+  'キャンパスにならぶ 8 種類のロボットのピクセルアート':'Pixel art of eight kinds of robots lined up on a campus',
+  '明るい色と暗い色を切りかえる':'Switch between light and dark colors',
+  'v1.4 · 無料のロボットエンジニア人生シミュレーション · 24か国の推計にもとづく':'v1.4 · A free robotics-engineer life simulation · based on estimates for 24 countries',
+  '世界には、およそ100万人のロボットエンジニアがいます。そのひとりとして大学に入学し、たった一度のエンジニア人生を定年まで生きてみます。どの国の、どの大学に入るかは選べません。':'There are about a million robotics engineers in the world. Enter university as one of them and live a single engineering life through to retirement. You don\'t get to choose the country or the university.',
+  'このページを開いてから、世界で売れたロボット':'Robots sold worldwide since you opened this page',
+  '同じ時間に、工場に入った産業用ロボット':'Industrial robots installed in factories in the same time',
+  '今日のテーマ':'Today\'s theme',
+  '今日入学するすべての人生が、このテーマをともに通り過ぎます。':'Every life that begins today passes through this theme together.',
+  '年代ごとの比率の変化':'How the shares changed over time',
+  '国際ロボット連盟（IFR）の産業用ロボット設置台数、ロボット学会 ICRA 2024 の著者数、CSRankings のロボティクス論文数をまぜた 2026 年の推計に、各国のロボット産業の歴史（日本の 1980 年代のロボット普及、2010 年代からの中国の急成長など）を加えています。':'A 2026 estimate blending IFR industrial-robot installations, ICRA 2024 author counts and CSRankings robotics publications, adjusted by each country\'s robot-industry history (Japan\'s 1980s robot boom, China\'s rapid rise since the 2010s, and so on).',
+  '入学する時代':'Era of enrollment',
+  'むかしの世界':'The past',
+  'いまの世界':'Today',
+  'どの時代でも':'Any era',
+  '大きな決断':'Big decisions',
+  '自分で選ぶ':'Choose myself',
+  'おまかせ':'Auto',
+  'おまかせにすると、進学・就職・転職などの決断も統計どおりに自動で進みます。':'With Auto, decisions like grad school, jobs and job changes are made for you according to the statistics.',
+  'ひとつの人生の長さ':'Length of one life',
+  '定年まで生きるのに約10分（1年 ≈ 13秒）。生きているあいだも、一時停止や倍速ができます。':'About 10 minutes to retirement (1 year ≈ 13 s). You can pause or speed up while you live.',
+  '入学する':'Enroll',
+  '設定はそのままで、すぐに入学してもかまいません。':'You can enroll right away with the default settings.',
+  '前世の記録':'Past lives',
+  'このブラウザで生きた人生です（10 件まで）。':'Lives lived in this browser (up to 10).',
+  'あそびかた':'How to play',
+  '18歳で入学したところから、定年まで 1 年ずつ時間が進む':'Time moves one year at a time, from entering university at 18 to retirement',
+  '入学したら、つくるロボットの種類（ヒューマノイド・犬型・アームなど 8 種）をえらぶ':'After enrolling, pick the kind of robot you\'ll build (8 types: humanoid, quadruped, arm…)',
+  '毎年の「重点」をえらぶと、技術・健康・幸福・人脈が変わる':'Your yearly “focus” changes skill, health, happiness and network',
+  '進学・就職・転職・起業などの大きな決断は、自分でえらぶ。選んだあとの年収も見える':'You make the big decisions — grad school, jobs, job changes, startups — and see the salary each choice leads to',
+  '年収・資産・携わったロボットの機種数・売れたロボットの台数が毎年変わる':'Salary, assets, robot models worked on and robots sold change every year',
+  '同じ年に入学した 4 人も、同じ統計で同時に人生を歩む':'Four classmates who entered the same year live their lives alongside yours, under the same statistics',
+  '元ネタは人生シミュレーター『':'A parody of the life simulator “',
+  '80億分の1':'1 in 8 Billion',
+  '』。この作品はそのパロディで、数字は公開データからのざっくり推計、できごとは業界あるあるの創作です。':'”. Numbers are rough estimates from public data; events are made-up industry in-jokes.',
+  '← ゲーム一覧へ':'← All games',
+  '入学カードを共有':'Share enrollment card',
+  '人生を始める':'Start your life',
+  '歳':'',
+  '一時停止':'Pause',
+  '次へ »':'Next »',
+  'いまの場面':'Current scene',
+  '人生の記録':'Life log',
+  '新しい順':'newest first',
+  '今年の重点':'This year\'s focus',
+  'いちばん力を入れることを選びます。いつでも変えられます。':'Choose what to focus on most. You can change it any time.',
+  '🔧 開発':'🔧 Build',
+  '📄 論文・発信':'📄 Publish',
+  '🤝 人脈':'🤝 Network',
+  '☕ 休む':'☕ Rest',
+  'お金とロボット':'Money and robots',
+  '同じ年に入学した人たち':'Classmates from the same year',
+  'いま、同じ年齢で':'now, at the same age',
+  '人生地図':'Life map',
+  '1マス = 1年':'1 square = 1 year',
+  '色が濃いほど幸福だった年。枠のマスは定年の年。':'Darker squares were happier years. The outlined square is retirement.',
+};
+function applyHtmlLang(){
+  document.documentElement.lang = LANG;
+  if(!EN) return;
+  document.title = '1 in a Million — Robotics Engineer Life Simulator';
+  const md=document.querySelector('meta[name="description"]'); if(md) md.setAttribute('content','Live one life as one of the world\'s million robotics engineers. Your country and university are drawn by statistics; build robots, write papers, change jobs, found startups and ride the humanoid boom to retirement.');
+  const walk=document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes=[]; while(walk.nextNode()) nodes.push(walk.currentNode);
+  for(const n of nodes){ if(n.parentNode && n.parentNode.nodeName==='SCRIPT') continue; const k=n.nodeValue.trim(); if(k && HTML_EN[k]!==undefined) n.nodeValue=n.nodeValue.replace(k,HTML_EN[k]); }
+  document.querySelectorAll('[alt],[aria-label],[placeholder],[title]').forEach(el=>{ for(const a of ['alt','aria-label','placeholder','title']){ const v=el.getAttribute(a); if(v && HTML_EN[v]!==undefined) el.setAttribute(a,HTML_EN[v]); } });
+  document.querySelector('.logo').innerHTML='<em>1</em> in a Million';
+  document.querySelector('.agebar .age').innerHTML='<small>Age</small> <span id="gAge">18</span>';
+}
+applyHtmlLang();
+document.querySelectorAll('#langSw button').forEach(b=>{
+  b.setAttribute('aria-pressed', b.dataset.lang===LANG);
+  b.onclick=()=>{ try{ localStorage.setItem('robolife.lang',b.dataset.lang); }catch(e){} const u=new URL(location.href); u.searchParams.set('lang',b.dataset.lang); location.href=u.toString(); };
+});
+
 
 function show(id){ ['title','birth','game','end'].forEach(x=>$(x).classList.toggle('hidden',x!==id)); window.scrollTo(0,0); }
 const ISO3 = {JP:'JPN',CN:'CHN',US:'USA',DE:'DEU',KR:'KOR',IN:'IND',GB:'GBR',FR:'FRA',IT:'ITA',CA:'CAN',TW:'TWN',CH:'CHE',SG:'SGP',AU:'AUS',NL:'NLD',ES:'ESP',DK:'DNK',SE:'SWE',IL:'ISR',MX:'MEX',BR:'BRA',AE:'ARE',HK:'HKG',CZ:'CZE',IR:'IRN',TR:'TUR',VN:'VNM',ID:'IDN',MY:'MYS',GR:'GRC',EG:'EGY',PK:'PAK'};
 const FAM_LV = {'きびしい家計':1,'ふつうの家庭':3,'エンジニア一家':3,'ゆたかな家庭':5};
 const dots = n=>'●'.repeat(n)+'○'.repeat(5-n);
-const TIER_TXT = ['','世界トップの研究大学','有力な大学','ふつうの大学'];
+const TIER_TXT = T(['','世界トップの研究大学','有力な大学','ふつうの大学'],['','a top research university','a strong university','an ordinary university']);
+const AGE = a=>T(a+'歳','age '+a);
+const GEN = (g,short)=>short?T(g==='f'?'女':'男',g==='f'?'F':'M'):T(g==='f'?'女性':'男性',g==='f'?'Female':'Male');
+const FAM_EN = {'きびしい家計':'a struggling family','ふつうの家庭':'an ordinary family','エンジニア一家':'a family of engineers','ゆたかな家庭':'a well-off family'};
+const DEG_TXT = s=>s.stage==='ug'?T('学部在学中','Undergraduate'):s.stage==='ms'?T('修士課程在学中','Master\'s student'):s.stage==='phd'?T('博士課程在学中','PhD student'):({'学部卒':T('学士','Bachelor\'s'),'修士':T('修士','Master\'s'),'博士':T('博士','PhD')})[s.deg]||s.deg;
 function docNo(s){ let h=0; for(const ch of s.id) h=(h*33+ch.charCodeAt(0))%9999999; return (ISO3[s.c]||'XXX')+'-'+s.entry+'-'+String(h).padStart(7,'0'); }
 function shortStage(s){ return stageLabel(s); }
 
 /* ---------- タイトル ---------- */
 const ERA_NOTE = {
-  past:'1965〜2015年のどこかで入学します。日本・アメリカ・ヨーロッパのロボット産業が強かった時代です。',
-  now:'2026年に入学します。ヒューマノイドブームのまっただ中です。卒業後の世界は、これからの予測で進みます。',
-  any:'1965〜2026年のどこかで入学します。ロボットエンジニアの多い近年ほど選ばれやすくなります。',
+  past:T('1965〜2015年のどこかで入学します。日本・アメリカ・ヨーロッパのロボット産業が強かった時代です。','You enter university sometime in 1965–2015, when Japan, the US and Europe led the robot industry.'),
+  now:T('2026年に入学します。ヒューマノイドブームのまっただ中です。卒業後の世界は、これからの予測で進みます。','You enter university in 2026, in the middle of the humanoid boom. Life after graduation follows forecasts.'),
+  any:T('1965〜2026年のどこかで入学します。ロボットエンジニアの多い近年ほど選ばれやすくなります。','You enter university sometime in 1965–2026. Recent years, with more roboticists, are more likely.'),
 };
 document.querySelectorAll('#eraSeg button').forEach(b=>b.onclick=()=>{
   ERA=b.dataset.era; document.querySelectorAll('#eraSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b));
@@ -1825,8 +1987,8 @@ $('startBtn').onclick=startBirth; $('startBtn2').onclick=startBirth;
 
 const SERIES = [['CN','var(--s1)'],['US','var(--s2)'],['JP','var(--s3)'],['DE','var(--s4)'],['KR','var(--s5)'],['IN','var(--s6)']];
 const OTHER_COL = 'var(--so)';
-const ERA_TITLE = {any:'どの時代かに入学する学生だったら', now:'いま入学する学生だったら', past:'むかし入学した学生だったら'};
-const ERA_SUB = {any:'1965〜2026年入学の重みづけ平均 · 上位 9 か国', now:'2026年入学 · 上位 9 か国', past:'1965〜2015年入学の重みづけ平均 · 上位 9 か国'};
+const ERA_TITLE = T({any:'どの時代かに入学する学生だったら', now:'いま入学する学生だったら', past:'むかし入学した学生だったら'},{any:'If you entered in any era', now:'If you entered university today', past:'If you entered in the past'});
+const ERA_SUB = T({any:'1965〜2026年入学の重みづけ平均 · 上位 9 か国', now:'2026年入学 · 上位 9 か国', past:'1965〜2015年入学の重みづけ平均 · 上位 9 か国'},{any:'Weighted average of 1965–2026 entrants · top 9 countries', now:'2026 entrants · top 9 countries', past:'Weighted average of 1965–2015 entrants · top 9 countries'});
 function renderCountryBars(){
   const d = eraDist(ERA);
   const ks = Object.keys(d).sort((a,b)=>d[b]-d[a]);
@@ -1836,7 +1998,7 @@ function renderCountryBars(){
   $('distLbl').textContent = ERA_SUB[ERA];
   $('eraNote').textContent = ERA_NOTE[ERA];
   $('countryBars').innerHTML = top.map(k=>`<span>${COUNTRIES[k].n}</span><span class="bt"><i style="width:${(d[k]/max*100).toFixed(1)}%"></i></span><span class="pc">${(d[k]*100).toFixed(1)}%</span>`).join('')
-    + `<span>その他${ks.length-9}か国</span><span class="bt"><i class="o" style="width:${(rest/max*100).toFixed(1)}%"></i></span><span class="pc">${(rest*100).toFixed(1)}%</span>`;
+    + `<span>${T('その他'+(ks.length-9)+'か国',(ks.length-9)+' other countries')}</span><span class="bt"><i class="o" style="width:${(rest/max*100).toFixed(1)}%"></i></span><span class="pc">${(rest*100).toFixed(1)}%</span>`;
   renderTrend();
 }
 function shareAt(y){
@@ -1846,8 +2008,8 @@ function shareAt(y){
   return r;
 }
 function renderTrend(){
-  const W=600,H=220,L=34,Rr=18,T=8,B=24, y0=1965,y1=2026;
-  const X=y=>L+(y-y0)/(y1-y0)*(W-L-Rr), Y=v=>T+(1-v)*(H-T-B);
+  const W=600,H=220,L=34,Rr=18,TP=8,B=24, y0=1965,y1=2026;
+  const X=y=>L+(y-y0)/(y1-y0)*(W-L-Rr), Y=v=>TP+(1-v)*(H-TP-B);
   const years=range(y0,y1), sh=years.map(shareAt);
   const cols=[...SERIES.map(x=>x[1]),OTHER_COL];
   let paths='';
@@ -1859,20 +2021,20 @@ function renderTrend(){
   }
   const er = ERA==='now'?[2025.2,2026]: ERA==='past'?[1965,2015]:[1965,2026];
   let shade='';
-  if(er[0]>y0) shade+=`<rect x="${L}" y="${T}" width="${X(er[0])-L}" height="${H-T-B}" style="fill:var(--card)" opacity=".72"/>`;
-  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${T}" width="${W-Rr-X(er[1])}" height="${H-T-B}" style="fill:var(--card)" opacity=".72"/>`;
+  if(er[0]>y0) shade+=`<rect x="${L}" y="${TP}" width="${X(er[0])-L}" height="${H-TP-B}" style="fill:var(--card)" opacity=".72"/>`;
+  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${TP}" width="${W-Rr-X(er[1])}" height="${H-TP-B}" style="fill:var(--card)" opacity=".72"/>`;
   let axis='';
   for(const v of [0,.25,.5,.75,1]) axis+=`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" style="fill:var(--ink3)" font-family="monospace">${v*100}%</text>`;
   for(const y of [1965,1980,1995,2010,2026]) axis+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle" font-size="11" style="fill:var(--ink3)" font-family="monospace">${y}</text>`;
-  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="1965年から2026年までの、ロボットエンジニアの国別の比率の変化">${paths}${shade}${axis}<line id="tx" y1="${T}" y2="${H-B}" style="stroke:var(--ink)" stroke-width="1" opacity="0"/><rect x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
-  $('trendLegend').innerHTML = SERIES.map(([k,c])=>`<span><i style="background:${c}"></i>${COUNTRIES[k].n}</span>`).join('')+`<span><i style="background:${OTHER_COL}"></i>その他</span>`;
+  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${T('1965年から2026年までの、ロボットエンジニアの国別の比率の変化','Share of robotics engineers by country, 1965–2026')}">${paths}${shade}${axis}<line id="tx" y1="${TP}" y2="${H-B}" style="stroke:var(--ink)" stroke-width="1" opacity="0"/><rect x="${L}" y="${TP}" width="${W-L-Rr}" height="${H-TP-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
+  $('trendLegend').innerHTML = SERIES.map(([k,c])=>`<span><i style="background:${c}"></i>${COUNTRIES[k].n}</span>`).join('')+`<span><i style="background:${OTHER_COL}"></i>${T('その他','Other')}</span>`;
   const svg=$('trend').querySelector('svg'), tip=$('ttip'), line=svg.querySelector('#tx');
   const move=ev=>{
     const r=svg.getBoundingClientRect(), px=(ev.clientX-r.left)/r.width*W;
     const y=clamp(Math.round(y0+(px-L)/(W-L-Rr)*(y1-y0)),y0,y1), v=shareAt(y);
     line.setAttribute('x1',X(y)); line.setAttribute('x2',X(y)); line.setAttribute('opacity','.6');
-    const names=[...SERIES.map(([k])=>COUNTRIES[k].n),'その他'];
-    tip.innerHTML=`<b>${y}年</b>`+names.map((n,i)=>`<span><i style="background:${cols[i]}"></i>${n} ${(v[i]*100).toFixed(0)}%</span>`).join('');
+    const names=[...SERIES.map(([k])=>COUNTRIES[k].n),T('その他','Other')];
+    tip.innerHTML=`<b>${T(y+'年',y)}</b>`+names.map((n,i)=>`<span><i style="background:${cols[i]}"></i>${n} ${(v[i]*100).toFixed(0)}%</span>`).join('');
     tip.classList.remove('hidden');
     const tx=X(y)/W*r.width; tip.style.left=(tx>r.width/2? tx-tip.offsetWidth-8 : tx+8)+'px';
   };
@@ -1885,7 +2047,7 @@ function renderTrend(){
   const t0=Date.now();
   setInterval(()=>{ const sec=(Date.now()-t0)/1000; $('cSold').textContent=Math.floor(sec*0.63).toLocaleString(); $('cArm').textContent=Math.floor(sec*542000/31536000).toLocaleString(); }, 500);
 })();
-const THEMES = [['デモ','デモ'],['ビルド','ビルドが通らない'],['論文','論文'],['バッテリー','バッテリー'],['展示会','展示会'],['工場','工場'],['キャリブレーション','キャリブレーション'],['子ども','子どもたち']];
+const THEMES = T([['デモ','デモ'],['ビルド','ビルドが通らない'],['論文','論文'],['バッテリー','バッテリー'],['展示会','展示会'],['工場','工場'],['キャリブレーション','キャリブレーション'],['子ども','子どもたち']],[['demo','Demos'],['build','Broken builds'],['paper','Papers'],['batter','Batteries'],['show','Trade shows'],['factory','Factories'],['calibrat','Calibration'],['kid','Kids']]);
 const TODAY_THEME = THEMES[Math.floor(Date.now()/86400000)%THEMES.length];
 THEME_KW = TODAY_THEME[0];
 $('themeName').textContent = TODAY_THEME[1];
@@ -1897,7 +2059,7 @@ function renderPast(){
   const h=loadHist();
   $('pastBox').classList.toggle('hidden', !h.length);
   $('pastList').innerHTML = h.map(x=>`<div class="life">
-    <div><span class="nm">${esc(x.name)}</span><span class="mt">${esc(x.cn||'')} · ${x.g==='f'?'女性':'男性'} · ${x.age}歳</span></div>
+    <div><span class="nm">${esc(x.name)}</span><span class="mt">${esc(x.cn||'')} · ${GEN(x.g)} · ${AGE(x.age)}</span></div>
     <div class="st">${esc(x.story||'')}</div>
     <div>${x.look?pxImg(personURL(x.look,x.age,x.o||'casual'),'pv',''):''}${x.rt?pxImg(robotURL(x.rt),'pr',''):''} <span class="ttl">${esc(x.title)}</span></div>
   </div>`).join('');
@@ -1911,7 +2073,7 @@ function startBirth(){
   PEERS = [0,1,2,3].map(()=>simulate(newLife(y)));
   $('birthCard').classList.add('hidden'); $('birthBar').classList.add('hidden');
   $('spin').classList.remove('hidden'); $('rouLabel').classList.remove('hidden');
-  $('rouLabel').textContent = '世界のどこかの大学に、入学しています…';
+  $('rouLabel').textContent = T('世界のどこかの大学に、入学しています…','Enrolling at a university somewhere in the world…');
   const spin=$('spin'); let n=0; const keys=Object.keys(COUNTRIES);
   const total = 22;
   const step=()=>{
@@ -1919,7 +2081,7 @@ function startBirth(){
     if(n<total){
       const k = n<total-6 ? pick(keys) : S.c;
       const u = n<total-6 ? pick(UNIS[k])[0] : (n<total-2 ? pick(UNIS[S.c])[0] : S.uniRaw);
-      spin.textContent = COUNTRIES[k].n+'・'+uniName(u,y);
+      spin.textContent = COUNTRIES[k].n+T('・',' · ')+uniName(u,y);
       setTimeout(step, 60+n*6);
     } else revealBirth();
   };
@@ -1927,6 +2089,11 @@ function startBirth(){
 }
 function storyBirth(s){
   const cn=COUNTRIES[s.c].n;
+  if(EN){
+    let t = `In ${s.entry}, you entered ${s.uni} in ${cn}, coming from ${FAM_EN[s.fam]}.`;
+    if(s.home!==s.c) t += ` You are an international student from ${cInfo(s.home).n}.`;
+    return t + ` It is ${TIER_TXT[s.tier]}.`;
+  }
   let t = `${s.entry}年4月、${cn}の${s.uni}に、${s.fam==='きびしい家計'?'家計のきびしい家庭から':s.fam==='ゆたかな家庭'?'ゆたかな家庭から':s.fam==='エンジニア一家'?'エンジニア一家から':''}${s.g==='f'?'女子':'男子'}学生として入学しました。`;
   if(s.home!==s.c) t += `${cInfo(s.home).n}から来た留学生です。`;
   t += `この大学は${TIER_TXT[s.tier]}です。`;
@@ -1940,46 +2107,46 @@ function revealBirth(){
   const rtTot = RT_KEYS.filter(x=>rtOK(x,s.entry)).reduce((a,x)=>a+kf(RTYPES[x].w,s.entry),0);
   $('birthCard').innerHTML = `
     <div class="doc">
-      <div class="hd"><b>入学届</b><span>No. ${docNo(s)}</span></div>
+      <div class="hd"><b>${T('入学届','Enrollment Record')}</b><span>No. ${docNo(s)}</span></div>
       <div class="bd">
-        <div class="who">${pxImg(personURL(s.look,18,'hoodie'),'','あなたのキャラクター')}<div><span class="label">名前</span><div class="name">${esc(s.name)}</div></div></div>
+        <div class="who">${pxImg(personURL(s.look,18,'hoodie'),'',T('あなたのキャラクター','Your character'))}<div><span class="label">${T('名前','Name')}</span><div class="name">${esc(s.name)}</div></div></div>
         <p class="story">${esc(storyBirth(s))}</p>
         <div class="unirow">${pxImg(buildingURL('uni'+s.tier,hashCol(s.uni)),'',s.uni)}<div><b>${esc(s.uni)}</b><br><span class="note">${COUNTRIES[s.c].n} · ${TIER_TXT[s.tier]}</span></div></div>
-        <p class="note" style="margin:0">定年まで生きると、約10分かかります（1年 ≈ 13秒）。とちゅうで一時停止や倍速もできます。</p>
+        <p class="note" style="margin:0">${T('定年まで生きると、約10分かかります（1年 ≈ 13秒）。とちゅうで一時停止や倍速もできます。','Living to retirement takes about 10 minutes (1 year ≈ 13 s). You can pause or speed up at any time.')}</p>
         <hr class="rule">
         <div class="kv">
-          <div><span class="label">性別</span><b>${s.g==='f'?'女性':'男性'}</b></div>
-          <div><span class="label">大学のある国</span><b>${COUNTRIES[s.c].n}</b></div>
-          <div><span class="label">出身</span><b>${cInfo(s.home).n}${s.home!==s.c?'（留学生）':''}</b></div>
-          <div><span class="label">家の暮らし向き</span><b>${dots(FAM_LV[s.fam])} 5段階中${FAM_LV[s.fam]}</b></div>
-          <div><span class="label">入学時の技術</span><b>${s.st.sk}</b></div>
-          <div><span class="label">定年</span><b>${s.ret}歳</b></div>
-          <div><span class="label">${COUNTRIES[s.c].n}の中堅の年収</span><b>約${yen(baseSal(s.c,Math.min(s.entry,2026)))}</b></div>
-          <div><span class="label">この入学先になる確率</span><b>約 ${one.toLocaleString()} 分の 1</b></div>
+          <div><span class="label">${T('性別','Sex')}</span><b>${GEN(s.g)}</b></div>
+          <div><span class="label">${T('大学のある国','Country of university')}</span><b>${COUNTRIES[s.c].n}</b></div>
+          <div><span class="label">${T('出身','From')}</span><b>${cInfo(s.home).n}${s.home!==s.c?T('（留学生）',' (international)'):''}</b></div>
+          <div><span class="label">${T('家の暮らし向き','Family means')}</span><b>${dots(FAM_LV[s.fam])} ${T('5段階中'+FAM_LV[s.fam],FAM_LV[s.fam]+' of 5')}</b></div>
+          <div><span class="label">${T('入学時の技術','Skill at entry')}</span><b>${s.st.sk}</b></div>
+          <div><span class="label">${T('定年','Retirement age')}</span><b>${s.ret}</b></div>
+          <div><span class="label">${T(COUNTRIES[s.c].n+'の中堅の年収','Mid-career salary in '+COUNTRIES[s.c].n)}</span><b>${T('約','~')}${money(baseSal(s.c,Math.min(s.entry,2026)))}</b></div>
+          <div><span class="label">${T('この入学先になる確率','Odds of this enrollment')}</span><b>${T('約 '+one.toLocaleString()+' 分の 1','about 1 in '+one.toLocaleString())}</b></div>
         </div>
         <hr class="rule">
-        <p class="note" style="margin:0">${s.entry}年に入学するロボット系の学生のうち ${(cp*100).toFixed(1)}% が${COUNTRIES[s.c].n}の大学に入ります。およそ ${Math.round(1/cp)} 人に 1 人の割合です。</p>
+        <p class="note" style="margin:0">${T(s.entry+'年に入学するロボット系の学生のうち '+(cp*100).toFixed(1)+'% が'+COUNTRIES[s.c].n+'の大学に入ります。およそ '+Math.round(1/cp)+' 人に 1 人の割合です。', (cp*100).toFixed(1)+'% of robotics students entering in '+s.entry+' study in '+COUNTRIES[s.c].n+' — about 1 in '+Math.round(1/cp)+'.')}</p>
       </div>
     </div>
     <div class="card">
-      <h3>どんなロボットをつくる？</h3>
-      <div class="sub">運命のおすすめが選ばれています。好きなものに変えられます。％は ${s.entry} 年のロボットエンジニアのうち、それにとりくむ人の割合（推計）。</div>
-      <div class="rtgrid" id="rtGrid">${RT_KEYS.map(k=>{ const ok=rtOK(k,s.entry); return `<button data-rt="${k}" ${ok?'':'disabled'} aria-pressed="${k===s.rt}">${pxImg(robotURL(k),'','')}${esc(RTYPES[k].n.replace(/（.*）/,''))}<small>${ok?Math.round(kf(RTYPES[k].w,s.entry)/rtTot*100)+'%':RTYPES[k].from+'年〜'}</small></button>`; }).join('')}</div>
+      <h3>${T('どんなロボットをつくる？','What kind of robot will you build?')}</h3>
+      <div class="sub">${T('運命のおすすめが選ばれています。好きなものに変えられます。％は '+s.entry+' 年のロボットエンジニアのうち、それにとりくむ人の割合（推計）。','Fate has picked one for you, but you can change it. % = estimated share of robotics engineers working on each type in '+s.entry+'.')}</div>
+      <div class="rtgrid" id="rtGrid">${RT_KEYS.map(k=>{ const ok=rtOK(k,s.entry); return `<button data-rt="${k}" ${ok?'':'disabled'} aria-pressed="${k===s.rt}">${pxImg(robotURL(k),'','')}${esc(RTYPES[k].n.replace(/（.*）|\s*\(.*\)/,''))}<small>${ok?Math.round(kf(RTYPES[k].w,s.entry)/rtTot*100)+'%':T(RTYPES[k].from+'年〜','from '+RTYPES[k].from)}</small></button>`; }).join('')}</div>
       <div class="rtdesc" id="rtDesc"></div>
     </div>
     <div class="card people">
-      <h3>同じ年に入学した人たち</h3>
-      ${PEERS.map(p=>`<div class="p"><div class="l">${pxImg(personURL(p.look,18,'hoodie'),'','')}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n}・${esc(p.uni)} · ${p.g==='f'?'女':'男'}</span></div></div><div class="r">${pxImg(robotURL(p.rt),'','')}</div></div>`).join('')}
-      <p class="note" style="margin:8px 0 0">この人たちの人生も、同じ統計にしたがって最後まで流れていきます。あなたのそばで、いっしょにお見せします。</p>
+      <h3>${T('同じ年に入学した人たち','Others who entered the same year')}</h3>
+      ${PEERS.map(p=>`<div class="p"><div class="l">${pxImg(personURL(p.look,18,'hoodie'),'','')}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n}${T('・',' · ')}${esc(p.uni)} · ${GEN(p.g,1)}</span></div></div><div class="r">${pxImg(robotURL(p.rt),'','')}</div></div>`).join('')}
+      <p class="note" style="margin:8px 0 0">${T('この人たちの人生も、同じ統計にしたがって最後まで流れていきます。あなたのそばで、いっしょにお見せします。','Their lives will also run to the end under the same statistics, shown right beside yours.')}</p>
     </div>
-    <p style="text-align:center"><button class="btn" id="rerollBtn">べつの人として入学しなおす</button></p>`;
+    <p style="text-align:center"><button class="btn" id="rerollBtn">${T('べつの人として入学しなおす','Enroll as someone else')}</button></p>`;
   $('birthCard').classList.remove('hidden'); $('birthBar').classList.remove('hidden');
-  const showRt=()=>{ $('rtDesc').innerHTML='<b>'+esc(RTYPES[S.rt].n)+'</b>：'+esc(RTYPES[S.rt].d); };
+  const showRt=()=>{ $('rtDesc').innerHTML='<b>'+esc(RTYPES[S.rt].n)+'</b>'+T('：',': ')+esc(RTYPES[S.rt].d); };
   showRt();
   $('rtGrid').querySelectorAll('button').forEach(b=>b.onclick=()=>{ S.rt=b.dataset.rt; $('rtGrid').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b)); showRt(); });
   $('goBtn').onclick=startLife;
   $('rerollBtn').onclick=startBirth;
-  $('copyBirth').onclick=()=>{ const t=`#100万分の1 入学届 No. ${docNo(s)}\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\nつくるロボット：${RTYPES[S.rt].n}\nこの入学先になる確率 約${one.toLocaleString()}分の1`; navigator.clipboard?.writeText(t+'\n'+location.href).then(()=>toast('コピーしました'),()=>toast('コピーできませんでした')); };
+  $('copyBirth').onclick=()=>{ const t=T(`#100万分の1 入学届 No. ${docNo(s)}\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\nつくるロボット：${RTYPES[S.rt].n}\nこの入学先になる確率 約${one.toLocaleString()}分の1`,`#1inaMillion Enrollment No. ${docNo(s)}\n${s.name} (${COUNTRIES[s.c].n} · ${s.uni} · entered ${s.entry})\nBuilding: ${RTYPES[S.rt].n}\nOdds of this enrollment: about 1 in ${one.toLocaleString()}`); navigator.clipboard?.writeText(t+'\n'+location.href).then(()=>toast(T('コピーしました','Copied')),()=>toast(T('コピーできませんでした','Could not copy'))); };
 }
 
 /* ---------- プレイ ---------- */
@@ -1990,7 +2157,7 @@ function startLife(){
   setSpeed(1);
   setFocus(S.focus);
   render();
-  addLine(`${S.entry}年4月、${COUNTRIES[S.c].n}の${S.uni}に入学しました。ここからロボットエンジニアの人生がはじまります。`,'big');
+  addLine(T(`${S.entry}年4月、${COUNTRIES[S.c].n}の${S.uni}に入学しました。ここからロボットエンジニアの人生がはじまります。`,`Entered ${S.uni} in ${COUNTRIES[S.c].n}, ${S.entry}. Your life as a robotics engineer begins.`),'big');
   schedule(800);
 }
 document.querySelectorAll('#focus button').forEach(b=>b.onclick=()=>setFocus(b.dataset.f));
@@ -2032,19 +2199,19 @@ function tick(){
   if(r.ask){ showAsk(r.ask); return; }
   schedule(delay);
 }
-const FXN={sk:'技術',he:'健康',ha:'幸福',ne:'人脈',as:'資産'};
+const FXN=T({sk:'技術',he:'健康',ha:'幸福',ne:'人脈',as:'資産'},{sk:'Skill',he:'Health',ha:'Happiness',ne:'Network',as:'Assets'});
 function addLine(t,k,e,age){
   const d=document.createElement('div');
   d.className='row '+(k||'');
   let fx='';
-  if(e){ fx=Object.keys(e).filter(x=>e[x]).map(x=>x==='as'?'資産'+(e[x]>0?'+':'')+yen(e[x]):FXN[x]+(e[x]>0?'+':'')+e[x]).join(' '); }
+  if(e){ fx=Object.keys(e).filter(x=>e[x]).map(x=>x==='as'?FXN.as+(e[x]>0?'+':'')+money(e[x]):FXN[x]+(e[x]>0?'+':'')+e[x]).join(' '); }
   let body;
   if(k==='world'){
-    body = `<span class="src"><b>世界</b>${esc(t.replace(/^🌐 /,''))}</span>`;
+    body = `<span class="src"><b>${T('世界','World')}</b>${esc(t.replace(/^🌐 /,''))}</span>`;
   } else if(k==='choice'){
-    body = `<span class="tag">決断</span>${esc(t.replace(/^▶ /,''))}`;
+    body = `<span class="tag">${T('決断','Decision')}</span>${esc(t.replace(/^▶ /,''))}`;
   } else body = esc(t);
-  d.innerHTML = `<span class="a">${age||S.age}歳</span><div class="t">${body}${fx?`<span class="fx">${fx}</span>`:''}</div>`;
+  d.innerHTML = `<span class="a">${T((age||S.age)+'歳','Age '+(age||S.age))}</span><div class="t">${body}${fx?`<span class="fx">${fx}</span>`:''}</div>`;
   $('logList').prepend(d);
   while($('logList').children.length>140) $('logList').lastChild.remove();
 }
@@ -2052,22 +2219,22 @@ const STAT_COL = {sk:'var(--stamp)',he:'var(--good)',ha:'var(--gold)',ne:'var(--
 function render(){
   const s=S;
   $('gAge').textContent = s.age;
-  $('gMeta').textContent = `${s.year}年 · ${s.name} · 1年 ≈ ${Math.round(yearMs()/1000)}秒`;
+  $('gMeta').textContent = T(`${s.year}年 · ${s.name} · 1年 ≈ ${Math.round(yearMs()/1000)}秒`,`${s.year} · ${s.name} · 1 yr ≈ ${Math.round(yearMs()/1000)} s`);
   $('gProg').style.width = clamp((s.age-18)/(s.ret-18)*100,0,100)+'%';
   $('gScene').src = sceneURL(s);
   $('gPlace').textContent = `${stageLabel(s)} · ${COUNTRIES[s.jc]?COUNTRIES[s.jc].n:''} · ${RTYPES[s.rt].n}`;
   $('gStats').innerHTML = ['he','ha','sk','ne'].map(k=>`<div><span class="label">${FXN[k]}</span><b>${s.st[k]}</b><div class="bt"><i style="width:${s.st[k]}%;background:${STAT_COL[k]}"></i></div></div>`).join('');
   const sal = calcSal(s);
-  const cut = s.payF<1 ? `<small>（今年は${s.payF?'半分':'ゼロ'}）</small>` : '';
+  const cut = s.payF<1 ? `<small>${T('（今年は'+(s.payF?'半分':'ゼロ')+'）',' ('+(s.payF?'half':'zero')+' this year)')}</small>` : '';
   $('gMoney').innerHTML = `
-    <div><span class="label">年収（日本円で）</span><b>${sal?'約'+yen(sal):'—'}</b>${cut}${sal?'':'<span class="note">学生なので給料はありません</span>'}</div>
-    <div><span class="label">資産（日本円で）</span><b class="${s.assets<0?'neg':''}">約${yen(s.assets)}</b></div>
-    <div><span class="label">携わったロボット</span><b>${s.robots} 機種</b></div>
-    <div><span class="label">売れたロボット</span><b>${s.sold.toLocaleString()} 台</b></div>
-    <div><span class="label">論文</span><b>${s.papers} 本</b></div>
-    <div><span class="label">特許</span><b>${s.patents} 件</b></div>`;
+    <div><span class="label">${T('年収（日本円で）','Salary (USD)')}</span><b>${sal?T('約','~')+money(sal):'—'}</b>${cut}${sal?'':`<span class="note">${T('学生なので給料はありません','No salary as a student')}</span>`}</div>
+    <div><span class="label">${T('資産（日本円で）','Assets (USD)')}</span><b class="${s.assets<0?'neg':''}">${T('約','~')}${money(s.assets)}</b></div>
+    <div><span class="label">${T('携わったロボット','Robots worked on')}</span><b>${T(s.robots+' 機種',s.robots+' model'+(s.robots===1?'':'s'))}</b></div>
+    <div><span class="label">${T('売れたロボット','Robots sold')}</span><b>${T(s.sold.toLocaleString()+' 台',s.sold.toLocaleString()+' units')}</b></div>
+    <div><span class="label">${T('論文','Papers')}</span><b>${s.papers}</b></div>
+    <div><span class="label">${T('特許','Patents')}</span><b>${s.patents}</b></div>`;
   const we = worldEngineers(s.year), here = Math.round(we*countryProb(s.jc,s.year)/100)*100;
-  $('recNote').textContent = `いま、${s.year}年の世界で約${Math.round(we/10000)}万人のロボットエンジニアが、ともに働いています · ${COUNTRIES[s.jc].n}に約${here.toLocaleString()}人`;
+  $('recNote').textContent = T(`いま、${s.year}年の世界で約${Math.round(we/10000)}万人のロボットエンジニアが、ともに働いています · ${COUNTRIES[s.jc].n}に約${here.toLocaleString()}人`,`In ${s.year}, about ${(we/1e6).toFixed(2)} million robotics engineers are working alongside you · about ${here.toLocaleString()} in ${COUNTRIES[s.jc].n}`);
   renderId(); renderPeers(); renderMap(s,$('gMap'));
 }
 function worldEngineers(y){ return kf([[1965,20000],[1980,120000],[2000,400000],[2015,750000],[2026,1000000],[2070,2000000]], y); }
@@ -2075,10 +2242,10 @@ function renderId(){
   const s=S, iso=ISO3[s.home]||'XXX';
   const mrz1 = ('I<'+iso+(s.id.toUpperCase().replace(/[^A-Z0-9]/g,''))+'<<'+RTYPES[s.rt].n.length+'<'+s.rt.toUpperCase()).padEnd(36,'<').slice(0,36);
   const mrz2 = (String(s.entry-18).slice(2)+'0401'+(s.g==='f'?'F':'M')+(ISO3[s.jc]||'XXX')+'<'+String(s.robots).padStart(5,'0')+'<'+String(s.sold).padStart(9,'0')).padEnd(36,'<').slice(0,36);
-  $('gId').innerHTML = `<div class="hd"><span>身元記録 · ${iso}</span><span>${s.year}</span></div>
-    <div class="bd">${pxImg(personURL(s.look,s.age,outfitOf(s)),'ph','あなた')}
+  $('gId').innerHTML = `<div class="hd"><span>${T('身元記録','Identity record')} · ${iso}</span><span>${s.year}</span></div>
+    <div class="bd">${pxImg(personURL(s.look,s.age,outfitOf(s)),'ph',T('あなた','You'))}
       <div style="min-width:0"><div class="nm">${esc(s.name)}</div>
-      <dl><dt>性別</dt><dd>${s.g==='f'?'女性':'男性'}</dd><dt>出身</dt><dd>${cInfo(s.home).n}</dd><dt>所属</dt><dd>${esc(stageLabel(s))}</dd><dt>学歴</dt><dd>${s.stage==='ug'?'学部在学中':s.stage==='ms'?'修士課程在学中':s.stage==='phd'?'博士課程在学中':s.deg==='学部卒'?'学士':s.deg}</dd><dt>専門</dt><dd>${pxImg(robotURL(s.rt),'','')} ${esc(RTYPES[s.rt].n)}</dd><dt>家庭</dt><dd>${dots(FAM_LV[s.fam])}</dd></dl></div>
+      <dl><dt>${T('性別','Sex')}</dt><dd>${GEN(s.g)}</dd><dt>${T('出身','From')}</dt><dd>${cInfo(s.home).n}</dd><dt>${T('所属','Position')}</dt><dd>${esc(stageLabel(s))}</dd><dt>${T('学歴','Degree')}</dt><dd>${DEG_TXT(s)}</dd><dt>${T('専門','Field')}</dt><dd>${pxImg(robotURL(s.rt),'','')} ${esc(RTYPES[s.rt].n)}</dd><dt>${T('家庭','Family')}</dt><dd>${dots(FAM_LV[s.fam])}</dd></dl></div>
     </div>
     <div class="mrz">${mrz1}<br>${mrz2}</div>`;
   $('gId').querySelectorAll('dd .px').forEach(x=>{x.style.width='16px';x.style.height='16px';});
@@ -2088,9 +2255,9 @@ function renderPeers(){
   $('peerList').innerHTML = PEERS.map(p=>{
     const last=Math.max(...Object.keys(p.snaps).map(Number));
     const gone = !p.snaps[a] && a>last;
-    const sn = p.snaps[a] || (gone ? {lbl:p.endWhy==='death'?'この世を去った':'引退',o:'casual',rt:p.rt} : {lbl:'',o:'hoodie',rt:p.rt});
+    const sn = p.snaps[a] || (gone ? {lbl:p.endWhy==='death'?T('この世を去った','Passed away'):T('引退','Retired'),o:'casual',rt:p.rt} : {lbl:'',o:'hoodie',rt:p.rt});
     const av = !(gone && p.endWhy==='death') ? pxImg(personURL(p.look, Math.min(a,last||a), sn.o),'','') : '';
-    return `<div class="p"><div class="l">${av}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n} · ${p.g==='f'?'女':'男'}</span></div></div><div class="r">${esc(sn.lbl)}${pxImg(robotURL(sn.rt||p.rt),'','')}</div></div>`;
+    return `<div class="p"><div class="l">${av}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n} · ${GEN(p.g,1)}</span></div></div><div class="r">${esc(sn.lbl)}${pxImg(robotURL(sn.rt||p.rt),'','')}</div></div>`;
   }).join('');
 }
 function hapCol(h){ // うすい黄 → 緑 → 深い青緑
@@ -2103,7 +2270,7 @@ function renderMap(s, el, done){
   for(let a=18;a<=last;a++){
     const sn=s.snaps[a];
     const cls = (!done && a===s.age)?'now':(a===s.ret?'ret':'');
-    h+=`<i class="${cls}" title="${a}歳" style="${sn?`background:${hapCol(sn.ha)}`:''}"></i>`;
+    h+=`<i class="${cls}" title="${AGE(a)}" style="${sn?`background:${hapCol(sn.ha)}`:''}"></i>`;
   }
   el.innerHTML=h;
 }
@@ -2112,16 +2279,16 @@ function renderMap(s, el, done){
 function showDecision(d){
   if(AUTO){
     const o=autoChoose(d); const t=o.run(S);
-    addLine(d.title+'：'+o.l+'（おまかせ）— '+t,'choice');
+    addLine(d.title+T('：',': ')+o.l+T('（おまかせ）',' (auto)')+' — '+t,'choice');
     S.moments.push({y:S.year,a:S.age,t});
     render(); schedule(yearMs()/4); return;
   }
   waiting=true; SKIP=false;
-  $('sheet').innerHTML = `<div class="hd"><span>大きな決断</span><span class="mono">${S.age}歳 · ${S.year}年</span></div>
-    <div class="bd"><h3>${d.rt?pxImg(robotURL(d.rt),'',RTYPES[d.rt].n):''}${S.age}歳、${esc(d.title)}</h3><p>${esc(d.text)}</p>`+
+  $('sheet').innerHTML = `<div class="hd"><span>${T('大きな決断','Big decision')}</span><span class="mono">${T(S.age+'歳 · '+S.year+'年','Age '+S.age+' · '+S.year)}</span></div>
+    <div class="bd"><h3>${d.rt?pxImg(robotURL(d.rt),'',RTYPES[d.rt].n):''}${T(S.age+'歳、','Age '+S.age+': ')}${esc(d.title)}</h3><p>${esc(d.text)}</p>`+
     d.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="n">${i+1}</span><span><b>${esc(o.l)}</b><span class="d">${esc(o.d)}</span></span></button>`).join('')+
-    `<button class="opt" data-i="auto"><span class="n">${d.opts.length+1}</span><span><b>運命にまかせる</b><span class="d">統計どおりに、どれかが選ばれる</span></span></button>
-    <button class="btn auto" id="autoAll">これからの決断をおまかせにする</button></div>`;
+    `<button class="opt" data-i="auto"><span class="n">${d.opts.length+1}</span><span><b>${T('運命にまかせる','Leave it to fate')}</b><span class="d">${T('統計どおりに、どれかが選ばれる','One is picked according to the statistics')}</span></span></button>
+    <button class="btn auto" id="autoAll">${T('これからの決断をおまかせにする','Auto-decide from now on')}</button></div>`;
   $('modal').classList.remove('hidden');
   const pickIt=(o)=>{
     $('modal').classList.add('hidden'); waiting=false;
@@ -2136,14 +2303,14 @@ function showDecision(d){
 function showAsk(age){
   if(AUTO){ schedule(50); return; }
   waiting=true; SKIP=false;
-  $('sheet').innerHTML = `<div class="hd"><span>ひと息</span><span class="mono">${S.age}歳 · ${S.year}年</span></div>
-    <div class="bd"><h3>${esc(ASKS[age])}</h3><p>時間が止まっています。ひとことだけ、のこしておけます。人生のさいごに読みかえせます。</p>
-    <textarea id="askT" maxlength="80" placeholder="（空でもかまいません）"></textarea>
-    <div class="act"><button class="btn" id="askSkip">とばす</button><button class="btn" id="askOk" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent)">のこす</button></div></div>`;
+  $('sheet').innerHTML = `<div class="hd"><span>${T('ひと息','A pause')}</span><span class="mono">${T(S.age+'歳 · '+S.year+'年','Age '+S.age+' · '+S.year)}</span></div>
+    <div class="bd"><h3>${esc(ASKS[age])}</h3><p>${T('時間が止まっています。ひとことだけ、のこしておけます。人生のさいごに読みかえせます。','Time has stopped. Leave a single line — you can read it again at the end of your life.')}</p>
+    <textarea id="askT" maxlength="80" placeholder="${T('（空でもかまいません）','(Leaving it blank is fine)')}"></textarea>
+    <div class="act"><button class="btn" id="askSkip">${T('とばす','Skip')}</button><button class="btn" id="askOk" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent)">${T('のこす','Save')}</button></div></div>`;
   $('modal').classList.remove('hidden');
   const done=(save)=>{
     const v=$('askT').value.trim();
-    if(save && v){ S.answers.push({a:S.age,q:ASKS[age],t:v}); addLine('「'+v+'」','choice'); }
+    if(save && v){ S.answers.push({a:S.age,q:ASKS[age],t:v}); addLine(T('「'+v+'」','“'+v+'”'),'choice'); }
     $('modal').classList.add('hidden'); waiting=false; schedule(200);
   };
   $('askSkip').onclick=()=>done(false);
@@ -2151,7 +2318,26 @@ function showAsk(age){
 }
 
 /* ---------- おわり ---------- */
+function lifeStoryEn(s, lastAge){
+  const cn=COUNTRIES[s.c].n;
+  const comps = s.path.filter((t,i)=>['factory','tower','garage','lab','workshop'].includes(s.pathI[i])).map(t=>t.replace(/\s*\([^)]*\)$/,''));
+  let t = `Entered ${s.uni} in ${cn} in ${s.entry} and went into ${RTYPES[s.rt].n.toLowerCase()}s.`;
+  if(s.deg==='博士') t+=' Earned a PhD.'; else if(s.deg==='修士') t+=' Completed a master\'s.';
+  if(s.stage==='prof'||s.path.some(x=>/Asst\. Prof/.test(x))) t+=` Became ${['an assistant professor','an associate professor','a full professor'][s.rank]}.`;
+  const cu=[...new Set(comps)];
+  if(cu.length) t+=` Worked at ${cu.slice(0,4).join(', ')}${cu.length>4?' and more':''}.`;
+  if(s.flags.mgr) t+=' Became a director.';
+  if(s.flags.founded) t+= s.flags.exit==='ipo'?' Founded a company and took it public.':s.flags.exit==='acq'?' Founded a company and sold it.':' Founded a company.';
+  if(s.home!==s.c) t+=` A life that crossed the sea from ${cInfo(s.home).n}.`;
+  t+=` Worked on ${s.robots} robot model${s.robots===1?'':'s'} in a lifetime; ${s.sold.toLocaleString()} units sold.`;
+  if(s.partner) t+= s.kids?` Married and raised ${s.kids} child${s.kids>1?'ren':''}.`:' Married.';
+  if(s.endWhy==='death') t+=` Died of illness at ${lastAge}.`;
+  else if(s.endWhy==='left') t+=` Left the robot road and retired at ${lastAge}.`;
+  else t+=` Retired at ${lastAge}.`;
+  return t;
+}
 function lifeStory(s, lastAge){
+  if(EN) return lifeStoryEn(s,lastAge);
   const cn=COUNTRIES[s.c].n;
   const comps = s.path.filter((t,i)=>['factory','tower','garage','lab','workshop'].includes(s.pathI[i])).map(t=>t.replace(/（[^）]*）$/,''));
   let t = `${s.entry}年、${cn}の${s.uni}に${s.g==='f'?'女子':'男子'}学生として入学し、${RTYPES[s.rt].n}の道に進みました。`;
@@ -2178,39 +2364,39 @@ function finish(){
   const mom = s.moments.slice(-8);
   const trail = `<div class="trail">${s.path.map((t,i)=>`<span class="chip">${s.pathI[i]?pxImg(iconURL(s.pathI[i],t),s.pathI[i].startsWith('rt:')?'r':'',''):''}${esc(t)}</span>`).join('<span class="arr">→</span>')}</div>`;
   const nComp = s.pathI.filter(k=>k&&['factory','tower','garage','lab','workshop','own','office'].includes(k)).length;
-  const peers = PEERS.map(p=>{ const la=p.endWhy==='death'?p.age:p.age-1; return `<div class="p"><div class="l">${pxImg(personURL(p.look,la,'casual'),'','')}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n} · ${p.g==='f'?'女':'男'} · ${la}歳 · ${esc(lifeTitle(p))}</span><span style="display:block">${esc(lifeStory(p,la))}</span></div></div></div>`; }).join('');
+  const peers = PEERS.map(p=>{ const la=p.endWhy==='death'?p.age:p.age-1; return `<div class="p"><div class="l">${pxImg(personURL(p.look,la,'casual'),'','')}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n} · ${GEN(p.g,1)} · ${AGE(la)} · ${esc(lifeTitle(p))}</span><span style="display:block">${esc(lifeStory(p,la))}</span></div></div></div>`; }).join('');
   $('end').innerHTML = `
     <div class="doc">
-      <div class="hd"><b>${s.endWhy==='death'?'人生の記録':'退職の記録'}</b><span>No. ${docNo(s)}</span></div>
+      <div class="hd"><b>${s.endWhy==='death'?T('人生の記録','Life Record'):T('退職の記録','Retirement Record')}</b><span>No. ${docNo(s)}</span></div>
       <div class="bd">
-        <div class="who">${pxImg(personURL(s.look,lastAge,s.endWhy==='death'?outfitOf(s):'casual'),'','あなたのキャラクター')}<div><span class="label">${s.entry}年 – ${s.year-(s.endWhy==='death'?0:1)}年 · ${COUNTRIES[s.c].n}</span><div class="name">${esc(s.name)}</div><span class="ttl">${esc(title)}</span></div></div>
+        <div class="who">${pxImg(personURL(s.look,lastAge,s.endWhy==='death'?outfitOf(s):'casual'),'',T('あなたのキャラクター','Your character'))}<div><span class="label">${s.entry} – ${s.year-(s.endWhy==='death'?0:1)} · ${COUNTRIES[s.c].n}</span><div class="name">${esc(s.name)}</div><span class="ttl">${esc(title)}</span></div></div>
         <p class="story">${esc(story)}</p>
         ${trail}
         <div class="nums">
-          <div><b>${s.robots} 機種</b><span>携わったロボット</span></div>
-          <div><b>${s.sold.toLocaleString()}</b><span>売れたロボット</span></div>
-          <div><b>${s.papers}</b><span>論文</span></div>
-          <div><b>${s.maxSal?yen(s.maxSal):'—'}</b><span>最高年収</span></div>
-          <div><b>${yen(s.earn)}</b><span>生涯の給料</span></div>
-          <div><b>${yen(s.assets)}</b><span>最後の資産</span></div>
-          <div><b>${s.patents}</b><span>特許</span></div>
-          <div><b>${nComp}</b><span>働いた職場</span></div>
-          <div><b>${s.kids}</b><span>子ども</span></div>
+          <div><b>${T(s.robots+' 機種',s.robots)}</b><span>${T('携わったロボット','Robot models')}</span></div>
+          <div><b>${s.sold.toLocaleString()}</b><span>${T('売れたロボット','Robots sold')}</span></div>
+          <div><b>${s.papers}</b><span>${T('論文','Papers')}</span></div>
+          <div><b>${s.maxSal?money(s.maxSal):'—'}</b><span>${T('最高年収','Peak salary')}</span></div>
+          <div><b>${money(s.earn)}</b><span>${T('生涯の給料','Lifetime pay')}</span></div>
+          <div><b>${money(s.assets)}</b><span>${T('最後の資産','Final assets')}</span></div>
+          <div><b>${s.patents}</b><span>${T('特許','Patents')}</span></div>
+          <div><b>${nComp}</b><span>${T('働いた職場','Workplaces')}</span></div>
+          <div><b>${s.kids}</b><span>${T('子ども','Children')}</span></div>
         </div>
-        <span class="label">人生地図</span>
+        <span class="label">${T('人生地図','Life map')}</span>
         <div class="lmap" id="endMap"></div>
         <hr class="rule">
-        <span class="label">おもなできごと</span>
-        <ul class="moments">${mom.map(m=>`<li>${m.a}歳（${m.y}年）${esc(m.t)}</li>`).join('')}</ul>
-        ${s.answers.length?`<hr class="rule"><span class="label">ひと息で残したことば</span><div class="answers">${s.answers.map(a=>`<div><i>${a.a}歳「${esc(a.q)}」</i><br>「${esc(a.t)}」</div>`).join('')}</div>`:''}
+        <span class="label">${T('おもなできごと','Key moments')}</span>
+        <ul class="moments">${mom.map(m=>`<li>${T(m.a+'歳（'+m.y+'年）','Age '+m.a+' ('+m.y+') ')}${esc(m.t)}</li>`).join('')}</ul>
+        ${s.answers.length?`<hr class="rule"><span class="label">${T('ひと息で残したことば','Words you left along the way')}</span><div class="answers">${s.answers.map(a=>`<div><i>${T(a.a+'歳「'+esc(a.q)+'」','Age '+a.a+' — '+esc(a.q))}</i><br>${T('「'+esc(a.t)+'」','“'+esc(a.t)+'”')}</div>`).join('')}</div>`:''}
       </div>
     </div>
-    <div class="card people"><h3>同じ年に入学した人たちは</h3>${peers}</div>
-    <div class="btnrow"><button class="btn" id="copyBtn">結果をコピー</button><a class="btn" id="xBtn" target="_blank" rel="noopener">X でシェア</a><button class="btn" id="topBtn">はじめの画面へ</button></div>
-    <div class="stickybar"><div class="in"><button class="cta" id="againBtn">もう一度入学する</button></div></div>`;
+    <div class="card people"><h3>${T('同じ年に入学した人たちは','What became of your classmates')}</h3>${peers}</div>
+    <div class="btnrow"><button class="btn" id="copyBtn">${T('結果をコピー','Copy result')}</button><a class="btn" id="xBtn" target="_blank" rel="noopener">${T('X でシェア','Share on X')}</a><button class="btn" id="topBtn">${T('はじめの画面へ','Back to start')}</button></div>
+    <div class="stickybar"><div class="in"><button class="cta" id="againBtn">${T('もう一度入学する','Enroll again')}</button></div></div>`;
   renderMap(s,$('endMap'),lastAge);
-  const share = `#100万分の1 ロボットエンジニア人生\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\n${RTYPES[s.rt].n}　称号「${title}」\n🔧携わった${s.robots}機種 🛒売れた${s.sold.toLocaleString()}台 📄${s.papers}本 💰資産 約${yen(s.assets)}`;
-  $('copyBtn').onclick=()=>{ navigator.clipboard?.writeText(share+'\n'+location.href).then(()=>toast('コピーしました'),()=>toast('コピーできませんでした')); };
+  const share = T(`#100万分の1 ロボットエンジニア人生\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\n${RTYPES[s.rt].n}　称号「${title}」\n🔧携わった${s.robots}機種 🛒売れた${s.sold.toLocaleString()}台 📄${s.papers}本 💰資産 約${money(s.assets)}`,`#1inaMillion — a robotics engineer's life\n${s.name} (${COUNTRIES[s.c].n} · ${s.uni} · entered ${s.entry})\n${RTYPES[s.rt].n} · Title: “${title}”\n🔧${s.robots} models 🛒${s.sold.toLocaleString()} sold 📄${s.papers} papers 💰${money(s.assets)} assets`);
+  $('copyBtn').onclick=()=>{ navigator.clipboard?.writeText(share+'\n'+location.href).then(()=>toast(T('コピーしました','Copied')),()=>toast(T('コピーできませんでした','Could not copy'))); };
   $('xBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(share)+'&url='+encodeURIComponent(location.href);
   $('againBtn').onclick=startBirth;
   $('topBtn').onclick=()=>{ renderPast(); show('title'); };
