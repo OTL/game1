@@ -1,6 +1,6 @@
 # 100万分の1 — ロボットエンジニア人生
 
-人生シミュレーター『80億分の1』のパロディです。世界に約 100 万人いるロボットエンジニアの、だれかひとりとして大学に入学し、定年までの一生を見とどけます。
+人生シミュレーター『80億分の1』（1in8b.life）に着想を得た、**非公式のパロディ作品**です。世界に約 100 万人いるロボットエンジニアの、だれかひとりとして大学に入学し、定年までのキャリアを歩みます。
 
 **▶ https://otl.github.io/game1/robolife/**
 
@@ -14,15 +14,11 @@
 
 ## 見た目
 
-原作『80億分の1』（https://1in8b.life/ja/）の画面に寄せています。
+ロボット工場をイメージした独自のデザインです。
 
-- 明るいグレーがかった緑の紙のような背景、白いカード、えんじ色と深い緑のアクセント。名前や大きな数字は明朝体、ラベルは等幅フォント
-- スマホがダークモードのときは、原作と同じ暗い配色（黒に近い深い緑・ピンク・水色）になり、場面のピクセルアートも夜になる。◐ ボタンで手動でも切りかえられる
-- タイトル：ピクセルアートの絵、小さな等幅の説明、大きな「100万分の**1**」、ページを開いてから売れたロボットの数、今日のテーマ、国別の確率の棒グラフ、四角いボタンを並べた設定、画面下に固定の「入学する」
-- 入学：えんじ色の帯に書類番号が入った「入学届」カード
-- プレイ：上に大きな年齢・倍速ボタン・進み具合のバー。その下に場面のピクセルアート、状態、人生の記録（新しい順・左に年齢）、今年の重点、お金とロボット、パスポート風の「身元記録」、同じ年に入学した人たち、人生地図（1マス = 1年）
-- 分かれ道：番号つきの選択肢を並べた「大きな決断」カード
-- おわり：「退職の記録」（亡くなったときは「人生の記録」）カードと、人生をふりかえる文章
+- 明るい配色は、あたたかい紙色の背景にオレンジ（安全色）と設計図の青。スマホがダークモードのときは暗い配色になり、場面のピクセルアートも夜になる。◐ ボタンで手動でも切りかえられる
+- 入学すると、黄黒の縞が入った「学生証」が出る。プレイ中は、年齢のバッジ、場面のピクセルアート、状態、できごと年表、ことしの方針、お金とロボット、バーコードつきの ID カード、同じ年に入学した人たち、キャリアのマス目（1 つ = 1 年）が並ぶ
+- 分かれ道では、番号つきの選択肢から選ぶ。最後に「キャリア証明書」が出る
 
 ## あそびかた
 
@@ -57,8 +53,14 @@
 
 数字は公開データからの大まかな推計で、正確な統計ではありません。
 
+## おことわり
+
+- 非公式のパロディ作品で、『80億分の1』（1in8b.life）およびその作者とは関係ありません。文章・デザイン・コードはすべてこのリポジトリのために書いたものです。
+- 登場する会社・大学・研究所の名前は実在しますが、ゲーム中のできごと（就職・転職のさそい・年収・買収・倒産など）はすべて架空で、実在の会社や団体の実際の出来事や方針をあらわすものではありません。
+- 年表は報道などで確認できる範囲で書いています（2027 年以降は架空の予測）。
+
 ---
 
 ## English
 
-**1 in a Million** — a parody of the life simulator *1 in 8 Billion*. Enter university as one of the world's ~1 million robotics engineers and live one life through to retirement. Your country and university are drawn from statistics; pick the kind of robot you build, make the big decisions (grad school, jobs, startups, going home), and watch your salary, assets, robot models and units sold change year by year. The language is chosen automatically from your browser settings (`?lang=en` / `?lang=ja` to switch).
+**1 in a Million** — an unofficial parody inspired by the life simulator *1 in 8 Billion* (1in8b.life); not affiliated with it or its creator. Company and university names are real, but all in-game events are fictional. Enter university as one of the world's ~1 million robotics engineers and live one life through to retirement. Your country and university are drawn from statistics; pick the kind of robot you build, make the big decisions (grad school, jobs, startups, going home), and watch your salary, assets, robot models and units sold change year by year. The language is chosen automatically from your browser settings (`?lang=en` / `?lang=ja` to switch).
