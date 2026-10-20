@@ -3,281 +3,340 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d1424">
+<meta name="theme-color" content="#EBF0ED">
 <title>100万分の1 — ロボットエンジニア人生シミュレーター</title>
 <meta name="description" content="世界に約100万人いるロボットエンジニアの、だれかひとりとして大学に入学する人生シミュレーター。国・大学・性別は統計にもとづくガチャ。研究室、論文、就職、起業、ヒューマノイドブームを生きて、定年までの一生を見とどける。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1424'/><rect x='8' y='9' width='16' height='13' rx='4' fill='%23e9eefb'/><circle cx='13' cy='15' r='2' fill='%2338d6c4'/><circle cx='19' cy='15' r='2' fill='%2338d6c4'/><path d='M16 9V5' stroke='%23e9eefb' stroke-width='2'/><circle cx='16' cy='4.5' r='2' fill='%23ffb547'/><rect x='11' y='23' width='10' height='4' rx='1.5' fill='%2363739c'/></svg>">
 <style>
   :root{
-    --bg:#0d1424;
-    --panel:#151f36;
-    --panel2:#1b2742;
-    --line:#2b3a62;
-    --text:#e9eefb;
-    --muted:#93a1c6;
-    --accent:#38d6c4;
-    --warm:#ffb547;
-    --good:#7ee081;
-    --bad:#ff6b6b;
-    --world:#9fb4ff;
+    --paper:#EBF0ED; --card:#F7FAF8; --card2:#F0F4F2;
+    --ink:#13212A; --ink2:#4A5A61; --ink3:#5F6E72;
+    --rule:#C7D2CE; --rule2:#DCE4E1;
+    --accent:#8C1D3C; --accent-soft:#F3E3E8;
+    --stamp:#0F6E68; --stamp-soft:#DCEDEA;
+    --gold:#9C7020; --good:#2B7A4E; --bad:#B0362B;
+    --shadow:0 1px 0 rgba(19,33,42,.04), 0 8px 24px -12px rgba(19,33,42,.18);
+    --f-body:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",Meiryo,system-ui,sans-serif;
+    --f-display:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
+    --f-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;}
-  body{
-    background:
-      radial-gradient(900px 500px at 10% -10%, #183459 0%, transparent 60%),
-      radial-gradient(800px 480px at 100% 0%, #2b1c4a 0%, transparent 58%),
-      var(--bg);
-    color:var(--text);
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,-apple-system,sans-serif;
-    line-height:1.6;
-    -webkit-text-size-adjust:100%;
-    -webkit-tap-highlight-color:transparent;
-  }
+  html,body{margin:0;}
+  body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;}
   button{font:inherit;color:inherit;cursor:pointer;}
+  a{color:var(--stamp);}
   .hidden{display:none !important;}
-  .wrap{width:min(640px,100%);margin:0 auto;padding:16px 16px 40px;}
-  a{color:var(--accent);}
+  .wrap{width:min(640px,100%);margin:0 auto;padding:16px 16px 120px;}
+  .mono{font-family:var(--f-mono);}
+  .serif{font-family:var(--f-display);}
+  .px{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;vertical-align:middle;}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:var(--shadow);padding:18px 18px;margin:0 0 14px;}
+  .card h3{margin:0 0 6px;font-size:20px;font-weight:800;line-height:1.4;}
+  .card h3 small{font-size:12px;color:var(--ink3);font-weight:700;margin-left:8px;}
+  .sub{color:var(--ink2);font-size:13px;}
+  .note{color:var(--ink3);font-size:13px;line-height:1.7;}
+  .label{color:var(--ink3);font-size:12px;font-weight:700;}
+  hr.rule{border:none;border-top:1px dashed var(--rule);margin:14px 0;}
+  .cta{display:block;width:100%;border:none;border-radius:6px;background:var(--accent);color:#fff;font-weight:800;font-size:18px;padding:14px;box-shadow:var(--shadow);}
+  .cta:active{filter:brightness(.92);}
+  .btn{border:1px solid var(--rule);background:var(--card);border-radius:6px;padding:10px 16px;font-size:14px;color:var(--ink);}
+  .seg{display:grid;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--card);}
+  .seg button{border:none;border-right:1px solid var(--rule);background:transparent;padding:11px 6px;font-size:14px;color:var(--ink2);}
+  .seg button:last-child{border-right:none;}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:#fff;font-weight:700;}
+  .seg.c2{grid-template-columns:1fr 1fr;} .seg.c3{grid-template-columns:1fr 1fr 1fr;} .seg.c4{grid-template-columns:repeat(4,1fr);}
+  .field{margin:18px 0 0;}
+  .field > .label{display:block;margin-bottom:6px;font-size:13px;}
+  .field .note{margin-top:6px;}
+  .stickybar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:rgba(247,250,248,.96);border-top:1px solid var(--rule2);padding:10px 16px calc(10px + env(safe-area-inset-bottom));}
+  .stickybar .in{width:min(640px,100%);margin:0 auto;display:flex;gap:10px;}
+  .stickybar .btn{flex:0 0 auto;}
+  .stickybar .cta{flex:1;}
 
-  /* ---------- タイトル ---------- */
-  .logo{margin:28px 0 4px;text-align:center;font-size:clamp(44px,13vw,72px);font-weight:900;letter-spacing:.02em;line-height:1.1;}
-  .logo small{font-size:.45em;color:var(--muted);font-weight:700;}
-  .logo b{color:var(--accent);}
-  .tag{text-align:center;color:var(--muted);margin:0 0 18px;font-size:14px;}
-  .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin:0 0 14px;}
-  .box h3{margin:0 0 8px;font-size:15px;color:var(--warm);}
-  .box p{margin:0 0 6px;font-size:14px;}
-  .box ul{margin:0;padding-left:1.2em;font-size:14px;}
-  .seg{display:flex;gap:6px;flex-wrap:wrap;}
-  .seg button{flex:1 1 auto;min-width:84px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 8px;font-size:14px;}
-  .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#06221f;font-weight:700;}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;font-size:14px;}
-  .switch{width:52px;height:30px;border-radius:99px;border:1px solid var(--line);background:var(--panel2);position:relative;flex:none;}
-  .switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:left .15s;}
-  .switch[aria-pressed="true"]{background:var(--accent);}
-  .switch[aria-pressed="true"]::after{left:25px;background:#fff;}
-  .big{display:block;width:100%;border:none;border-radius:999px;padding:15px;font-size:19px;font-weight:800;background:var(--accent);color:#06221f;box-shadow:0 5px 0 #1f9a8c;margin:6px 0 18px;}
-  .big:active{transform:translateY(3px);box-shadow:0 2px 0 #1f9a8c;}
-  .btn2{border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:10px 16px;font-size:15px;}
-  .past{font-size:13px;list-style:none;padding-left:0;}
-  .past li{margin:4px 0;}
-  .note{font-size:12px;color:var(--muted);}
-  .bars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;font-size:13px;align-items:center;}
-  .bars i{display:block;height:8px;border-radius:4px;background:var(--accent);transition:width .35s;}
-  .trend{position:relative;}
+  /* タイトル */
+  .hero{margin:-16px -16px 0;}
+  .hero img{width:100%;height:auto;display:block;}
+  .meta{color:var(--stamp);font-family:var(--f-mono);font-size:12px;margin:14px 0 2px;}
+  .logo{font-family:var(--f-display);font-weight:800;font-size:clamp(46px,14vw,72px);line-height:1.1;margin:0 0 14px;letter-spacing:-.01em;}
+  .logo em{font-style:normal;color:var(--accent);}
+  .lead{font-size:17px;color:var(--ink2);line-height:1.9;margin:0 0 18px;}
+  .counter{margin:0 0 12px;}
+  .counter b{display:block;font-family:var(--f-display);font-size:38px;line-height:1.1;}
+  .counter span{color:var(--ink3);font-size:13px;}
+  .pill{display:inline-block;background:var(--stamp);color:#fff;border-radius:999px;padding:1px 10px;font-size:13px;font-weight:700;margin-right:6px;}
+  .theme{font-size:14px;color:var(--ink2);margin:8px 0 18px;}
+  .theme b{color:var(--ink);}
+  .bars{display:grid;grid-template-columns:7.5em 1fr 3.6em;gap:8px 10px;font-size:14px;align-items:center;margin-top:12px;}
+  .bars .bt{height:10px;background:var(--rule2);border-radius:2px;overflow:hidden;}
+  .bars .bt i{display:block;height:100%;background:var(--stamp);transition:width .35s;}
+  .bars .bt i.o{background:#7fb3ae;}
+  .bars .pc{text-align:right;font-family:var(--f-mono);font-size:13px;}
+  .trend{position:relative;margin-top:10px;}
   .trend svg{display:block;width:100%;height:auto;touch-action:pan-y;}
-  .trend .tip{position:absolute;top:0;pointer-events:none;background:#0b1222;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11px;line-height:1.4;white-space:nowrap;display:grid;grid-template-columns:auto auto;gap:0 10px;}
+  .trend .tip{position:absolute;top:0;pointer-events:none;background:var(--card);border:1px solid var(--rule);box-shadow:var(--shadow);border-radius:6px;padding:5px 8px;font-size:11px;line-height:1.4;white-space:nowrap;display:grid;grid-template-columns:auto auto;gap:0 10px;}
   .trend .tip b{grid-column:1 / -1;}
-  .trend .tip.hidden{display:none;}
-  .trend .tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;}
-  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:6px;}
-  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+  .trend .tip i,.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;}
+  .legend{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--ink2);margin-top:6px;}
+  .lives .life{padding:14px 0;border-bottom:1px solid var(--rule2);}
+  .lives .life:last-child{border-bottom:none;}
+  .lives .nm{font-family:var(--f-display);font-weight:800;font-size:18px;}
+  .lives .mt{color:var(--ink3);font-size:13px;margin-left:8px;}
+  .lives .st{color:var(--ink2);font-size:14px;margin:4px 0 6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .lives .qt{font-size:15px;}
+  .lives .pv{width:24px;height:30px;margin-right:4px;}
+  .lives .pr{width:22px;height:22px;margin-right:6px;}
+  .ttl{display:inline-block;border:1px solid var(--accent);color:var(--accent);border-radius:999px;padding:2px 12px;font-size:13px;font-weight:700;}
 
-  /* ---------- 入学ガチャ ---------- */
-  #birth{text-align:center;}
-  .roulette{margin:40px 0 10px;font-size:15px;color:var(--muted);min-height:1.6em;}
-  .spin{font-size:clamp(26px,7vw,36px);font-weight:900;min-height:2.6em;display:flex;align-items:center;justify-content:center;}
-  .card{background:linear-gradient(180deg,#1d2a4a,#151f36);border:1px solid var(--line);border-radius:18px;padding:18px 16px;text-align:left;margin:10px 0 16px;}
-  .card .flag{font-size:44px;line-height:1;}
-  .card h2{margin:6px 0 2px;font-size:24px;}
-  .card .meta{color:var(--muted);font-size:14px;}
-  .card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:12px 0 0;font-size:14px;}
-  .card dt{color:var(--muted);}
-  .card dd{margin:0;}
-  .prob{display:inline-block;margin-top:10px;padding:4px 10px;border-radius:99px;background:#2a2140;color:var(--warm);font-size:13px;font-weight:700;}
-  .mates{text-align:left;font-size:13px;}
-  .mates li{margin:3px 0;}
+  /* 入学届 */
+  .doc{background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:var(--shadow);overflow:hidden;margin:16px 0 14px;}
+  .doc .hd{background:var(--accent);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;}
+  .doc .hd b{font-size:20px;}
+  .doc .hd span{font-family:var(--f-mono);font-size:12px;opacity:.9;}
+  .doc .bd{padding:18px 22px 20px;}
+  .doc .name{font-family:var(--f-display);font-weight:800;font-size:30px;line-height:1.25;margin:0 0 10px;}
+  .doc .story{font-size:17px;color:var(--ink2);line-height:1.85;margin:0 0 12px;}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;}
+  .kv .label{display:block;}
+  .kv b{display:block;font-size:16px;line-height:1.5;}
+  .who{display:flex;gap:14px;align-items:center;margin-bottom:10px;}
+  .who .px{width:64px;height:80px;background:var(--card2);border:1px solid var(--rule2);border-radius:4px;flex:none;}
+  .unirow{display:flex;gap:12px;align-items:center;margin:4px 0 14px;padding:8px 10px;background:var(--card2);border:1px solid var(--rule2);border-radius:6px;}
+  .unirow .px{width:72px;height:60px;flex:none;}
+  .rtgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--rule);border-radius:6px;overflow:hidden;margin-top:10px;}
+  .rtgrid button{border:none;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);background:var(--card);padding:8px 2px 6px;font-size:11px;line-height:1.3;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink2);word-break:keep-all;}
+  .rtgrid button:nth-child(4n){border-right:none;}
+  .rtgrid button:nth-child(n+5){border-bottom:none;}
+  .rtgrid button .px{width:40px;height:40px;}
+  .rtgrid button[aria-pressed="true"]{background:var(--ink);color:#fff;font-weight:700;}
+  .rtgrid button:disabled{opacity:.35;}
+  .rtgrid small{font-family:var(--f-mono);font-size:10px;opacity:.85;}
+  .rtdesc{margin-top:8px;font-size:14px;color:var(--ink2);}
+  .people .p{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule2);}
+  .people .p:last-child{border-bottom:none;}
+  .people .p b{display:block;font-size:15px;}
+  .people .p span{color:var(--ink3);font-size:13px;}
+  .people .p .r{text-align:right;color:var(--ink2);font-size:13px;flex:none;max-width:52%;}
+  .people .px{width:24px;height:30px;margin-right:8px;}
+  .people .l{display:flex;align-items:center;}
+  .people .r .px{width:20px;height:20px;margin:0 0 0 4px;}
+  .spin{font-family:var(--f-display);font-weight:800;font-size:clamp(24px,7vw,34px);min-height:3em;display:flex;align-items:center;justify-content:center;text-align:center;margin-top:30vh;}
+  .roulette{text-align:center;color:var(--ink3);font-size:14px;}
 
-  /* ---------- プレイ画面 ---------- */
-  #game{display:flex;flex-direction:column;height:100dvh;}
-  .head{flex:none;padding:10px 16px 8px;background:rgba(13,20,36,.92);border-bottom:1px solid var(--line);}
-  .head .inner{width:min(640px,100%);margin:0 auto;}
-  .who{display:flex;align-items:center;gap:10px;}
-  .who .flag{font-size:30px;line-height:1;}
-  .who .nm{font-weight:800;font-size:16px;line-height:1.3;}
-  .who .sub{color:var(--muted);font-size:12px;line-height:1.35;}
-  .when{margin-left:auto;text-align:right;}
-  .when .y{font-size:20px;font-weight:900;line-height:1.1;}
-  .when .a{font-size:12px;color:var(--muted);}
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin-top:8px;font-size:12px;}
-  .stat{display:grid;grid-template-columns:3.6em 1fr 2.4em;align-items:center;gap:6px;}
-  .stat .bar{height:7px;background:#25324f;border-radius:4px;overflow:hidden;}
-  .stat .bar i{display:block;height:100%;border-radius:4px;transition:width .4s;}
-  .stat .v{text-align:right;font-variant-numeric:tabular-nums;}
-  .money{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted);}
-  .money b{color:var(--text);}
+  /* プレイ */
+  .top{position:sticky;top:0;z-index:4;background:var(--paper);border-bottom:1px solid var(--rule);padding:10px 16px 10px;}
+  .top .in{width:min(640px,100%);margin:0 auto;}
+  .agebar{display:flex;align-items:baseline;gap:10px;}
+  .agebar .age{font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1;}
+  .agebar .age small{font-family:var(--f-body);font-size:20px;font-weight:400;margin-left:2px;}
+  .agebar .gm{color:var(--ink2);font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .prog{height:4px;background:var(--rule2);border-radius:2px;margin:6px 0 8px;overflow:hidden;}
+  .prog i{display:block;height:100%;background:var(--accent);transition:width .4s;}
+  .ctrls{display:flex;gap:6px;}
+  .ctrls .seg{flex:1;grid-template-columns:repeat(5,1fr);}
+  .ctrls .seg button{padding:7px 0;font-size:13px;}
+  .ctrls .btn{padding:6px 10px;font-size:13px;}
+  .scene{padding:0;overflow:hidden;}
+  .scene img{width:100%;height:auto;display:block;border-bottom:1px solid var(--rule2);}
+  .scene .cap{padding:10px 18px 12px;font-size:15px;color:var(--ink2);}
+  .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .stats4 .label{font-weight:400;}
+  .stats4 b{display:block;font-family:var(--f-mono);font-size:15px;}
+  .stats4 .bt{height:4px;background:var(--rule2);border-radius:2px;overflow:hidden;margin-top:2px;}
+  .stats4 .bt i{display:block;height:100%;transition:width .4s;}
+  .money{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;}
+  .money b{display:block;font-family:var(--f-mono);font-size:16px;}
   .money b.neg{color:var(--bad);}
-  .money small{color:var(--warm);}
-  .yr{padding-bottom:4px;border-bottom:1px dashed #22304f;}
-  .focus{display:flex;gap:6px;margin-top:8px;}
-  .focus button{flex:1;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:6px 2px;font-size:12px;line-height:1.25;}
-  .focus button[aria-pressed="true"]{background:#173f3c;border-color:var(--accent);color:var(--accent);font-weight:700;}
-  .log{flex:1;overflow-y:auto;padding:8px 16px 12px;}
-  .log .inner{width:min(640px,100%);margin:0 auto;}
-  .ln{padding:5px 0 5px 10px;border-left:3px solid transparent;font-size:14px;animation:pop .25s ease-out;}
-  .ln.year{border:none;padding:12px 0 2px;color:var(--warm);font-weight:800;font-size:13px;}
-  .ln.world{color:var(--world);font-size:13px;border-left-color:#3a4f8f;}
-  .ln.good{border-left-color:var(--good);}
-  .ln.bad{border-left-color:var(--bad);}
-  .ln.big{border-left-color:var(--warm);font-weight:700;}
-  .ln.choice{border-left-color:var(--accent);color:#bff3ec;}
-  .ln .fx{font-size:11px;color:var(--muted);margin-left:6px;white-space:nowrap;}
-  @keyframes pop{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
-  .peers{flex:none;border-top:1px solid var(--line);background:rgba(21,31,54,.95);padding:6px max(16px, calc(50% - 304px));font-size:12px;}
-  .peers .inner{width:min(640px,100%);margin:0 auto;}
-  .peers summary{color:var(--muted);cursor:pointer;}
-  .peers li{margin:2px 0;color:var(--muted);}
-  .peers li b{color:var(--text);font-weight:600;}
-  .ctrl{flex:none;display:flex;gap:6px;justify-content:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);}
-  .ctrl button{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:8px 10px;font-size:14px;min-width:44px;white-space:nowrap;}
-  .ctrl button[aria-pressed="true"]{background:var(--accent);color:#06221f;border-color:var(--accent);font-weight:700;}
+  .money small{color:var(--gold);font-size:11px;}
+  .focus{grid-template-columns:1fr 1fr;}
+  .focus button{border-bottom:1px solid var(--rule);}
+  .focus button:nth-child(2){border-right:none;}
+  .focus button:nth-child(n+3){border-bottom:none;}
+  #logList{max-height:46vh;overflow-y:auto;overscroll-behavior:contain;}
+  .rec .row{display:grid;grid-template-columns:3.6em 1fr;gap:10px;padding:12px 0;border-bottom:1px solid var(--rule2);animation:pop .3s ease-out;}
+  .rec .row:last-child{border-bottom:none;}
+  .rec .a{font-family:var(--f-mono);color:var(--ink3);font-size:13px;padding-top:2px;}
+  .rec .t{font-size:15px;line-height:1.75;}
+  .rec .row.big .t,.rec .row.choice .t{font-weight:700;}
+  .rec .row.good .t::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:6px;vertical-align:2px;}
+  .rec .row.bad .t::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--bad);margin-right:6px;vertical-align:2px;}
+  .rec .src{display:block;font-size:12px;color:var(--ink3);margin-top:2px;font-weight:400;}
+  .rec .src b{color:var(--stamp);margin-right:6px;}
+  .rec .tag{display:inline-block;color:var(--accent);font-size:12px;font-weight:700;margin-right:6px;}
+  .rec .fx{font-family:var(--f-mono);font-size:11px;color:var(--ink3);margin-left:6px;white-space:nowrap;font-weight:400;}
+  @keyframes pop{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+  .idc{padding:0;overflow:hidden;}
+  .idc .hd{background:var(--accent);color:#fff;font-family:var(--f-mono);font-size:13px;display:flex;justify-content:space-between;padding:8px 18px;}
+  .idc .bd{display:flex;gap:16px;padding:16px 18px 10px;}
+  .idc .ph{width:72px;height:90px;background:#cfe6ef;border:1px solid var(--rule2);border-radius:3px;flex:none;}
+  .idc .nm{font-family:var(--f-display);font-weight:800;font-size:22px;line-height:1.3;margin-bottom:4px;}
+  .idc dl{display:grid;grid-template-columns:auto 1fr;gap:1px 14px;margin:0;font-size:14px;}
+  .idc dt{color:var(--ink3);} .idc dd{margin:0;}
+  .idc .mrz{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;border-top:1px dashed var(--rule);padding:8px 18px 12px;color:var(--ink2);white-space:nowrap;overflow:hidden;}
+  .lmap{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:10px;}
+  .lmap i{aspect-ratio:1;border-radius:3px;background:var(--rule2);}
+  .lmap i.now{outline:2px solid var(--accent);outline-offset:-2px;}
+  .lmap i.ret{outline:1.5px solid var(--ink2);outline-offset:-2px;}
 
-  /* ---------- モーダル ---------- */
-  .modal{position:fixed;inset:0;background:rgba(5,9,18,.72);display:flex;align-items:flex-end;justify-content:center;z-index:10;padding:16px;}
-  @media (min-width:640px){.modal{align-items:center;}}
-  .sheet{width:min(560px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 16px 16px;max-height:88dvh;overflow:auto;animation:pop .2s ease-out;}
-  .sheet .k{font-size:12px;color:var(--warm);font-weight:700;}
-  .sheet h3{margin:2px 0 6px;font-size:19px;}
-  .sheet p{margin:0 0 12px;font-size:14px;color:#cfd8f0;}
-  .opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:11px 14px;margin:0 0 8px;}
-  .opt b{display:block;font-size:15px;}
-  .opt span{display:block;font-size:12px;color:var(--muted);}
-  .opt:active{border-color:var(--accent);}
-  .sheet textarea{width:100%;min-height:70px;border-radius:10px;border:1px solid var(--line);background:#0f1729;color:var(--text);padding:10px;font:inherit;font-size:16px;}
+  /* 決断 */
+  .modal{position:fixed;inset:0;background:rgba(19,33,42,.45);display:flex;align-items:flex-start;justify-content:center;z-index:10;padding:54px 16px 16px;overflow:auto;}
+  .sheet{width:min(560px,100%);background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:0 20px 50px -20px rgba(19,33,42,.5);animation:pop .2s ease-out;}
+  .sheet .hd{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--rule2);color:var(--accent);font-size:14px;}
+  .sheet .hd .mono{font-size:13px;}
+  .sheet .bd{padding:14px 18px 16px;}
+  .sheet h3{font-family:var(--f-display);font-weight:800;font-size:24px;line-height:1.35;margin:0 0 8px;}
+  .sheet h3 .px{width:40px;height:40px;margin-right:6px;}
+  .sheet p{margin:0 0 12px;color:var(--ink2);font-size:15px;}
+  .opt{display:grid;grid-template-columns:2em 1fr;gap:6px;align-items:start;width:100%;text-align:left;border:1px solid var(--rule);background:var(--paper);border-radius:4px;padding:12px 14px;margin:0 0 8px;}
+  .opt .n{font-family:var(--f-mono);color:var(--ink3);font-size:13px;padding-top:2px;}
+  .opt b{display:block;font-size:16px;line-height:1.5;}
+  .opt span.d{display:block;font-size:13px;color:var(--ink2);margin-top:2px;}
+  .opt:hover,.opt:focus-visible{border-color:var(--accent);outline:none;}
+  .sheet .auto{display:block;margin:6px auto 0;}
+  .sheet textarea{width:100%;min-height:72px;border-radius:4px;border:1px solid var(--rule);background:#fff;color:var(--ink);padding:10px;font:inherit;font-size:16px;}
   .sheet .act{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
 
-  /* ---------- おわり ---------- */
-  .endc{background:linear-gradient(180deg,#1f2b4d,#141d33);border:1px solid var(--line);border-radius:18px;padding:18px 16px;margin:16px 0;}
-  .endc .t{color:var(--warm);font-weight:800;font-size:13px;}
-  .endc h2{margin:2px 0 4px;font-size:22px;}
-  .endc .ttl{display:inline-block;margin:6px 0 10px;padding:4px 12px;border-radius:99px;background:#173f3c;color:var(--accent);font-weight:800;}
-  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;}
-  .nums div{background:#121a2e;border-radius:12px;padding:8px 6px;text-align:center;}
-  .nums b{display:block;font-size:17px;white-space:nowrap;}
-  .nums span{font-size:11px;color:var(--muted);}
-  .path{font-size:14px;margin:8px 0;}
-  .moments{font-size:13px;padding-left:1.1em;margin:6px 0;}
-  .answers{font-size:13px;color:#cfd8f0;margin:8px 0 0;}
-  .answers div{margin:4px 0;}
-  .answers i{color:var(--muted);font-style:normal;}
-  .btnrow{display:flex;gap:8px;flex-wrap:wrap;}
-  .btnrow > *{flex:1 1 140px;text-align:center;text-decoration:none;}
-  .px{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;vertical-align:middle;}
-  .px.av{width:40px;height:50px;}
-  .px.av-l{width:80px;height:100px;flex:none;}
-  .px.av-s{width:20px;height:25px;margin-right:4px;}
-  .px.bld{width:72px;height:60px;flex:none;}
-  .px.ic{width:24px;height:20px;margin-right:3px;}
-  .px.icr{width:20px;height:20px;margin-right:3px;}
-  .px.rb{width:48px;height:48px;}
-  .avwrap{position:relative;flex:none;}
-  .avwrap .mf{position:absolute;right:-6px;bottom:-2px;font-size:16px;line-height:1;}
-  .robots{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:6px 0 14px;}
-  .robots .px{width:36px;height:36px;}
-  .bhead{display:flex;gap:14px;align-items:center;}
-  .unirow{display:flex;gap:12px;align-items:center;margin-top:12px;padding:8px;background:#121a2e;border-radius:12px;font-size:14px;}
-  .rtgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
-  .rtgrid button{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:6px 2px 5px;font-size:10.5px;word-break:keep-all;line-height:1.3;display:flex;flex-direction:column;align-items:center;gap:2px;}
-  .rtgrid button[aria-pressed="true"]{border-color:var(--accent);background:#173f3c;color:var(--accent);font-weight:700;}
-  .rtgrid button:disabled{opacity:.35;}
-  .rtgrid small{color:var(--muted);font-weight:400;font-size:10px;}
-  .rtdesc{margin-top:8px;font-size:13px;color:#cfd8f0;min-height:1.6em;}
-  .mates li{list-style:none;margin:4px 0;}
-  .mates{padding-left:0;}
+  /* おわり */
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--rule2);border-left:1px solid var(--rule2);margin:14px 0;}
+  .nums div{border-right:1px solid var(--rule2);border-bottom:1px solid var(--rule2);padding:10px 6px;text-align:center;}
+  .nums b{display:block;font-family:var(--f-mono);font-size:16px;white-space:nowrap;}
+  .nums span{font-size:11px;color:var(--ink3);}
   .trail{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:8px 0;font-size:13px;}
-  .trail .chip{display:inline-flex;align-items:center;background:#121a2e;border-radius:8px;padding:3px 7px;}
-  .trail .arr{color:var(--muted);}
-  .ehead{display:flex;gap:14px;align-items:flex-end;}
-  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000c;color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;z-index:20;}
+  .trail .chip{display:inline-flex;align-items:center;background:var(--card2);border:1px solid var(--rule2);border-radius:4px;padding:2px 7px;}
+  .trail .chip .px{width:24px;height:20px;margin-right:4px;}
+  .trail .chip .px.r{width:18px;height:18px;}
+  .trail .arr{color:var(--ink3);}
+  .moments{font-size:14px;padding-left:1.1em;margin:6px 0;color:var(--ink2);}
+  .answers div{margin:6px 0;font-size:15px;}
+  .answers i{color:var(--ink3);font-style:normal;font-size:12px;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
+  .btnrow > *{flex:1 1 140px;text-align:center;text-decoration:none;}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;z-index:20;}
+  footer{color:var(--ink3);font-size:12px;text-align:center;margin-top:20px;}
 </style>
+
 </head>
 <body>
 
 <!-- ===== タイトル ===== -->
 <section id="title" class="wrap">
-  <h1 class="logo"><b>100万</b>分の1<br><small>ロボットエンジニア人生</small></h1>
-  <div class="robots" id="titleRobots"></div>
-  <p class="tag">世界にいる約100万人のロボットエンジニアの、だれかひとりとして大学に入学する。<br>国も大学も選べない。生き方はあなたしだい。</p>
+  <div class="hero"><img id="titleScene" class="px" alt="キャンパスにならぶ 8 種類のロボットのピクセルアート"></div>
+  <p class="meta">v1.3 · 無料のロボットエンジニア人生シミュレーション · 24か国の推計にもとづく</p>
+  <h1 class="logo">100万分の<em>1</em></h1>
+  <p class="lead">世界には、およそ100万人のロボットエンジニアがいます。そのひとりとして大学に入学し、たった一度のエンジニア人生を定年まで生きてみます。どの国の、どの大学に入るかは選べません。</p>
+  <div class="counter"><b id="cSold">0</b><span>このページを開いてから、世界で売れたロボット</span></div>
+  <div class="counter"><b id="cArm">0</b><span>同じ時間に、工場に入った産業用ロボット</span></div>
+  <p class="theme"><span class="pill">今日のテーマ</span><b id="themeName"></b>　今日入学するすべての人生が、このテーマをともに通り過ぎます。</p>
 
-  <div class="box">
-    <h3>入学する時代</h3>
-    <div class="seg" id="eraSeg">
-      <button data-era="any" aria-pressed="true">どの時代でも</button>
-      <button data-era="now">いま（2026年）</button>
-      <button data-era="past">むかし（1965〜2015年）</button>
-    </div>
-    <div class="row"><span>おまかせモード（選択も自動で進む）</span><button class="switch" id="autoSw" aria-pressed="false" aria-label="おまかせモード"></button></div>
-  </div>
-
-  <button class="big" id="startBtn">入学する</button>
-
-  <div class="box" id="pastBox">
-    <h3>前世の記録</h3>
-    <ul class="past" id="pastList"></ul>
-  </div>
-
-  <div class="box">
-    <h3>どこで生まれるか</h3>
-    <p class="note" id="distLbl" style="margin:0 0 8px"></p>
+  <div class="card">
+    <h3 id="distTitle">いま入学する学生だったら</h3>
+    <div class="sub" id="distLbl"></div>
     <div class="bars" id="countryBars"></div>
-    <h3 style="margin-top:16px">年代ごとの比率の変化</h3>
+    <hr class="rule">
+    <h3 style="font-size:16px">年代ごとの比率の変化</h3>
     <div class="trend" id="trend"></div>
     <div class="legend" id="trendLegend"></div>
-    <p class="note" style="margin-top:8px">国際ロボット連盟（IFR）の産業用ロボット設置台数、ロボット学会 ICRA 2024 の著者数、CSRankings のロボティクス論文数をまぜた 2026 年の推計に、各国のロボット産業の歴史（日本の 1980 年代のロボット普及、2010 年代からの中国の急成長など）を加えて年代ごとの比率を作っています。上の「入学する時代」を変えると、グラフも変わります。</p>
+    <p class="note" style="margin:8px 0 0">国際ロボット連盟（IFR）の産業用ロボット設置台数、ロボット学会 ICRA 2024 の著者数、CSRankings のロボティクス論文数をまぜた 2026 年の推計に、各国のロボット産業の歴史（日本の 1980 年代のロボット普及、2010 年代からの中国の急成長など）を加えています。</p>
   </div>
 
-  <div class="box">
+  <div class="field">
+    <span class="label">入学する時代</span>
+    <div class="seg c3" id="eraSeg">
+      <button data-era="past">むかしの世界</button>
+      <button data-era="now">いまの世界</button>
+      <button data-era="any" aria-pressed="true">どの時代でも</button>
+    </div>
+    <div class="note" id="eraNote"></div>
+  </div>
+  <div class="field">
+    <span class="label">大きな決断</span>
+    <div class="seg c2" id="autoSeg">
+      <button data-auto="0" aria-pressed="true">自分で選ぶ</button>
+      <button data-auto="1">おまかせ</button>
+    </div>
+    <div class="note">おまかせにすると、進学・就職・転職などの決断も統計どおりに自動で進みます。</div>
+  </div>
+  <div class="field">
+    <span class="label">ひとつの人生の長さ</span>
+    <div class="note" style="margin-top:0">定年まで生きるのに約10分（1年 ≈ 13秒）。生きているあいだも、一時停止や倍速ができます。</div>
+  </div>
+  <div style="margin:18px 0 6px;max-width:220px"><button class="cta" id="startBtn">入学する</button></div>
+  <p class="note" style="margin:0 0 22px">設定はそのままで、すぐに入学してもかまいません。</p>
+
+  <div class="card" id="pastBox">
+    <h3>前世の記録</h3>
+    <div class="sub">このブラウザで生きた人生です（10 件まで）。</div>
+    <div class="lives" id="pastList"></div>
+  </div>
+
+  <div class="card">
     <h3>あそびかた</h3>
-    <ul>
-      <li>18歳で入学したところから、定年まで 1 年ずつ時間が進む（1 人生 10 分ほど。2×〜16× で早送りもできる）</li>
-      <li>年収と資産（貯金・投資・家・株・退職金）が毎年変わる。分かれ道では、選んだあとの年収が見える</li>
+    <ul style="margin:0;padding-left:1.2em;font-size:14px;color:var(--ink2)">
+      <li>18歳で入学したところから、定年まで 1 年ずつ時間が進む</li>
       <li>入学したら、つくるロボットの種類（ヒューマノイド・犬型・アームなど 8 種）をえらぶ</li>
-      <li>毎年の「重点」をえらぶと、技術・健康・幸福・人脈が変わる。販売したロボットの台数も数える</li>
-      <li>進学・就職・転職・起業などの分かれ道では、自分でえらぶ</li>
+      <li>毎年の「重点」をえらぶと、技術・健康・幸福・人脈が変わる</li>
+      <li>進学・就職・転職・起業などの大きな決断は、自分でえらぶ。選んだあとの年収も見える</li>
+      <li>年収・資産・作ったロボット・売れたロボットが毎年変わる</li>
       <li>同じ年に入学した 4 人も、同じ統計で同時に人生を歩む</li>
     </ul>
-    <p class="note" style="margin-top:8px">元ネタは人生シミュレーター『80億分の1』。この作品はそのパロディで、数字は公開データからのざっくり推計、できごとは業界あるあるの創作です。</p>
+    <p class="note" style="margin:10px 0 0">元ネタは人生シミュレーター『<a href="https://1in8b.life/ja/" target="_blank" rel="noopener">80億分の1</a>』。この作品はそのパロディで、数字は公開データからのざっくり推計、できごとは業界あるあるの創作です。</p>
   </div>
-  <p class="note" style="text-align:center"><a href="../">← ゲーム一覧へ</a></p>
+  <footer><a href="../">← ゲーム一覧へ</a></footer>
+  <div class="stickybar"><div class="in"><button class="cta" id="startBtn2">入学する</button></div></div>
 </section>
 
-<!-- ===== 入学ガチャ ===== -->
+<!-- ===== 入学 ===== -->
 <section id="birth" class="wrap hidden">
-  <div class="roulette" id="rouLabel">世界のどこかの大学に入学しています…</div>
   <div class="spin" id="spin"></div>
+  <div class="roulette" id="rouLabel"></div>
   <div id="birthCard" class="hidden"></div>
+  <div class="stickybar hidden" id="birthBar"><div class="in"><button class="btn" id="copyBirth">入学カードを共有</button><button class="cta" id="goBtn">人生を始める</button></div></div>
 </section>
 
 <!-- ===== プレイ ===== -->
 <section id="game" class="hidden">
-  <div class="head"><div class="inner">
-    <div class="who">
-      <div class="avwrap"><img class="px av" id="hAv" alt="あなたのキャラクター"><span class="mf" id="hFlag"></span></div>
-      <div>
-        <div class="nm" id="hName"></div>
-        <div class="sub" id="hSub"></div>
-        <div class="sub" id="hRt"></div>
-      </div>
-      <div class="when"><div class="y" id="hYear"></div><div class="a" id="hAge"></div></div>
-    </div>
-    <div class="stats" id="hStats"></div>
-    <div class="money" id="hMoney"></div>
-    <div class="focus" id="focus">
-      <button data-f="make">🔧 開発</button>
-      <button data-f="paper">📄 論文</button>
-      <button data-f="people">🤝 人脈</button>
-      <button data-f="rest">☕ 休む</button>
+  <div class="top"><div class="in">
+    <div class="agebar"><span class="age"><span id="gAge">18</span><small>歳</small></span><span class="gm" id="gMeta"></span></div>
+    <div class="prog"><i id="gProg" style="width:0"></i></div>
+    <div class="ctrls">
+      <button class="btn" id="pauseBtn" aria-label="一時停止">❚❚</button>
+      <div class="seg" id="spSeg"><button data-sp="1" aria-pressed="true">1×</button><button data-sp="2">2×</button><button data-sp="4">4×</button><button data-sp="8">8×</button><button data-sp="16">16×</button></div>
+      <button class="btn" id="skipBtn">次へ »</button>
     </div>
   </div></div>
-  <div class="log" id="log"><div class="inner" id="logInner"></div></div>
-  <details class="peers" id="peers"><summary id="peersSum">同じ年に入学した 4 人</summary><div class="inner"><ul id="peerList" style="margin:4px 0 0;padding-left:0;list-style:none"></ul></div></details>
-  <div class="ctrl" id="ctrl">
-    <button data-sp="0" aria-label="一時停止">⏸</button>
-    <button data-sp="1" aria-pressed="true">1×</button>
-    <button data-sp="2">2×</button>
-    <button data-sp="4">4×</button>
-    <button data-sp="16">16×</button>
-    <button id="skipBtn" aria-label="次の分かれ道まで進む">⏭ 分かれ道</button>
+  <div class="wrap" style="padding-bottom:40px">
+    <div class="card scene"><img id="gScene" class="px" alt="いまの場面"><div class="cap" id="gPlace"></div></div>
+    <div class="card" style="padding:12px 16px">
+      <div class="stats4" id="gStats"></div>
+    </div>
+    <div class="card rec">
+      <h3>人生の記録 <small>新しい順</small></h3>
+      <div class="sub" id="recNote" style="color:var(--stamp)"></div>
+      <div id="logList"></div>
+    </div>
+    <div class="card">
+      <h3>今年の重点</h3>
+      <div class="sub" id="focusNote" style="margin-bottom:8px">いちばん力を入れることを選びます。いつでも変えられます。</div>
+      <div class="seg focus" id="focus">
+        <button data-f="make">🔧 開発</button>
+        <button data-f="paper">📄 論文・発信</button>
+        <button data-f="people">🤝 人脈</button>
+        <button data-f="rest">☕ 休む</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>お金とロボット</h3>
+      <div class="money" id="gMoney"></div>
+    </div>
+    <div class="card idc" id="gId"></div>
+    <div class="card people">
+      <h3>同じ年に入学した人たち <small>いま、同じ年齢で</small></h3>
+      <div id="peerList"></div>
+    </div>
+    <div class="card">
+      <h3>人生地図 <small>1マス = 1年</small></h3>
+      <div class="lmap" id="gMap"></div>
+      <div class="note" style="margin-top:8px">色が濃いほど幸福だった年。枠のマスは定年の年。</div>
+    </div>
   </div>
 </section>
 
@@ -751,6 +810,7 @@ function contest(s){
 function expo(s){
   return ({JP:'国際ロボット展',DE:'automatica',CN:'世界ロボット大会（北京）',US:s.year>=1990?'CES':'工作機械見本市',KR:'ロボワールド'})[s.jc]||'展示会';
 }
+let THEME_KW = null; // 今日のテーマ（このことばをふくむできごとが出やすい）
 const LAB=['ms','phd','postdoc','prof'];
 const RS=['ms','phd','postdoc','work','startup','prof'];
 const ALL=['ug','ms','phd','postdoc','work','startup','prof'];
@@ -1001,8 +1061,8 @@ const EVENTS = [
   {st:['work','startup'],y:[2012,9999],t:'倉庫のロボットが、床のシールのはがれで迷子になった',e:{}},
   {st:['work','startup'],y:[2012,9999],t:'物流倉庫で、ロボットが通路で渋滞した',e:{sk:1}},
   {st:['work','startup'],y:[2005,9999],t:'自動運転のテスト中、カラスに道をゆずられた',e:{}},
-  {st:['work','startup'],y:[2023,9999],t:'ヒューマノイドのデモで、ロボットが冷蔵庫をあけるのに 5 分かかった',e:{}},
-  {st:['work','startup'],y:[2023,9999],t:'ヒューマノイドの指が 1 本動かなくなり、ピースしかできなくなった',e:{}},
+  {st:['work','startup'],rt:['humanoid'],y:[2023,9999],t:'ヒューマノイドのデモで、ロボットが冷蔵庫をあけるのに 5 分かかった',e:{}},
+  {st:['work','startup'],rt:['humanoid'],y:[2023,9999],t:'ヒューマノイドの指が 1 本動かなくなり、ピースしかできなくなった',e:{}},
   {st:['work','startup'],y:[2015,9999],t:'デモ動画を 10 倍速にしていいか、社内でもめた',e:{}},
   {st:['work','startup','phd','postdoc'],y:[2016,9999],t:'遠隔操作用の VR ゴーグルで酔った',e:{he:-1}},
   {st:['work','startup','phd','postdoc'],y:[2023,9999],t:'学習データが足りず、自分で 1000 回遠隔操作した',e:{he:-2,sk:2}},
@@ -1372,6 +1432,7 @@ function randomEvent(s){
   const ev = wpick(cand, e=>{
     let w=e.w||1;
     if(s.recent.includes(e)) w*=.04; // 最近出たできごとは出にくい
+    if(THEME_KW && typeof e.t==='string' && e.t.includes(THEME_KW)) w*=3;
     if(e.p && s.focus==='paper') w*=1.8;
     if(e.r && s.focus==='make') w*=1.5;
     if(e.e && e.e.ne>0 && s.focus==='people') w*=1.4;
@@ -1445,7 +1506,7 @@ function endYear(s){
   }
   return out;
 }
-function snap(s){ return {lbl:stageLabel(s), f:cInfo(s.jc).f, o:outfitOf(s), age:s.age, rt:s.rt}; }
+function snap(s){ return {lbl:stageLabel(s), f:cInfo(s.jc).f, o:outfitOf(s), age:s.age, rt:s.rt, ha:s.st.ha}; }
 // 株価の大きな動き（実際の年）
 const MARKET = {1973:-.17,1974:-.3,1987:-.05,1990:-.1,2000:-.1,2001:-.13,2002:-.22,2008:-.38,2011:-.02,2018:-.06,2020:.16,2022:-.19,2023:.24,2024:.23};
 function updateAssets(s){
@@ -1540,9 +1601,9 @@ const SKIN=[['#f6d5b8','#e2b895'],['#e9b892','#cf9a73'],['#c98d64','#ad7450'],['
 const HAIR=['#1d1a1e','#5a3a22','#c9963a','#8a3b1e'];
 const SHIRT=['#3b82c4','#d1495b','#2a9d8f','#e9a23b','#7b5ea7','#4a5a6a'];
 // 人：16×20。年齢で髪が白くなり、服は立場で変わる
-function personURL(look, age, outfit){
-  const key=['p',look.skin,look.hair,look.style,look.glasses,look.beard,look.bald,look.shirt,age>=58?2:age>=45?1:0,age>=30?1:0,outfit].join('_');
-  return pxURL(key,16,20,P=>{
+function personURL(look, age, outfit){ return pxURL(personKey(look,age,outfit),16,20,P=>drawPerson(P,look,age,outfit)); }
+function personKey(look, age, outfit){ return ['p',look.skin,look.hair,look.style,look.glasses,look.beard,look.bald,look.shirt,age>=58?2:age>=45?1:0,age>=30?1:0,outfit].join('_'); }
+function drawPerson(P, look, age, outfit){ {
     const [sk,sd]=SKIN[look.skin];
     const gray = age>=58, salt = age>=45 && !gray;
     const hc = gray ? '#b9bcc6' : HAIR[look.hair];
@@ -1577,14 +1638,12 @@ function personURL(look, age, outfit){
     }
     if(look.beard && age>=28){ P(5,11,2,2,hc); P(9,11,2,2,hc); P(7,12,2,1,hc); }
     if(look.glasses){ const F='#8fa3c8'; for(const gx of [5,8]){ P(gx,7,3,1,F); P(gx,9,3,1,F); P(gx,8,1,1,F); P(gx+2,8,1,1,F); } P(6,8,1,1,K); P(9,8,1,1,K); }
-  });
+  }
 }
 // 建物：24×20
 function hashCol(name){ let h=0; for(const ch of String(name)) h=(h*31+ch.charCodeAt(0))>>>0; return ['#e94f37','#3b82c4','#2a9d8f','#e9a23b','#7b5ea7','#d1495b','#38d6c4','#f08a24'][h%8]; }
-function buildingURL(kind, tint){
-  tint = tint||'#38d6c4';
-  return pxURL('b_'+kind+'_'+tint,24,20,P=>{
-    P(0,18,24,2,'#2b3a55');
+function buildingURL(kind, tint){ tint=tint||'#38d6c4'; return pxURL('b_'+kind+'_'+tint,24,20,P=>{ P(0,18,24,2,'#c7d2ce'); drawBuilding(P,kind,tint); }); }
+function drawBuilding(P, kind, tint){ {
     if(kind==='uni1'){ // ドームのある本館
       P(10,0,1,3,K); P(11,0,3,1,tint);
       P(8,3,7,1,K); P(7,4,9,3,'#7aa0c4'); P(8,4,3,1,'#a7c4e0');
@@ -1623,11 +1682,11 @@ function buildingURL(kind, tint){
     } else { // オフィス
       P(5,2,14,16,'#8e9bb0'); for(let y=4;y<16;y+=3) for(let x=7;x<17;x+=3) P(x,y,2,2,'#d6e2f2'); P(10,14,4,4,'#3b4252');
     }
-  });
+  }
 }
 // ロボット：16×16
-function robotURL(kind){
-  return pxURL('r_'+kind,16,16,P=>{
+function robotURL(kind){ return pxURL('r_'+kind,16,16,P=>drawRobot(P,kind)); }
+function drawRobot(P, kind){ {
     const A='#38d6c4', M='#c9d1de', D='#5f6b80';
     if(kind==='humanoid'){
       P(5,0,6,5,K); P(6,1,4,3,M); P(6,2,4,1,A);
@@ -1663,7 +1722,7 @@ function robotURL(kind){
       P(5,5,1,4,D); P(10,5,1,4,D); P(5,9,1,1,K); P(10,9,1,1,K);
       P(4,13,8,3,K); P(5,13,6,2,'#9aa3b2');
     }
-  });
+  }
 }
 function iconURL(key, name){
   if(!key) return null;
@@ -1672,31 +1731,77 @@ function iconURL(key, name){
 }
 function placeURL(s){ return iconURL(placeIcon(s), s.stage==='startup'?s.own:(s.job?s.job.n:s.uni)); }
 
+const offP=(P,ox,oy)=>(x,y,w,h,c)=>P(x+ox,y+oy,w,h,c);
+// 場面の絵：120×44。左に今いる場所、右に自分とロボット
+function sceneURL(s, ageOverride, outfitOverride){
+  const age = ageOverride||s.age, out = outfitOverride||outfitOf(s);
+  const place = placeIcon(s), tint = hashCol(s.stage==='startup'?s.own:(s.job?s.job.n:s.uni));
+  const night = s.flags && s.flags.burnout;
+  const key = ['sc',place,tint,personKey(s.look,age,out),s.rt,night?1:0].join('|');
+  return pxURL(key,120,44,P=>{
+    P(0,0,120,36, night?'#2d3550':'#cfe6ef'); P(0,0,120,12, night?'#232a42':'#b9dbe9');
+    if(night){ for(const [x,y] of [[20,5],[44,9],[70,4],[96,8],[110,14],[58,15]]) P(x,y,1,1,'#f3e2b3'); P(100,4,4,4,'#f3e2b3'); P(101,4,3,3,'#2d3550'); }
+    else { P(14,5,5,5,'#fff3b0'); P(13,6,7,3,'#fff3b0'); P(32,7,14,3,'#ffffff'); P(35,5,8,2,'#ffffff'); P(78,9,12,3,'#ffffff'); P(81,7,6,2,'#ffffff'); }
+    P(0,28,120,8, night?'#3c5a52':'#a8cfb0'); P(36,24,34,4, night?'#3c5a52':'#a8cfb0'); P(62,22,40,6, night?'#3c5a52':'#a8cfb0');
+    P(0,35,120,2,'#6aa84f'); P(0,37,120,7,'#8a6a45');
+    for(let x=3;x<120;x+=9) P(x,40+(x%3),1,1,'#6e5235');
+    P(48,28,2,8,'#6b4a2b'); P(45,22,8,7,'#4f9a5a'); P(46,21,6,1,'#4f9a5a');
+    drawBuilding(offP(P,8,16), place, tint);
+    drawPerson(offP(P,70,16), s.look, age, out);
+    drawRobot(offP(P,92, s.rt==='drone'?8:20), s.rt);
+  });
+}
+// タイトルの絵：キャンパスに 8 種類のロボット
+function titleSceneURL(){
+  return pxURL('title',160,40,P=>{
+    P(0,0,160,30,'#cfe6ef'); P(0,0,160,10,'#b9dbe9');
+    P(20,5,14,3,'#fff'); P(23,3,8,2,'#fff'); P(110,7,16,3,'#fff'); P(114,5,8,2,'#fff');
+    P(0,24,160,8,'#a8cfb0'); P(40,20,50,4,'#a8cfb0');
+    P(0,31,160,2,'#6aa84f'); P(0,33,160,7,'#8a6a45');
+    RT_KEYS.forEach((k,i)=>drawRobot(offP(P,4+i*19, k==='drone'?6:16), k));
+  });
+}
 const $ = id=>document.getElementById(id);
-let ERA='any', AUTO=false, SPEED=1, SKIP=false;
-let S=null, PEERS=[], Q=[], timer=null, waiting=false, lastSpeed=1, curYear=null;
+let ERA='any', AUTO=false, SPEED=1, SKIP=false, PAUSED=false;
+let S=null, PEERS=[], Q=[], timer=null, waiting=false;
 
 function show(id){ ['title','birth','game','end'].forEach(x=>$(x).classList.toggle('hidden',x!==id)); window.scrollTo(0,0); }
+const ISO3 = {JP:'JPN',CN:'CHN',US:'USA',DE:'DEU',KR:'KOR',IN:'IND',GB:'GBR',FR:'FRA',IT:'ITA',CA:'CAN',TW:'TWN',CH:'CHE',SG:'SGP',AU:'AUS',NL:'NLD',ES:'ESP',DK:'DNK',SE:'SWE',IL:'ISR',MX:'MEX',BR:'BRA',AE:'ARE',HK:'HKG',CZ:'CZE',IR:'IRN',TR:'TUR',VN:'VNM',ID:'IDN',MY:'MYS',GR:'GRC',EG:'EGY',PK:'PAK'};
+const FAM_LV = {'きびしい家計':1,'ふつうの家庭':3,'エンジニア一家':3,'ゆたかな家庭':5};
+const dots = n=>'●'.repeat(n)+'○'.repeat(5-n);
+const TIER_TXT = ['','世界トップの研究大学','有力な大学','ふつうの大学'];
+function docNo(s){ let h=0; for(const ch of s.id) h=(h*33+ch.charCodeAt(0))%9999999; return (ISO3[s.c]||'XXX')+'-'+s.entry+'-'+String(h).padStart(7,'0'); }
+function shortStage(s){ return stageLabel(s); }
 
-// ---- タイトル
+/* ---------- タイトル ---------- */
+const ERA_NOTE = {
+  past:'1965〜2015年のどこかで入学します。日本・アメリカ・ヨーロッパのロボット産業が強かった時代です。',
+  now:'2026年に入学します。ヒューマノイドブームのまっただ中です。卒業後の世界は、これからの予測で進みます。',
+  any:'1965〜2026年のどこかで入学します。ロボットエンジニアの多い近年ほど選ばれやすくなります。',
+};
 document.querySelectorAll('#eraSeg button').forEach(b=>b.onclick=()=>{
   ERA=b.dataset.era; document.querySelectorAll('#eraSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b));
   renderCountryBars();
 });
-$('autoSw').onclick=()=>{ AUTO=!AUTO; $('autoSw').setAttribute('aria-pressed',AUTO); };
-$('startBtn').onclick=startBirth;
+document.querySelectorAll('#autoSeg button').forEach(b=>b.onclick=()=>{
+  AUTO=b.dataset.auto==='1'; document.querySelectorAll('#autoSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+});
+$('startBtn').onclick=startBirth; $('startBtn2').onclick=startBirth;
 
-// グラフの色（国ごとに固定。順位で色を変えない）
-const SERIES = [['CN','#3987e5'],['US','#d95926'],['JP','#199e70'],['DE','#c98500'],['KR','#d55181'],['IN','#9085e9']];
-const OTHER_COL = '#5b6785';
-const colOf = k=>(SERIES.find(x=>x[0]===k)||[0,OTHER_COL])[1];
-const ERA_TXT = {any:'どの時代でも（1965〜2026年入学）', now:'いま（2026年入学）', past:'むかし（1965〜2015年入学）'};
+const SERIES = [['CN','#2a78d6'],['US','#eb6834'],['JP','#1baf7a'],['DE','#eda100'],['KR','#e87ba4'],['IN','#6250d6']];
+const OTHER_COL = '#aab5b1';
+const ERA_TITLE = {any:'どの時代かに入学する学生だったら', now:'いま入学する学生だったら', past:'むかし入学した学生だったら'};
+const ERA_SUB = {any:'1965〜2026年入学の重みづけ平均 · 上位 9 か国', now:'2026年入学 · 上位 9 か国', past:'1965〜2015年入学の重みづけ平均 · 上位 9 か国'};
 function renderCountryBars(){
   const d = eraDist(ERA);
-  const ks = Object.keys(d).sort((a,b)=>d[b]-d[a]).slice(0,10);
-  const max = d[ks[0]];
-  $('distLbl').textContent = ERA_TXT[ERA]+'に入学したとき、その国になる確率（上位 10 か国）';
-  $('countryBars').innerHTML = ks.map(k=>`<span>${COUNTRIES[k].f} ${COUNTRIES[k].n}</span><span><i style="width:${(d[k]/max*100).toFixed(1)}%;background:${colOf(k)}"></i></span><span>${(d[k]*100).toFixed(d[k]<.1?1:0)}%</span>`).join('');
+  const ks = Object.keys(d).sort((a,b)=>d[b]-d[a]);
+  const top = ks.slice(0,9), rest = ks.slice(9).reduce((a,k)=>a+d[k],0);
+  const max = Math.max(d[top[0]], rest);
+  $('distTitle').textContent = ERA_TITLE[ERA];
+  $('distLbl').textContent = ERA_SUB[ERA];
+  $('eraNote').textContent = ERA_NOTE[ERA];
+  $('countryBars').innerHTML = top.map(k=>`<span>${COUNTRIES[k].n}</span><span class="bt"><i style="width:${(d[k]/max*100).toFixed(1)}%"></i></span><span class="pc">${(d[k]*100).toFixed(1)}%</span>`).join('')
+    + `<span>その他${ks.length-9}か国</span><span class="bt"><i class="o" style="width:${(rest/max*100).toFixed(1)}%"></i></span><span class="pc">${(rest*100).toFixed(1)}%</span>`;
   renderTrend();
 }
 function shareAt(y){
@@ -1715,24 +1820,22 @@ function renderTrend(){
     const lo=sh.map(r=>r.slice(0,i).reduce((a,b)=>a+b,0)), hi=lo.map((v,j)=>v+sh[j][i]);
     const top=years.map((y,j)=>`${X(y).toFixed(1)},${Y(hi[j]).toFixed(1)}`).join(' L');
     const bot=years.map((y,j)=>`${X(y).toFixed(1)},${Y(lo[j]).toFixed(1)}`).reverse().join(' L');
-    paths+=`<path d="M${top} L${bot} Z" fill="${cols[i]}" stroke="#151f36" stroke-width="2" stroke-linejoin="round"/>`;
+    paths+=`<path d="M${top} L${bot} Z" fill="${cols[i]}" stroke="#F7FAF8" stroke-width="2" stroke-linejoin="round"/>`;
   }
-  // 選んだ時代の外を暗くする
-  const er = ERA==='now'?[2026,2026]: ERA==='past'?[1965,2015]:[1965,2026];
+  const er = ERA==='now'?[2025.2,2026]: ERA==='past'?[1965,2015]:[1965,2026];
   let shade='';
-  if(er[0]>y0) shade+=`<rect x="${L}" y="${T}" width="${X(er[0])-L}" height="${H-T-B}" fill="#151f36" opacity=".72"/>`;
-  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${T}" width="${W-Rr-X(er[1])}" height="${H-T-B}" fill="#151f36" opacity=".72"/>`;
-  if(ERA==='now') shade=`<rect x="${L}" y="${T}" width="${X(2025.2)-L}" height="${H-T-B}" fill="#151f36" opacity=".72"/>`;
+  if(er[0]>y0) shade+=`<rect x="${L}" y="${T}" width="${X(er[0])-L}" height="${H-T-B}" fill="#F7FAF8" opacity=".72"/>`;
+  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${T}" width="${W-Rr-X(er[1])}" height="${H-T-B}" fill="#F7FAF8" opacity=".72"/>`;
   let axis='';
-  for(const v of [0,.25,.5,.75,1]) axis+=`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="#93a1c6">${v*100}%</text>`;
-  for(const y of [1965,1980,1995,2010,2026]) axis+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle" font-size="11" fill="#93a1c6">${y}</text>`;
-  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="1965年から2026年までの、ロボットエンジニアの国別の比率の変化">${paths}${shade}${axis}<line id="tx" y1="${T}" y2="${H-B}" stroke="#e9eefb" stroke-width="1" opacity="0"/><rect id="thit" x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
+  for(const v of [0,.25,.5,.75,1]) axis+=`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="#5F6E72" font-family="monospace">${v*100}%</text>`;
+  for(const y of [1965,1980,1995,2010,2026]) axis+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle" font-size="11" fill="#5F6E72" font-family="monospace">${y}</text>`;
+  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="1965年から2026年までの、ロボットエンジニアの国別の比率の変化">${paths}${shade}${axis}<line id="tx" y1="${T}" y2="${H-B}" stroke="#13212A" stroke-width="1" opacity="0"/><rect x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
   $('trendLegend').innerHTML = SERIES.map(([k,c])=>`<span><i style="background:${c}"></i>${COUNTRIES[k].n}</span>`).join('')+`<span><i style="background:${OTHER_COL}"></i>その他</span>`;
   const svg=$('trend').querySelector('svg'), tip=$('ttip'), line=svg.querySelector('#tx');
   const move=ev=>{
     const r=svg.getBoundingClientRect(), px=(ev.clientX-r.left)/r.width*W;
     const y=clamp(Math.round(y0+(px-L)/(W-L-Rr)*(y1-y0)),y0,y1), v=shareAt(y);
-    line.setAttribute('x1',X(y)); line.setAttribute('x2',X(y)); line.setAttribute('opacity','.8');
+    line.setAttribute('x1',X(y)); line.setAttribute('x2',X(y)); line.setAttribute('opacity','.6');
     const names=[...SERIES.map(([k])=>COUNTRIES[k].n),'その他'];
     tip.innerHTML=`<b>${y}年</b>`+names.map((n,i)=>`<span><i style="background:${cols[i]}"></i>${n} ${(v[i]*100).toFixed(0)}%</span>`).join('');
     tip.classList.remove('hidden');
@@ -1742,104 +1845,137 @@ function renderTrend(){
   svg.addEventListener('pointerdown',move);
   svg.addEventListener('pointerleave',()=>{tip.classList.add('hidden');line.setAttribute('opacity','0');});
 }
+// 世界で売れたロボット（おそうじロボットなどもふくめ年に約2,000万台）と、産業用ロボット（2024年 54.2万台）
+(function counters(){
+  const t0=Date.now();
+  setInterval(()=>{ const sec=(Date.now()-t0)/1000; $('cSold').textContent=Math.floor(sec*0.63).toLocaleString(); $('cArm').textContent=Math.floor(sec*542000/31536000).toLocaleString(); }, 500);
+})();
+const THEMES = [['デモ','デモ'],['ビルド','ビルドが通らない'],['論文','論文'],['バッテリー','バッテリー'],['展示会','展示会'],['工場','工場'],['キャリブレーション','キャリブレーション'],['子ども','子どもたち']];
+const TODAY_THEME = THEMES[Math.floor(Date.now()/86400000)%THEMES.length];
+THEME_KW = TODAY_THEME[0];
+$('themeName').textContent = TODAY_THEME[1];
+
 const HKEY='robolife.history.v1';
 function loadHist(){ try{ return JSON.parse(localStorage.getItem(HKEY))||[]; }catch(e){ return []; } }
 function saveHist(h){ try{ localStorage.setItem(HKEY, JSON.stringify(h.slice(0,10))); }catch(e){} }
 function renderPast(){
   const h=loadHist();
   $('pastBox').classList.toggle('hidden', !h.length);
-  $('pastList').innerHTML = h.map(x=>`<li>${x.look?pxImg(personURL(x.look,x.age,x.o||'casual'),'av-s',''):''}${x.rt?pxImg(robotURL(x.rt),'icr',''):''}${x.f} <b>${esc(x.name)}</b>（${x.entry}年 ${esc(x.uni)}）… ${esc(x.title)}・${x.age}歳まで</li>`).join('');
+  $('pastList').innerHTML = h.map(x=>`<div class="life">
+    <div><span class="nm">${esc(x.name)}</span><span class="mt">${esc(x.cn||'')} · ${x.g==='f'?'女性':'男性'} · ${x.age}歳</span></div>
+    <div class="st">${esc(x.story||'')}</div>
+    <div>${x.look?pxImg(personURL(x.look,x.age,x.o||'casual'),'pv',''):''}${x.rt?pxImg(robotURL(x.rt),'pr',''):''} <span class="ttl">${esc(x.title)}</span></div>
+  </div>`).join('');
 }
 
-// ---- 入学ガチャ
+/* ---------- 入学 ---------- */
 function startBirth(){
   show('birth');
   const y = pickEntryYear(ERA);
   S = newLife(y);
   PEERS = [0,1,2,3].map(()=>simulate(newLife(y)));
-  $('birthCard').classList.add('hidden');
-  $('rouLabel').textContent = '世界のどこかの大学に入学しています…';
+  $('birthCard').classList.add('hidden'); $('birthBar').classList.add('hidden');
+  $('spin').classList.remove('hidden'); $('rouLabel').classList.remove('hidden');
+  $('rouLabel').textContent = '世界のどこかの大学に、入学しています…';
   const spin=$('spin'); let n=0; const keys=Object.keys(COUNTRIES);
   const total = 22;
-  const iv=setInterval(()=>{
+  const step=()=>{
     n++;
     if(n<total){
       const k = n<total-6 ? pick(keys) : S.c;
       const u = n<total-6 ? pick(UNIS[k])[0] : (n<total-2 ? pick(UNIS[S.c])[0] : S.uniRaw);
-      spin.textContent = COUNTRIES[k].f+' '+uniName(u,y);
-    } else { clearInterval(iv); revealBirth(); }
-  }, 70+n*4);
+      spin.textContent = COUNTRIES[k].n+'・'+uniName(u,y);
+      setTimeout(step, 60+n*6);
+    } else revealBirth();
+  };
+  step();
+}
+function storyBirth(s){
+  const cn=COUNTRIES[s.c].n;
+  let t = `${s.entry}年4月、${cn}の${s.uni}に、${s.fam==='きびしい家計'?'家計のきびしい家庭から':s.fam==='ゆたかな家庭'?'ゆたかな家庭から':s.fam==='エンジニア一家'?'エンジニア一家から':''}${s.g==='f'?'女子':'男子'}学生として入学しました。`;
+  if(s.home!==s.c) t += `${cInfo(s.home).n}から来た留学生です。`;
+  t += `この大学は${TIER_TXT[s.tier]}です。`;
+  return t;
 }
 function revealBirth(){
   const s=S;
-  $('rouLabel').textContent = s.entry+'年 春';
-  $('spin').textContent = '';
+  $('spin').classList.add('hidden'); $('rouLabel').classList.add('hidden');
   const one = Math.max(2, Math.round(1/s.prob));
-  const homeTxt = s.home!==s.c ? `${cInfo(s.home).f} ${cInfo(s.home).n}から${COUNTRIES[s.c].n}へ留学` : `${COUNTRIES[s.c].f} ${COUNTRIES[s.c].n}`;
+  const cp = countryProb(s.c, s.entry);
+  const rtTot = RT_KEYS.filter(x=>rtOK(x,s.entry)).reduce((a,x)=>a+kf(RTYPES[x].w,s.entry),0);
   $('birthCard').innerHTML = `
-    <div class="card">
-      <div class="bhead">
-        ${pxImg(personURL(s.look,18,'hoodie'),'av-l','あなたのキャラクター')}
-        <div>
-          <div class="flag">${COUNTRIES[s.c].f}${s.home!==s.c?cInfo(s.home).f:''}</div>
-          <h2>${esc(s.name)}</h2>
-          <div class="meta">${s.g==='f'?'女性':'男性'}・18歳・${s.fam}</div>
+    <div class="doc">
+      <div class="hd"><b>入学届</b><span>No. ${docNo(s)}</span></div>
+      <div class="bd">
+        <div class="who">${pxImg(personURL(s.look,18,'hoodie'),'','あなたのキャラクター')}<div><span class="label">名前</span><div class="name">${esc(s.name)}</div></div></div>
+        <p class="story">${esc(storyBirth(s))}</p>
+        <div class="unirow">${pxImg(buildingURL('uni'+s.tier,hashCol(s.uni)),'',s.uni)}<div><b>${esc(s.uni)}</b><br><span class="note">${COUNTRIES[s.c].n} · ${TIER_TXT[s.tier]}</span></div></div>
+        <p class="note" style="margin:0">定年まで生きると、約10分かかります（1年 ≈ 13秒）。とちゅうで一時停止や倍速もできます。</p>
+        <hr class="rule">
+        <div class="kv">
+          <div><span class="label">性別</span><b>${s.g==='f'?'女性':'男性'}</b></div>
+          <div><span class="label">大学のある国</span><b>${COUNTRIES[s.c].n}</b></div>
+          <div><span class="label">出身</span><b>${cInfo(s.home).n}${s.home!==s.c?'（留学生）':''}</b></div>
+          <div><span class="label">家の暮らし向き</span><b>${dots(FAM_LV[s.fam])} 5段階中${FAM_LV[s.fam]}</b></div>
+          <div><span class="label">入学時の技術</span><b>${s.st.sk}</b></div>
+          <div><span class="label">定年</span><b>${s.ret}歳</b></div>
+          <div><span class="label">${COUNTRIES[s.c].n}の中堅の年収</span><b>約${yen(baseSal(s.c,Math.min(s.entry,2026)))}</b></div>
+          <div><span class="label">この入学先になる確率</span><b>約 ${one.toLocaleString()} 分の 1</b></div>
         </div>
+        <hr class="rule">
+        <p class="note" style="margin:0">${s.entry}年に入学するロボット系の学生のうち ${(cp*100).toFixed(1)}% が${COUNTRIES[s.c].n}の大学に入ります。およそ ${Math.round(1/cp)} 人に 1 人の割合です。</p>
       </div>
-      <div class="unirow">${pxImg(buildingURL('uni'+s.tier,hashCol(s.uni)),'bld',s.uni)}<div><b>${esc(s.uni)}</b><br><span class="note">${s.entry}年入学・${['','世界トップの研究大学','有力な大学','ふつうの大学'][s.tier]}</span></div></div>
-      <dl>
-        <dt>出身</dt><dd>${homeTxt}</dd>
-        <dt>技術</dt><dd>${s.st.sk}</dd>
-      </dl>
-      <span class="prob">この入学先になる確率　約 ${one.toLocaleString()} 分の 1</span>
     </div>
-    <div class="box"><h3>どんなロボットをつくる？</h3>
-      <p class="note" style="margin:0 0 8px">運命のおすすめが選ばれています。好きなものに変えられます。％は ${s.entry} 年のロボットエンジニアのうち、それにとりくむ人の割合（推計）。</p>
-      <div class="rtgrid" id="rtGrid">${RT_KEYS.map(k=>{ const ok=rtOK(k,s.entry); const w=RT_KEYS.filter(x=>rtOK(x,s.entry)).reduce((a,x)=>a+kf(RTYPES[x].w,s.entry),0); return `<button data-rt="${k}" ${ok?'':'disabled'} aria-pressed="${k===s.rt}">${pxImg(robotURL(k),'rb','')}${esc(RTYPES[k].n.replace(/（.*）/,''))}<small>${ok?Math.round(kf(RTYPES[k].w,s.entry)/w*100)+'%':RTYPES[k].from+'年〜'}</small></button>`; }).join('')}</div>
+    <div class="card">
+      <h3>どんなロボットをつくる？</h3>
+      <div class="sub">運命のおすすめが選ばれています。好きなものに変えられます。％は ${s.entry} 年のロボットエンジニアのうち、それにとりくむ人の割合（推計）。</div>
+      <div class="rtgrid" id="rtGrid">${RT_KEYS.map(k=>{ const ok=rtOK(k,s.entry); return `<button data-rt="${k}" ${ok?'':'disabled'} aria-pressed="${k===s.rt}">${pxImg(robotURL(k),'','')}${esc(RTYPES[k].n.replace(/（.*）/,''))}<small>${ok?Math.round(kf(RTYPES[k].w,s.entry)/rtTot*100)+'%':RTYPES[k].from+'年〜'}</small></button>`; }).join('')}</div>
       <div class="rtdesc" id="rtDesc"></div>
     </div>
-    <div class="box"><h3>同じ年に入学した 4 人</h3><ul class="mates">${PEERS.map(p=>`<li>${pxImg(personURL(p.look,18,'hoodie'),'av-s','')}${COUNTRIES[p.c].f}${p.home!==p.c?cInfo(p.home).f:''} ${esc(p.name)}（${esc(p.uni)}）${pxImg(robotURL(p.rt),'icr','')}</li>`).join('')}</ul>
-    <p class="note" style="margin:6px 0 0">4 人の人生も同じ統計で進みます。どうなったかは、あなたの人生のあとで。</p></div>
-    <button class="big" id="goBtn">人生をはじめる</button>
-    <p style="text-align:center"><button class="btn2" id="rerollBtn">べつの人として入学しなおす</button></p>`;
-  $('birthCard').classList.remove('hidden');
+    <div class="card people">
+      <h3>同じ年に入学した人たち</h3>
+      ${PEERS.map(p=>`<div class="p"><div class="l">${pxImg(personURL(p.look,18,'hoodie'),'','')}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n}・${esc(p.uni)} · ${p.g==='f'?'女':'男'}</span></div></div><div class="r">${pxImg(robotURL(p.rt),'','')}</div></div>`).join('')}
+      <p class="note" style="margin:8px 0 0">この人たちの人生も、同じ統計にしたがって最後まで流れていきます。あなたのそばで、いっしょにお見せします。</p>
+    </div>
+    <p style="text-align:center"><button class="btn" id="rerollBtn">べつの人として入学しなおす</button></p>`;
+  $('birthCard').classList.remove('hidden'); $('birthBar').classList.remove('hidden');
   const showRt=()=>{ $('rtDesc').innerHTML='<b>'+esc(RTYPES[S.rt].n)+'</b>：'+esc(RTYPES[S.rt].d); };
   showRt();
   $('rtGrid').querySelectorAll('button').forEach(b=>b.onclick=()=>{ S.rt=b.dataset.rt; $('rtGrid').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b)); showRt(); });
   $('goBtn').onclick=startLife;
   $('rerollBtn').onclick=startBirth;
+  $('copyBirth').onclick=()=>{ const t=`#100万分の1 入学届 No. ${docNo(s)}\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\nつくるロボット：${RTYPES[S.rt].n}\nこの入学先になる確率 約${one.toLocaleString()}分の1`; navigator.clipboard?.writeText(t+'\n'+location.href).then(()=>toast('コピーしました'),()=>toast('コピーできませんでした')); };
 }
 
-// ---- プレイ
+/* ---------- プレイ ---------- */
 function startLife(){
   show('game');
-  $('logInner').innerHTML=''; curYear=null;
-  Q=[]; waiting=false; SKIP=false;
+  $('logList').innerHTML='';
+  Q=[]; waiting=false; SKIP=false; PAUSED=false;
   setSpeed(1);
   setFocus(S.focus);
-  renderHead();
-  renderPeers();
-  addLine(`${COUNTRIES[S.c].f} ${S.name}、${S.uni}に入学。ここからロボットエンジニアの人生がはじまる。`,'big');
-  schedule(600);
+  render();
+  addLine(`${S.entry}年4月、${COUNTRIES[S.c].n}の${S.uni}に入学しました。ここからロボットエンジニアの人生がはじまります。`,'big');
+  schedule(800);
 }
 document.querySelectorAll('#focus button').forEach(b=>b.onclick=()=>setFocus(b.dataset.f));
 function setFocus(f){ if(S) S.focus=f; document.querySelectorAll('#focus button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.f===f)); }
-document.querySelectorAll('#ctrl button[data-sp]').forEach(b=>b.onclick=()=>{ SKIP=false; setSpeed(+b.dataset.sp); });
-$('skipBtn').onclick=()=>{ SKIP=true; if(SPEED===0) setSpeed(lastSpeed||1); schedule(10); };
+document.querySelectorAll('#spSeg button').forEach(b=>b.onclick=()=>{ SKIP=false; PAUSED=false; setSpeed(+b.dataset.sp); });
+$('pauseBtn').onclick=()=>{ PAUSED=!PAUSED; $('pauseBtn').textContent=PAUSED?'▶':'❚❚'; if(!PAUSED) schedule(100); else clearTimeout(timer); };
+$('skipBtn').onclick=()=>{ SKIP=true; PAUSED=false; $('pauseBtn').textContent='❚❚'; schedule(10); };
 function setSpeed(v){
-  if(v>0) lastSpeed=v;
-  SPEED=v;
-  document.querySelectorAll('#ctrl button[data-sp]').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.sp===v));
-  if(v>0 && !waiting) schedule(150);
+  SPEED=v; $('pauseBtn').textContent='❚❚';
+  document.querySelectorAll('#spSeg button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.sp===v));
+  if(!waiting) schedule(150);
 }
-function yearMs(){ return 13000 / (SPEED||1); }
+function yearMs(){ return 13000 / SPEED; }
 function schedule(ms){
   clearTimeout(timer);
-  if(SPEED===0 || waiting) return;
+  if(PAUSED || waiting) return;
   timer=setTimeout(tick, SKIP?25:ms);
 }
 function tick(){
-  if(SPEED===0 || waiting || !S) return;
+  if(PAUSED || waiting || !S) return;
   if(!Q.length){
     if(S.ended) return finish();
     Q = buildYear(S); Q._n = Q.length;
@@ -1850,13 +1986,11 @@ function tick(){
   if(!r){ schedule(SKIP?0:Math.min(delay*.3,120)); return; }
   if(r.log){
     if(r.log.e) applyFx(S,r.log.e);
-    addLine(r.log.t, r.log.k, r.log.e);
+    if(r.log.k!=='year') addLine(r.log.t, r.log.k, r.log.e, r.log.a);
     if(r.log.k==='big') S.moments.push({y:r.log.y||S.year,a:r.log.a||S.age,t:r.log.t});
-    renderHead();
-    if(r.log.k==='year') renderPeers();
-    if(S.ended && !Q.length) { Q=[]; schedule(delay); return; }
-    if(S.ended){ Q=[]; }
-    schedule(delay);
+    render();
+    if(S.ended) Q=[];
+    schedule(r.log.k==='year'?Math.min(delay*.4,300):delay);
     return;
   }
   if(r.decide){ showDecision(r.decide); return; }
@@ -1864,129 +1998,183 @@ function tick(){
   schedule(delay);
 }
 const FXN={sk:'技術',he:'健康',ha:'幸福',ne:'人脈',as:'資産'};
-function addLine(t,k,e){
+function addLine(t,k,e,age){
   const d=document.createElement('div');
-  d.className='ln '+(k||'');
+  d.className='row '+(k||'');
   let fx='';
   if(e){ fx=Object.keys(e).filter(x=>e[x]).map(x=>x==='as'?'資産'+(e[x]>0?'+':'')+yen(e[x]):FXN[x]+(e[x]>0?'+':'')+e[x]).join(' '); }
-  d.innerHTML = esc(t)+(fx?`<span class="fx">${fx}</span>`:'');
-  // 新しい年のかたまりを一番上に積む。年の中は上から順に読める
-  const box=$('logInner');
-  if(k==='year' || !curYear){ curYear=document.createElement('div'); curYear.className='yr'; box.prepend(curYear); }
-  curYear.appendChild(d);
-  const lg=$('log'); if(lg.scrollTop<120) lg.scrollTop=0;
+  let body;
+  if(k==='world'){
+    body = `<span class="src"><b>世界</b>${esc(t.replace(/^🌐 /,''))}</span>`;
+  } else if(k==='choice'){
+    body = `<span class="tag">決断</span>${esc(t.replace(/^▶ /,''))}`;
+  } else body = esc(t);
+  d.innerHTML = `<span class="a">${age||S.age}歳</span><div class="t">${body}${fx?`<span class="fx">${fx}</span>`:''}</div>`;
+  $('logList').prepend(d);
+  while($('logList').children.length>140) $('logList').lastChild.remove();
 }
-function renderHead(){
+const STAT_COL = {sk:'#0F6E68',he:'#2B7A4E',ha:'#9C7020',ne:'#8C1D3C'};
+function render(){
   const s=S;
-  $('hFlag').textContent = cInfo(s.jc).f;
-  $('hAv').src = personURL(s.look, s.age, outfitOf(s));
-  $('hRt').innerHTML = pxImg(placeURL(s),'ic','')+pxImg(robotURL(s.rt),'icr','')+esc(RTYPES[s.rt].n);
-  $('hName').textContent = s.name;
-  $('hSub').textContent = stageLabel(s);
-  $('hYear').textContent = s.year+'年';
-  $('hAge').textContent = s.age+'歳';
-  const col={sk:'#38d6c4',he:'#7ee081',ha:'#ffb547',ne:'#b49cff'};
-  $('hStats').innerHTML = ['sk','he','ha','ne'].map(k=>`<div class="stat"><span>${FXN[k]}</span><span class="bar"><i style="width:${s.st[k]}%;background:${col[k]}"></i></span><span class="v">${s.st[k]}</span></div>`).join('');
+  $('gAge').textContent = s.age;
+  $('gMeta').textContent = `${s.year}年 · ${s.name} · 1年 ≈ ${Math.round(yearMs()/1000)}秒`;
+  $('gProg').style.width = clamp((s.age-18)/(s.ret-18)*100,0,100)+'%';
+  $('gScene').src = sceneURL(s);
+  $('gPlace').textContent = `${stageLabel(s)} · ${COUNTRIES[s.jc]?COUNTRIES[s.jc].n:''} · ${RTYPES[s.rt].n}`;
+  $('gStats').innerHTML = ['he','ha','sk','ne'].map(k=>`<div><span class="label">${FXN[k]}</span><b>${s.st[k]}</b><div class="bt"><i style="width:${s.st[k]}%;background:${STAT_COL[k]}"></i></div></div>`).join('');
   const sal = calcSal(s);
   const cut = s.payF<1 ? `<small>（今年は${s.payF?'半分':'ゼロ'}）</small>` : '';
-  $('hMoney').innerHTML = `<span>年収 <b>${sal?'約'+yen(sal):'なし'}</b>${cut}</span><span>資産 <b class="${s.assets<0?'neg':''}">約${yen(s.assets)}</b></span><span>🔧 作った <b>${s.robots.toLocaleString()}</b> 台</span><span>🛒 売れた <b>${s.sold.toLocaleString()}</b> 台</span><span>📄 <b>${s.papers}</b> 本</span>`;
+  $('gMoney').innerHTML = `
+    <div><span class="label">年収（日本円で）</span><b>${sal?'約'+yen(sal):'—'}</b>${cut}${sal?'':'<span class="note">学生なので給料はありません</span>'}</div>
+    <div><span class="label">資産（日本円で）</span><b class="${s.assets<0?'neg':''}">約${yen(s.assets)}</b></div>
+    <div><span class="label">作ったロボット</span><b>${s.robots.toLocaleString()} 台</b></div>
+    <div><span class="label">売れたロボット</span><b>${s.sold.toLocaleString()} 台</b></div>
+    <div><span class="label">論文</span><b>${s.papers} 本</b></div>
+    <div><span class="label">特許</span><b>${s.patents} 件</b></div>`;
+  const we = worldEngineers(s.year), here = Math.round(we*countryProb(s.jc,s.year)/100)*100;
+  $('recNote').textContent = `いま、${s.year}年の世界で約${Math.round(we/10000)}万人のロボットエンジニアが、ともに働いています · ${COUNTRIES[s.jc].n}に約${here.toLocaleString()}人`;
+  renderId(); renderPeers(); renderMap(s,$('gMap'));
+}
+function worldEngineers(y){ return kf([[1965,20000],[1980,120000],[2000,400000],[2015,750000],[2026,1000000],[2070,2000000]], y); }
+function renderId(){
+  const s=S, iso=ISO3[s.home]||'XXX';
+  const mrz1 = ('I<'+iso+(s.id.toUpperCase().replace(/[^A-Z0-9]/g,''))+'<<'+RTYPES[s.rt].n.length+'<'+s.rt.toUpperCase()).padEnd(36,'<').slice(0,36);
+  const mrz2 = (String(s.entry-18).slice(2)+'0401'+(s.g==='f'?'F':'M')+(ISO3[s.jc]||'XXX')+'<'+String(s.robots).padStart(5,'0')+'<'+String(s.sold).padStart(9,'0')).padEnd(36,'<').slice(0,36);
+  $('gId').innerHTML = `<div class="hd"><span>身元記録 · ${iso}</span><span>${s.year}</span></div>
+    <div class="bd">${pxImg(personURL(s.look,s.age,outfitOf(s)),'ph','あなた')}
+      <div style="min-width:0"><div class="nm">${esc(s.name)}</div>
+      <dl><dt>性別</dt><dd>${s.g==='f'?'女性':'男性'}</dd><dt>出身</dt><dd>${cInfo(s.home).n}</dd><dt>所属</dt><dd>${esc(stageLabel(s))}</dd><dt>学歴</dt><dd>${s.stage==='ug'?'学部在学中':s.stage==='ms'?'修士課程在学中':s.stage==='phd'?'博士課程在学中':s.deg==='学部卒'?'学士':s.deg}</dd><dt>専門</dt><dd>${pxImg(robotURL(s.rt),'','')} ${esc(RTYPES[s.rt].n)}</dd><dt>家庭</dt><dd>${dots(FAM_LV[s.fam])}</dd></dl></div>
+    </div>
+    <div class="mrz">${mrz1}<br>${mrz2}</div>`;
+  $('gId').querySelectorAll('dd .px').forEach(x=>{x.style.width='16px';x.style.height='16px';});
 }
 function renderPeers(){
   const a=S.age;
   $('peerList').innerHTML = PEERS.map(p=>{
-    const gone = !p.snaps[a] && a>Math.max(...Object.keys(p.snaps).map(Number));
-    const sn = p.snaps[a] || (gone ? {lbl:p.endWhy==='death'?'（この世を去った）':'引退した',f:cInfo(p.jc).f,o:'casual',rt:p.rt} : null);
-    const av = sn && !(gone && p.endWhy==='death') ? pxImg(personURL(p.look, a, sn.o),'av-s','') : '';
-    return `<li>${av}${sn?sn.f:''} <b>${esc(p.name)}</b>：${esc(sn?sn.lbl:'')}${sn?' '+pxImg(robotURL(sn.rt),'icr',''):''}</li>`;
+    const last=Math.max(...Object.keys(p.snaps).map(Number));
+    const gone = !p.snaps[a] && a>last;
+    const sn = p.snaps[a] || (gone ? {lbl:p.endWhy==='death'?'この世を去った':'引退',o:'casual',rt:p.rt} : {lbl:'',o:'hoodie',rt:p.rt});
+    const av = !(gone && p.endWhy==='death') ? pxImg(personURL(p.look, Math.min(a,last||a), sn.o),'','') : '';
+    return `<div class="p"><div class="l">${av}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n} · ${p.g==='f'?'女':'男'}</span></div></div><div class="r">${esc(sn.lbl)}${pxImg(robotURL(sn.rt||p.rt),'','')}</div></div>`;
   }).join('');
 }
+function hapCol(h){ // うすい黄 → 緑 → 深い青緑
+  const st=[[243,226,179],[127,191,134],[11,92,99]], t=clamp(h/100,0,1)*2, i=Math.min(1,Math.floor(t)), f=t-i;
+  const c=st[i].map((v,j)=>Math.round(v+(st[i+1][j]-v)*f)); return `rgb(${c.join(',')})`;
+}
+function renderMap(s, el, done){
+  const last = done ? Math.max(s.ret, done) : Math.max(s.ret, s.age);
+  let h='';
+  for(let a=18;a<=last;a++){
+    const sn=s.snaps[a];
+    const cls = (!done && a===s.age)?'now':(a===s.ret?'ret':'');
+    h+=`<i class="${cls}" title="${a}歳" style="${sn?`background:${hapCol(sn.ha)}`:''}"></i>`;
+  }
+  el.innerHTML=h;
+}
 
-// ---- 選択モーダル
+/* ---------- 決断 ---------- */
 function showDecision(d){
   if(AUTO){
     const o=autoChoose(d); const t=o.run(S);
-    addLine('▶ '+d.title+'：'+o.l+'（おまかせ）— '+t,'choice');
+    addLine(d.title+'：'+o.l+'（おまかせ）— '+t,'choice');
     S.moments.push({y:S.year,a:S.age,t});
-    renderHead(); schedule(yearMs()/4); return;
+    render(); schedule(yearMs()/4); return;
   }
   waiting=true; SKIP=false;
-  $('sheet').innerHTML = `<div class="k">${S.year}年・${S.age}歳</div><h3>${d.rt?pxImg(robotURL(d.rt),'rb',RTYPES[d.rt].n)+' ':''}${esc(d.title)}</h3><p>${esc(d.text)}</p>`+
-    d.opts.map((o,i)=>`<button class="opt" data-i="${i}"><b>${esc(o.l)}</b><span>${esc(o.d)}</span></button>`).join('')+
-    `<button class="opt" data-i="auto"><b>おまかせ</b><span>統計どおりに運命にまかせる</span></button>`;
+  $('sheet').innerHTML = `<div class="hd"><span>大きな決断</span><span class="mono">${S.age}歳 · ${S.year}年</span></div>
+    <div class="bd"><h3>${d.rt?pxImg(robotURL(d.rt),'',RTYPES[d.rt].n):''}${S.age}歳、${esc(d.title)}</h3><p>${esc(d.text)}</p>`+
+    d.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="n">${i+1}</span><span><b>${esc(o.l)}</b><span class="d">${esc(o.d)}</span></span></button>`).join('')+
+    `<button class="opt" data-i="auto"><span class="n">${d.opts.length+1}</span><span><b>運命にまかせる</b><span class="d">統計どおりに、どれかが選ばれる</span></span></button>
+    <button class="btn auto" id="autoAll">これからの決断をおまかせにする</button></div>`;
   $('modal').classList.remove('hidden');
-  $('sheet').querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
-    const o = b.dataset.i==='auto'?autoChoose(d):d.opts[+b.dataset.i];
+  const pickIt=(o)=>{
     $('modal').classList.add('hidden'); waiting=false;
     const t=o.run(S);
-    addLine('▶ '+o.l+' — '+t,'choice');
+    addLine(o.l+' — '+t,'choice');
     S.moments.push({y:S.year,a:S.age,t});
-    renderHead(); schedule(yearMs()/4);
-  });
+    render(); schedule(yearMs()/4);
+  };
+  $('sheet').querySelectorAll('.opt').forEach(b=>b.onclick=()=>pickIt(b.dataset.i==='auto'?autoChoose(d):d.opts[+b.dataset.i]));
+  $('autoAll').onclick=()=>{ AUTO=true; document.querySelectorAll('#autoSeg button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.auto==='1')); pickIt(autoChoose(d)); };
 }
 function showAsk(age){
   if(AUTO){ schedule(50); return; }
   waiting=true; SKIP=false;
-  $('sheet').innerHTML = `<div class="k">ひと息　${S.age}歳</div><h3>${esc(ASKS[age])}</h3><p>ひとことだけ。のこしておくと、人生のさいごに読みかえせます。</p>
-    <textarea id="askT" maxlength="80" placeholder="（空でもOK）"></textarea>
-    <div class="act"><button class="btn2" id="askSkip">とばす</button><button class="btn2" id="askOk" style="background:var(--accent);color:#06221f;border-color:var(--accent)">のこす</button></div>`;
+  $('sheet').innerHTML = `<div class="hd"><span>ひと息</span><span class="mono">${S.age}歳 · ${S.year}年</span></div>
+    <div class="bd"><h3>${esc(ASKS[age])}</h3><p>時間が止まっています。ひとことだけ、のこしておけます。人生のさいごに読みかえせます。</p>
+    <textarea id="askT" maxlength="80" placeholder="（空でもかまいません）"></textarea>
+    <div class="act"><button class="btn" id="askSkip">とばす</button><button class="btn" id="askOk" style="background:var(--accent);color:#fff;border-color:var(--accent)">のこす</button></div></div>`;
   $('modal').classList.remove('hidden');
   const done=(save)=>{
     const v=$('askT').value.trim();
-    if(save && v){ S.answers.push({a:S.age,q:ASKS[age],t:v}); addLine('💭 「'+v+'」','choice'); }
+    if(save && v){ S.answers.push({a:S.age,q:ASKS[age],t:v}); addLine('「'+v+'」','choice'); }
     $('modal').classList.add('hidden'); waiting=false; schedule(200);
   };
   $('askSkip').onclick=()=>done(false);
   $('askOk').onclick=()=>done(true);
 }
 
-// ---- おわり
+/* ---------- おわり ---------- */
+function lifeStory(s, lastAge){
+  const cn=COUNTRIES[s.c].n;
+  const comps = s.path.filter((t,i)=>['factory','tower','garage','lab','workshop'].includes(s.pathI[i])).map(t=>t.replace(/（[^）]*）$/,''));
+  let t = `${s.entry}年、${cn}の${s.uni}に${s.g==='f'?'女子':'男子'}学生として入学し、${RTYPES[s.rt].n}の道に進みました。`;
+  if(s.deg==='博士') t+='博士号を取得しました。'; else if(s.deg==='修士') t+='修士課程を修了しました。';
+  if(s.stage==='prof'||s.path.some(x=>/助教/.test(x))) t+=`大学で${['助教','准教授','教授'][s.rank]}になりました。`;
+  if(comps.length) t+=`${[...new Set(comps)].slice(0,4).join('、')}${comps.length>4?'など':''}で働きました。`;
+  if(s.flags.mgr) t+='部長になりました。';
+  if(s.flags.founded) t+=`自分の会社を${s.flags.exit==='ipo'?'上場させました。':s.flags.exit==='acq'?'つくり、売却しました。':'つくりました。'}`;
+  if(s.home!==s.c) t+=`${cInfo(s.home).n}から海をわたった人生でした。`;
+  t+=`生涯で ${s.robots.toLocaleString()} 台のロボットをつくり、${s.sold.toLocaleString()} 台が売れました。`;
+  if(s.partner) t+= s.kids?`結婚し、${s.kids}人の子どもを育てました。`:'結婚しました。';
+  if(s.endWhy==='death') t+=`${lastAge}歳のとき、病気で亡くなりました。`;
+  else if(s.endWhy==='left') t+=`ロボットの道を降り、${lastAge}歳で定年をむかえました。`;
+  else t+=`${lastAge}歳で定年をむかえました。`;
+  return t;
+}
 function finish(){
   clearTimeout(timer);
   const s=S;
   const title=lifeTitle(s);
   const lastAge = s.endWhy==='death'?s.age:s.age-1;
-  const why = s.endWhy==='death' ? `${lastAge}歳でこの世を去った` : s.endWhy==='left' ? `ロボットの道を降り、${lastAge}歳で定年をむかえた` : `${lastAge}歳で定年をむかえた`;
-  const h=loadHist(); h.unshift({f:COUNTRIES[s.c].f,name:s.name,entry:s.entry,uni:uniName(s.uniRaw,s.entry),title,age:lastAge,rt:s.rt,look:s.look,o:outfitOf(s)}); saveHist(h);
+  const story = lifeStory(s,lastAge);
+  const h=loadHist(); h.unshift({name:s.name,cn:COUNTRIES[s.c].n,g:s.g,entry:s.entry,uni:uniName(s.uniRaw,s.entry),title,age:lastAge,rt:s.rt,look:s.look,o:s.endWhy==='death'?outfitOf(s):'casual',story}); saveHist(h);
   const mom = s.moments.slice(-8);
-  const trail = (x,pi)=>`<div class="trail">${x.path.map((t,i)=>`<span class="chip">${pi[i]?pxImg(iconURL(pi[i],t),pi[i].startsWith('rt:')?'icr':'ic',''):''}${esc(t)}</span>`).join('<span class="arr">→</span>')}</div>`;
+  const trail = `<div class="trail">${s.path.map((t,i)=>`<span class="chip">${s.pathI[i]?pxImg(iconURL(s.pathI[i],t),s.pathI[i].startsWith('rt:')?'r':'',''):''}${esc(t)}</span>`).join('<span class="arr">→</span>')}</div>`;
   const nComp = s.pathI.filter(k=>k&&['factory','tower','garage','lab','workshop','own','office'].includes(k)).length;
-  const peers = PEERS.map(p=>`<li>${pxImg(personURL(p.look,p.endWhy==='death'?p.age:p.age-1,'casual'),'av-s','')}${COUNTRIES[p.c].f}${p.home!==p.c?cInfo(p.home).f:''} <b>${esc(p.name)}</b>${pxImg(robotURL(p.rt),'icr','')}（${esc(uniName(p.uniRaw,p.entry))}）<br><span class="note">${esc(p.path.slice(1).join(' → ')||'—')}　／　${esc(lifeTitle(p))}</span></li>`).join('');
+  const peers = PEERS.map(p=>{ const la=p.endWhy==='death'?p.age:p.age-1; return `<div class="p"><div class="l">${pxImg(personURL(p.look,la,'casual'),'','')}<div><b>${esc(p.name)}</b><span>${COUNTRIES[p.c].n} · ${p.g==='f'?'女':'男'} · ${la}歳 · ${esc(lifeTitle(p))}</span><span style="display:block">${esc(lifeStory(p,la))}</span></div></div></div>`; }).join('');
   $('end').innerHTML = `
-    <div class="endc">
-      <div class="t">${s.entry}年 〜 ${s.year - (s.endWhy==='death'?0:1)}年　${why}</div>
-      <div class="ehead">
-        ${pxImg(personURL(s.look,lastAge,s.endWhy==='death'?outfitOf(s):'casual'),'av-l','あなたのキャラクター')}
-        <div>
-          <h2>${COUNTRIES[s.c].f} ${esc(s.name)}</h2>
-          <div>${pxImg(robotURL(s.rt),'rb',RTYPES[s.rt].n)} <span class="note">${esc(RTYPES[s.rt].n)}</span></div>
+    <div class="doc">
+      <div class="hd"><b>${s.endWhy==='death'?'人生の記録':'退職の記録'}</b><span>No. ${docNo(s)}</span></div>
+      <div class="bd">
+        <div class="who">${pxImg(personURL(s.look,lastAge,s.endWhy==='death'?outfitOf(s):'casual'),'','あなたのキャラクター')}<div><span class="label">${s.entry}年 – ${s.year-(s.endWhy==='death'?0:1)}年 · ${COUNTRIES[s.c].n}</span><div class="name">${esc(s.name)}</div><span class="ttl">${esc(title)}</span></div></div>
+        <p class="story">${esc(story)}</p>
+        ${trail}
+        <div class="nums">
+          <div><b>${s.robots.toLocaleString()}</b><span>作ったロボット</span></div>
+          <div><b>${s.sold.toLocaleString()}</b><span>売れたロボット</span></div>
+          <div><b>${s.papers}</b><span>論文</span></div>
+          <div><b>${s.maxSal?yen(s.maxSal):'—'}</b><span>最高年収</span></div>
+          <div><b>${yen(s.earn)}</b><span>生涯の給料</span></div>
+          <div><b>${yen(s.assets)}</b><span>最後の資産</span></div>
+          <div><b>${s.patents}</b><span>特許</span></div>
+          <div><b>${nComp}</b><span>働いた職場</span></div>
+          <div><b>${s.kids}</b><span>子ども</span></div>
         </div>
+        <span class="label">人生地図</span>
+        <div class="lmap" id="endMap"></div>
+        <hr class="rule">
+        <span class="label">おもなできごと</span>
+        <ul class="moments">${mom.map(m=>`<li>${m.a}歳（${m.y}年）${esc(m.t)}</li>`).join('')}</ul>
+        ${s.answers.length?`<hr class="rule"><span class="label">ひと息で残したことば</span><div class="answers">${s.answers.map(a=>`<div><i>${a.a}歳「${esc(a.q)}」</i><br>「${esc(a.t)}」</div>`).join('')}</div>`:''}
       </div>
-      <span class="ttl">${esc(title)}</span>
-      ${trail(s,s.pathI)}
-      <div class="note">${s.partner?'結婚した':'独身'}</div>
-      <div class="nums">
-        <div><b>${s.robots.toLocaleString()}</b><span>作ったロボット</span></div>
-        <div><b>${s.sold.toLocaleString()}</b><span>売れたロボット</span></div>
-        <div><b>${s.papers}</b><span>論文</span></div>
-        <div><b>${s.maxSal?yen(s.maxSal):'—'}</b><span>最高年収</span></div>
-        <div><b>${yen(s.earn)}</b><span>生涯の給料</span></div>
-        <div><b>${yen(s.assets)}</b><span>最後の資産</span></div>
-        <div><b>${s.patents}</b><span>特許</span></div>
-        <div><b>${nComp}</b><span>働いた職場</span></div>
-        <div><b>${s.kids}</b><span>子ども</span></div>
-      </div>
-      <div class="note">おもなできごと</div>
-      <ul class="moments">${mom.map(m=>`<li>${m.y}年（${m.a}歳）${esc(m.t)}</li>`).join('')}</ul>
-      ${s.answers.length?`<div class="answers">${s.answers.map(a=>`<div><i>${a.a}歳「${esc(a.q)}」</i><br>${esc(a.t)}</div>`).join('')}</div>`:''}
     </div>
-    <div class="box"><h3>同じ年に入学した 4 人は</h3><ul class="mates">${peers}</ul></div>
-    <div class="btnrow" style="margin-bottom:14px">
-      <button class="btn2" id="copyBtn">結果をコピー</button>
-      <a class="btn2" id="xBtn" target="_blank" rel="noopener">X でシェア</a>
-    </div>
-    <button class="big" id="againBtn">もう一度入学する</button>
-    <p style="text-align:center"><button class="btn2" id="topBtn">タイトルへ</button></p>`;
-  const share = `#100万分の1 ロボットエンジニア人生\n${COUNTRIES[s.c].f}${s.name}（${s.entry}年 ${s.uni}入学）\n${s.path.slice(1).join('→')}\n称号「${title}」${why}\n${RTYPES[s.rt].n}　🔧作った${s.robots}台 🛒売れた${s.sold.toLocaleString()}台 📄${s.papers}本 💰資産 約${yen(s.assets)}`;
+    <div class="card people"><h3>同じ年に入学した人たちは</h3>${peers}</div>
+    <div class="btnrow"><button class="btn" id="copyBtn">結果をコピー</button><a class="btn" id="xBtn" target="_blank" rel="noopener">X でシェア</a><button class="btn" id="topBtn">はじめの画面へ</button></div>
+    <div class="stickybar"><div class="in"><button class="cta" id="againBtn">もう一度入学する</button></div></div>`;
+  renderMap(s,$('endMap'),lastAge);
+  const share = `#100万分の1 ロボットエンジニア人生\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\n${RTYPES[s.rt].n}　称号「${title}」\n🔧作った${s.robots}台 🛒売れた${s.sold.toLocaleString()}台 📄${s.papers}本 💰資産 約${yen(s.assets)}`;
   $('copyBtn').onclick=()=>{ navigator.clipboard?.writeText(share+'\n'+location.href).then(()=>toast('コピーしました'),()=>toast('コピーできませんでした')); };
   $('xBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(share)+'&url='+encodeURIComponent(location.href);
   $('againBtn').onclick=startBirth;
@@ -1995,9 +2183,9 @@ function finish(){
 }
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),1600); }
 
+$('titleScene').src = titleSceneURL();
 renderCountryBars();
 renderPast();
-$('titleRobots').innerHTML = RT_KEYS.map(k=>pxImg(robotURL(k),'',RTYPES[k].n)).join('');
 </script>
 </body>
 </html>
