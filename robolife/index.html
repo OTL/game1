@@ -63,7 +63,15 @@
   .past li{margin:4px 0;}
   .note{font-size:12px;color:var(--muted);}
   .bars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;font-size:13px;align-items:center;}
-  .bars i{display:block;height:8px;border-radius:4px;background:var(--accent);}
+  .bars i{display:block;height:8px;border-radius:4px;background:var(--accent);transition:width .35s;}
+  .trend{position:relative;}
+  .trend svg{display:block;width:100%;height:auto;touch-action:pan-y;}
+  .trend .tip{position:absolute;top:0;pointer-events:none;background:#0b1222;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11px;line-height:1.4;white-space:nowrap;display:grid;grid-template-columns:auto auto;gap:0 10px;}
+  .trend .tip b{grid-column:1 / -1;}
+  .trend .tip.hidden{display:none;}
+  .trend .tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:6px;}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
 
   /* ---------- 入学ガチャ ---------- */
   #birth{text-align:center;}
@@ -98,6 +106,9 @@
   .stat .v{text-align:right;font-variant-numeric:tabular-nums;}
   .money{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted);}
   .money b{color:var(--text);}
+  .money b.neg{color:var(--bad);}
+  .money small{color:var(--warm);}
+  .yr{padding-bottom:4px;border-bottom:1px dashed #22304f;}
   .focus{display:flex;gap:6px;margin-top:8px;}
   .focus button{flex:1;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:6px 2px;font-size:12px;line-height:1.25;}
   .focus button[aria-pressed="true"]{background:#173f3c;border-color:var(--accent);color:var(--accent);font-weight:700;}
@@ -179,15 +190,20 @@
   </div>
 
   <div class="box">
-    <h3>どこで生まれるか（ロボットエンジニアの多い国）</h3>
+    <h3>どこで生まれるか</h3>
+    <p class="note" id="distLbl" style="margin:0 0 8px"></p>
     <div class="bars" id="countryBars"></div>
-    <p class="note" style="margin-top:8px">2026年の比率。国際ロボット連盟（IFR）の産業用ロボット設置台数、ロボット学会 ICRA 2024 の著者数、CSRankings のロボティクス論文数をまぜた推計です。時代がさかのぼるほど日本・アメリカの比率が上がり、中国は下がります。</p>
+    <h3 style="margin-top:16px">年代ごとの比率の変化</h3>
+    <div class="trend" id="trend"></div>
+    <div class="legend" id="trendLegend"></div>
+    <p class="note" style="margin-top:8px">国際ロボット連盟（IFR）の産業用ロボット設置台数、ロボット学会 ICRA 2024 の著者数、CSRankings のロボティクス論文数をまぜた 2026 年の推計に、各国のロボット産業の歴史（日本の 1980 年代のロボット普及、2010 年代からの中国の急成長など）を加えて年代ごとの比率を作っています。上の「入学する時代」を変えると、グラフも変わります。</p>
   </div>
 
   <div class="box">
     <h3>あそびかた</h3>
     <ul>
-      <li>18歳で入学したところから、定年まで 1 年ずつ時間が進む（1 人生 5〜10 分）</li>
+      <li>18歳で入学したところから、定年まで 1 年ずつ時間が進む（1 人生 10 分ほど。2×〜16× で早送りもできる）</li>
+      <li>年収と資産（貯金・投資・家・株・退職金）が毎年変わる。分かれ道では、選んだあとの年収が見える</li>
       <li>毎年の「重点」をえらぶと、技術・健康・幸福・人脈が変わる</li>
       <li>進学・就職・転職・起業などの分かれ道では、自分でえらぶ</li>
       <li>同じ年に入学した 4 人も、同じ統計で同時に人生を歩む</li>
@@ -456,7 +472,7 @@ function kf(arr, y){ // キーフレーム補間
 const cInfo = c=>COUNTRIES[c]||HOMES[c];
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function uniName(raw, y){ const p=raw.split('|'); if(p.length===3) return y>=+p[1]?p[2]:p[0]; return raw; }
-function yen(usd){ const man=Math.round(usd*150/10000); return man>=10000?(man/10000).toFixed(1)+'億円':man+'万円'; }
+function yen(usd){ const man=Math.round(usd*150/10000), a=Math.abs(man), sg=man<0?'−':''; return a>=10000?sg+(a/10000).toFixed(1)+'億円':sg+a.toLocaleString()+'万円'; }
 function usd(v){ return '$'+Math.round(v).toLocaleString('en-US'); }
 
 /* =========================================================
@@ -472,10 +488,19 @@ function makeName(home, g){
   if(home==='KR') return s+'・'+f;
   return ASIAN_ORDER[home] ? s+' '+f : f+'・'+s;
 }
-function pickEntryYear(era){
-  if(era==='now') return 2026;
-  if(era==='past') return wpick(range(1965,2015), y=>Math.exp((y-1965)/30));
-  return wpick(range(1965,2026), y=>Math.exp((y-1965)/25));
+// 時代ごとの入学年の重み（ロボットエンジニアの人数はだんだん増えてきた）
+function eraYears(era){
+  if(era==='now') return [[2026,1]];
+  if(era==='past') return range(1965,2015).map(y=>[y,Math.exp((y-1965)/30)]);
+  return range(1965,2026).map(y=>[y,Math.exp((y-1965)/25)]);
+}
+function pickEntryYear(era){ return wpick(eraYears(era), x=>x[1])[0]; }
+// その時代に入学したとき、どの国になるかの確率
+function eraDist(era){
+  const ys=eraYears(era), tw=ys.reduce((a,x)=>a+x[1],0), d={};
+  for(const k in COUNTRIES) d[k]=0;
+  for(const [y,w] of ys){ const t=Object.keys(COUNTRIES).reduce((a,k)=>a+countryWeight(k,y),0); for(const k in COUNTRIES) d[k]+=w/tw*countryWeight(k,y)/t; }
+  return d;
 }
 function range(a,b){ const r=[]; for(let i=a;i<=b;i++) r.push(i); return r; }
 
@@ -500,7 +525,7 @@ function newLife(entryYear){
     prob: countryProb(c,y)*(u[1]/uniTot)*(home!==c?(it.p*it.from[home]/Object.values(it.from).reduce((a,b)=>a+b,0)):(it?1-it.p:1)),
     stage:'ug', deg:'学部生', st:{sk:0,he:0,ha:0,ne:0},
     focus:'make', job:null, jc:c, title:'', rank:0, exp:0,
-    robots:0, papers:0, patents:0, earn:0, maxSal:0, sal:0,
+    robots:0, papers:0, patents:0, earn:0, maxSal:0, sal:0, assets:0, payF:1,
     partner:false, kids:0, flags:{}, path:[], moments:[], answers:[], snaps:{},
     ret: COUNTRIES[c].ret + (y<1990 && c==='JP' ? -5 : 0), ended:false, endWhy:'',
   };
@@ -508,7 +533,8 @@ function newLife(entryYear){
   s.st.he = clamp(70 + ri(-10,15), 10, 100);
   s.st.ha = clamp(55 + ri(-10,10) + (fam==='きびしい家計'?-6:0) + (fam==='ゆたかな家庭'?4:0), 5, 100);
   s.st.ne = clamp(20 + (3-tier)*6 + ri(-5,5), 0, 100);
-  if(s.c==='JP' && /高専/.test(u[0])) s.flags.kosen=true;
+  const b0 = baseSal(c,y);
+  s.assets = b0*({'ふつうの家庭':.05,'ゆたかな家庭':.8,'きびしい家計':-.15,'エンジニア一家':.25})[fam];
   s.path.push(s.uni+'（'+y+'年入学）');
   return s;
 }
@@ -528,11 +554,14 @@ function calcSal(s){
       m *= s.deg==='博士'?1.25: s.deg==='修士'?1.1:1;
       m *= 0.65 + Math.min(s.exp,25)*0.016;
       m *= 0.9 + s.st.sk/500;
+      m *= s.job.pm||1;
+      m = Math.min(m, 2.4); // どんなに転職を重ねても、その国の相場の 2.4 倍まで
       if(s.flags.mgr) m*=1.15; if(s.flags.expert) m*=1.08;
       if(s.job && (s.job.t==='start'||s.job.t==='it') && s.flags.humanoid) m*=1.2;
       return b*m;
     }
     case 'startup': return b*(s.flags.exitRich?1.6:.6);
+    case 'left': return baseSal(s.c, s.year)*(.6 + Math.min(Math.max(s.age-22,0),25)*.014);
   }
   return 0;
 }
@@ -549,10 +578,10 @@ function pickCompany(s, c, types, avoid){
   if(!list.length) return ['地元の工場',1900,0,'si',1];
   return wpick(list, x=>x[4]*(x[3]==='si'?(s.tier===1?.3:1):1)*(x[3]==='lab'&&s.deg==='博士'?3:1)*((x[3]==='start')&&s.year>=2023?1.6:1));
 }
-function setJob(s, comp, c){
+function setJob(s, comp, c, pm){
   const same = s.job && s.job.n===comp[0];
   s.stage='work'; s.jc=c||s.jc;
-  s.job={n:comp[0], t:comp[3], until:comp[2], since:s.year};
+  s.job={n:comp[0], t:comp[3], until:comp[2], since:s.year, pm:pm||1};
   if(!same) s.path.push(comp[0]+(s.jc!==s.c && s.jc!==s.home?'（'+COUNTRIES[s.jc].n+'）':''));
 }
 function abroadCountry(s){
@@ -633,7 +662,7 @@ const EVENTS = [
   {st:['ug'],t:s=>contest(s)+'の本番でロボットが動かず、会場がしずまりかえった',e:{ha:-5,sk:2},f:s=>s.flags.club},
   {st:['ug'],t:s=>contest(s)+'で優勝した！ 部室で朝までさわいだ',e:{ha:10,ne:5,sk:3},f:s=>s.flags.club,w:.35,k:'big',r:1},
   {st:['ug','ms'],t:'モーターを逆につないだら煙が出た。いいにおいがした',e:{sk:1}},
-  {st:['ug'],t:'バイト代がすべてサーボモーターに消えた',e:{ha:2,sk:1}},
+  {st:['ug'],t:'バイト代がすべてサーボモーターに消えた',e:{ha:2,sk:1},m:-.01},
   {st:['ug','ms'],y:[2010,9999],t:'ROS のチュートリアルで、画面の中のカメを動かした',e:{sk:2}},
   {st:['ug','ms','phd'],y:[1990,9999],t:'MATLAB のライセンスが切れて途方にくれた',e:{ha:-2}},
   {st:['ug','ms'],y:[2008,9999],t:'ハッカソンで徹夜した。できたのは動かないロボットと友だち',e:{ne:4,he:-2}},
@@ -691,7 +720,7 @@ const EVENTS = [
   {st:['startup'],y:[2023,9999],t:'投資家に「で、いつ人型にするの？」と聞かれた',e:{ha:-1}},
   {st:['startup'],t:'資金調達のピッチで、デモロボットがバッテリー切れ',e:{ha:-5}},
   {st:['startup'],t:'ガレージで作った試作機が、はじめて客先で動いた',e:{ha:8,sk:3},k:'good',r:1},
-  {st:['startup'],t:'お金が足りず、自分の給料をゼロにした',e:{ha:-5}},
+  {st:['startup'],t:'会社のお金が足りず、今年の自分の給料をゼロにした',e:{ha:-5},pay:0,f:s=>s.payF>0},
   {st:['startup'],t:'採用面接で「ロボットの会社って、ほんとうに動くんですか？」と聞かれた',e:{}},
   // ---- 大学教員
   {st:['prof'],t:'学生の論文を、真夜中に赤ペンでまっかにした',e:{he:-2},p:1},
@@ -702,7 +731,7 @@ const EVENTS = [
   {st:['prof'],t:'会議が多すぎて、ロボットにさわれない',e:{ha:-3}},
   {st:['prof'],t:'オープンキャンパスでロボットが子どもに大人気だった',e:{ha:3}},
   // ---- くらし
-  {st:ALL,f:s=>!s.partner&&s.age>=24&&s.age<=45,t:'結婚した。相手はロボットの話を 3 割くらい聞いてくれる',e:{ha:10},w:.9,k:'big',do:s=>{s.partner=true;}},
+  {st:ALL,f:s=>!s.partner&&s.age>=24&&s.age<=45,t:'結婚した。相手はロボットの話を 3 割くらい聞いてくれる',e:{ha:10},w:.9,k:'big',m:-.15,do:s=>{s.partner=true;}},
   {st:ALL,f:s=>s.partner&&s.kids<3&&s.age<=46,t:'子どもが生まれた',e:{ha:10,he:-2},w:.9,k:'big',do:s=>{s.kids++;}},
   {st:ALL,f:s=>s.kids>0,t:'子どもがロボットのおもちゃを分解した。才能かもしれない',e:{ha:3}},
   {st:ALL,f:s=>s.age>=45,t:'親の介護で、実家に通う日々がはじまった',e:{he:-2,ha:-3},once:'kaigo',w:.6},
@@ -717,38 +746,294 @@ const EVENTS = [
   {st:ALL,f:s=>s.home!==s.jc,t:'母国の親から「いつ帰ってくるの」と電話があった',e:{ha:-2}},
   {st:['left'],t:'ロボットのニュースを見るたびに、少しだけ胸がさわぐ',e:{ha:-1}},
   {st:['left'],t:'週末に、こっそりロボットを作っている',e:{ha:4},r:1},
+  // ======== あるある追加分 ========
+  // ---- 学部
+  {st:['ug'],y:[1990,9999],t:'入学式の日、サークル勧誘のロボットに手をふられた',e:{ha:2},f:s=>s.sy===1},
+  {st:['ug'],t:'「機械工学科って、なにするの？」と聞かれて、うまく答えられなかった',e:{}},
+  {st:['ug'],y:[0,1999],t:'製図の課題で、ひと晩中ドラフターに向かった',e:{sk:1,he:-1}},
+  {st:['ug'],y:[2000,9999],t:'CAD の課題で、アセンブリが画面の中で爆発した',e:{sk:1}},
+  {st:['ug'],t:'材料力学の試験で、はりがたわみすぎた（答案の中で）',e:{ha:-1}},
+  {st:['ug'],t:'サークルの先輩に「まずは LED を光らせよう」と言われて半年がすぎた',e:{sk:1}},
+  {st:['ug'],t:'モータードライバを 3 つ燃やした。部費がとけた',e:{ha:-2,sk:1},m:-.005},
+  {st:['ug'],t:'学園祭でロボットを展示した。子どもに大人気、親にはふしぎがられた',e:{ne:2,ha:3}},
+  {st:['ug','ms'],t:'はじめて自分で設計した部品が、0.2 mm ずれて入らなかった',e:{sk:2}},
+  {st:['ug'],t:'ヤスリがけの腕だけは、プロ級になった',e:{sk:1}},
+  {st:['ug'],t:'オシロスコープの使い方を覚えて、世界が少しわかった',e:{sk:3}},
+  {st:['ug','ms'],t:'工作センターの職人さんに弟子入りした',e:{sk:3,ne:2},once:'shokunin'},
+  {st:['ug','ms'],t:'夜中の部室で食べるカップ麺が、人生でいちばんおいしかった',e:{ha:3,he:-1}},
+  {st:['ug'],t:'大会前日、ロボットが重量制限を 50 g オーバーしていることが発覚した',e:{he:-2,sk:2},f:s=>s.flags.club},
+  {st:['ug','ms'],t:'ボール盤で、机に穴をあけた',e:{}},
+  {st:['ug'],t:'ロボット工学の授業でヤコビ行列に出会った。仲良くなれる気がしない',e:{sk:1}},
+  {st:['ug'],t:'フーリエ変換の意味が、3 年目にやっとわかった',e:{sk:2},f:s=>s.sy>=3},
+  {st:['ug'],t:'プログラミングの授業で、無限ループからぬけられなくなった（コードも自分も）',e:{sk:1}},
+  {st:['ug'],t:'ライバル校のロボットがかっこよすぎて、眠れなかった',e:{sk:1,he:-1}},
+  {st:['ug'],t:'サークルの同期がやめて、部員が 3 人になった',e:{ha:-3},f:s=>s.flags.club},
+  {st:['ug'],t:'部品代のために、奨学金に手をつけてしまった',e:{ha:1},m:-.02},
+  {st:['ug','ms'],t:'電子部品の店で、店員さんに顔を覚えられた',e:{ne:1}},
+  {st:['ug'],t:'はじめてのロボットに「1 号」と名づけた。いまでも 1 号のことを思い出す',e:{ha:2},r:1,once:'ichigo'},
+  {st:['ug'],t:'テスト前なのに、ロボットの動画ばかり見ていた',e:{ha:2}},
+  {st:['ug'],t:'インターンでロボットメーカーの工場を見学した。ロボットが 24 時間はたらいていた',e:{ne:2,sk:1}},
+  {st:['ug'],y:[2008,9999],t:'海外のロボット動画に感動して、英語を勉強しはじめた',e:{ne:1,sk:1}},
+  {st:['ug'],c:['JP'],t:'教授に「ガンダムは作れないけど、ガンダムの指なら作れる」と言われた',e:{ha:1}},
+  {st:['ug'],t:'ロボコンのルールブックを、教科書よりも読みこんだ',e:{sk:1},f:s=>s.flags.club},
+  {st:['ug'],t:'大会の遠征費を、みんなのカンパで集めた',e:{ne:2},m:-.01,f:s=>s.flags.club},
+  {st:['ug'],t:'大会で他チームに部品を借りた。お礼にはんだごてを貸した',e:{ne:3},f:s=>s.flags.club},
+  {st:['ug'],t:'試験期間中、ロボットは分解されたまま放置された',e:{}},
+  {st:['ug','ms'],t:'恋人に「わたしとロボット、どっちが大事？」と聞かれた',e:{ha:-2},f:s=>!s.partner},
+  {st:['ug','ms'],t:'「ロボットの学生」というだけで、家電の修理をたのまれる',e:{ne:1}},
+  {st:['ug'],y:[1995,9999],t:'パソコンを自作した。ロボットより先にパソコンが動いた',e:{sk:1},m:-.01},
+  {st:['ug'],y:[2018,9999],t:'バイト先にロボットが入って、自分の仕事がひとつへった',e:{ha:-1}},
+  {st:['ug','ms','phd'],t:'留学生の友だちと、深夜までロボットの話をした',e:{ne:3}},
+  {st:['ug'],t:'卒業研究のテーマが決まらず、教授の部屋の前を 3 往復した',e:{ha:-1},f:s=>s.sy===4},
+  {st:['ug'],t:'バイトで家庭教師をした。生徒にロボットの話をしたら、成績が上がった',e:{ha:2},m:.01},
+  // ---- 研究室
+  {st:['ms','phd','postdoc','prof'],t:'研究室の冷蔵庫に、だれのかわからないプリンが 3 年前から入っている',e:{}},
+  {st:['ms','phd'],t:'ゼミの発表スライドが 80 枚になった。持ち時間は 15 分だった',e:{ha:-1}},
+  {st:['ms','phd','postdoc'],t:'論文の図を 1 ピクセル単位で直していたら、朝になった',e:{he:-2,sk:1}},
+  {st:['ms','phd','postdoc','prof'],y:[1990,9999],t:'LaTeX のエラーで、表が 2 ページ先に飛んでいった',e:{ha:-1}},
+  {st:['ms','phd','postdoc'],y:[2005,9999],t:'締め切りの時差をまちがえていた。AoE（地球のどこかでまだ締め切り前）に救われた',e:{ha:2}},
+  {st:['phd','postdoc','prof'],t:'査読で「関連研究が足りない」と言われ、関連研究を 40 本足した',e:{sk:1}},
+  {st:['ms','phd','postdoc'],t:'学会のポスター発表で、2 時間ずっと同じ人に話しかけられていた',e:{ne:1}},
+  {st:['ms','phd','postdoc'],t:'国際会議の懇親会で、論文で名前を見ていた有名人と話せた',e:{ne:5,ha:3}},
+  {st:['ms','phd'],t:'研究室のロボットに、先輩の名前がついていた',e:{}},
+  {st:['ms','phd','postdoc','work'],t:'ロボットアームが暴走。非常停止ボタンがどこにあるか、みんなが一瞬わすれた',e:{he:-1,sk:1}},
+  {st:['ms','phd','postdoc','work'],t:'非常停止ボタンを押したら、全員が静かにふりかえった',e:{}},
+  {st:['ms','phd','postdoc'],t:'データ集めのために、同じ動作を 1000 回くりかえした',e:{sk:2,he:-2}},
+  {st:['ms','phd','postdoc'],y:[1995,9999],t:'モーションキャプチャのマーカーを全身につけて、研究室を歩きまわった',e:{}},
+  {st:['ms','phd','postdoc'],t:'実験の参加者を集めるために、学食でチラシを配った',e:{ne:2}},
+  {st:['ms','phd','postdoc','prof'],t:'研究室の大掃除で、20 年前のロボットが出てきた。まだ動いた',e:{ha:3}},
+  {st:['ms','phd','postdoc','prof'],t:'年度末、研究費の締め日直前に部品を大量に注文した',e:{},r:1},
+  {st:['ms','phd'],t:'論文の英語を直してもらったら、ほぼ全部が赤くなって返ってきた',e:{sk:1,ha:-1}},
+  {st:['ms','phd','postdoc'],t:'先生の「ちょっといい？」が、2 時間になった',e:{ha:-1}},
+  {st:['ms','phd','postdoc','prof'],c:['JP'],t:'デモのため、ロボットをハイエースに積んで運んだ',e:{ne:1}},
+  {st:['ms','phd','postdoc','prof','work'],t:'学会会場で、コンセントの近くはロボット屋の取り合いになる',e:{}},
+  {st:['ms','phd','postdoc','prof','work','startup'],t:'デモを見た子どもに「中に人いるの？」と聞かれた',e:{ha:2}},
+  {st:['ms','phd','postdoc'],y:[2016,9999],t:'研究室の GPU の空きを待つ行列ができた',e:{ha:-1}},
+  {st:['ms','phd','postdoc','work'],y:[2016,9999],t:'強化学習のロボットが、ズルい動きを覚えた',e:{sk:2}},
+  {st:['ms','phd','postdoc','work'],y:[2015,9999],t:'3 週間学習させたモデルが、照明が変わっただけで動かなくなった',e:{ha:-3,sk:1}},
+  {st:['ms','phd','postdoc'],y:[2012,9999],t:'データのラベル付けを、研究室総出でやった',e:{ne:1}},
+  {st:['phd','postdoc'],y:[2012,9999],t:'arXiv に投稿した翌日、ほぼ同じ論文が出ていた',e:{ha:-6}},
+  {st:['ms','phd','postdoc','work','startup'],y:[2012,9999],t:'公開したコードの GitHub スターが 100 をこえた',e:{ne:4,ha:3}},
+  {st:['ms','phd','postdoc','work'],y:[2008,9999],t:'オープンソースのライブラリにバグを見つけて、修正を送った',e:{sk:2,ne:2}},
+  {st:['ms','phd','postdoc','work','startup'],t:'自分のコードに「TODO: あとで直す」が 200 個あった',e:{}},
+  {st:['phd'],t:'博士論文の謝辞を書いていて、ちょっと泣いた',e:{ha:3},f:s=>s.sy>=3},
+  {st:['phd'],t:'公聴会で想定外の質問が来て、「今後の課題です」と答えた',e:{},f:s=>s.sy>=3},
+  {st:['ms','phd','postdoc'],y:[2010,9999],t:'研究室の後輩に ROS の使い方を教えた',e:{ne:2}},
+  {st:['ms','phd','postdoc','work'],t:'ロボットの関節を 1 つ増やしたら、計算が 10 倍重くなった',e:{sk:1}},
+  {st:['ms','phd','postdoc','work'],t:'逆運動学が解けず、ロボットの腕がありえない方向に曲がった',e:{sk:2}},
+  {st:['ms','phd','postdoc'],t:'「歩く」研究をして 3 年。ロボットはまだ「立つ」ことに集中している',e:{ha:-1}},
+  {st:['ms','phd','postdoc','work'],y:[2000,9999],t:'SLAM の地図が、ぐにゃぐにゃに曲がった',e:{sk:1}},
+  {st:['ms','phd','postdoc','work'],y:[2000,9999],t:'ロボットが鏡に映った自分を障害物だと思って止まった',e:{}},
+  {st:['ms','phd','postdoc','work'],y:[2003,9999],t:'ロボット掃除機が、実験用のケーブルを食べた',e:{}},
+  {st:['ms','phd','postdoc'],t:'学会で「それ 1990 年代にやられてるよ」と言われた',e:{ha:-4,sk:1}},
+  {st:['ms','phd','postdoc','work','startup'],t:'締め切り前にギアが欠けた。替えの部品は 3 週間後',e:{ha:-3}},
+  {st:['ms','phd'],t:'発表の練習を、ロボットに聞いてもらった（聞いていない）',e:{}},
+  {st:['ms','phd','postdoc','prof'],t:'お世話になった先生が定年退職した',e:{ha:-1,ne:1},once:'sensei'},
+  {st:['postdoc'],t:'任期の残りを、指で数えた',e:{ha:-3}},
+  {st:['postdoc','phd'],t:'海外の研究仲間と時差を使って、24 時間リレーで実験した',e:{ne:3,he:-1}},
+  {st:['phd','postdoc','prof'],t:'研究費の書類で、「消耗品」と「備品」の区別に 1 日かかった',e:{ha:-1}},
+  {st:['phd','postdoc','prof'],t:'企業との共同研究に守秘義務があり、論文に書けなくなった',e:{ha:-3,ne:2}},
+  {st:['phd'],c:['US','CN','DE','CH','KR','SG'],t:'研究補助の仕事で、少しだけ臨時収入があった',e:{ha:2},m:.03},
+  {st:['ms','phd','postdoc','work','startup'],t:'ロボットの充電を忘れていて、デモ開始 1 分で止まった',e:{ha:-3}},
+  {st:['ms','phd','postdoc','prof'],t:'学会帰りの飛行機で、論文のアイデアを思いついた',e:{sk:2}},
+  {st:['ms','phd'],t:'ほかの研究室の実験に、参加者としてかり出された',e:{ne:1}},
+  {st:['ms','phd','postdoc'],t:'実験室の床に、テープで謎の線がたくさん引かれている',e:{}},
+  {st:['ms','phd','postdoc','work'],t:'ロボットの指先に、毎日ちがうものをつかませた',e:{sk:2},r:1},
+  {st:['ms','phd'],t:'学会の参加費を自腹で払った',e:{ne:2},m:-.02},
+  // ---- 会社
+  {st:['work'],t:'新人研修で、まず安全教育を 3 日間受けた',e:{he:1},f:s=>s.exp<1},
+  {st:['work'],t:'配属先は、希望とちがう部署だった',e:{ha:-3},f:s=>s.exp<1},
+  {st:['work','startup'],t:'先輩のコードを読んだら、コメントが一行もなかった',e:{sk:1}},
+  {st:['work'],t:'「動いているものにはさわるな」が職場の合言葉だった',e:{}},
+  {st:['work'],c:['JP'],t:'工場の朝礼で、ラジオ体操をした',e:{he:1}},
+  {st:['work'],t:'安全靴にも、だんだん慣れてきた',e:{},f:s=>s.exp<3},
+  {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'ティーチングペンダントを持つ手つきが、プロっぽくなってきた',e:{sk:2}},
+  {st:['work'],c:['JP'],f:s=>['si','big'].includes(s.job.t),t:'客先の工場長に缶コーヒーをもらった。それだけで報われた',e:{ha:3}},
+  {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'据え付けの日、床にアンカーボルトの穴があいていなかった',e:{ha:-2}},
+  {st:['work','startup'],t:'休日に「ロボットが止まった」と電話が来た',e:{he:-2,ha:-2}},
+  {st:['work','startup'],t:'トラブルの原因は、だれかがケーブルを足でひっかけたことだった',e:{}},
+  {st:['work','startup'],t:'仕様書に「いい感じに動くこと」と書いてあった',e:{ha:-1}},
+  {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'見積もりをしたら、ロボットより安全柵のほうが高かった',e:{}},
+  {st:['work','startup'],t:'ロボットより、ロボットを置く台の設計に時間がかかった',e:{sk:1}},
+  {st:['work','startup'],t:'お客さんに「人間がやったほうが早いね」と言われた',e:{ha:-3}},
+  {st:['work'],t:'1 年かけて自動化したら、その製品が生産終了になった',e:{ha:-6}},
+  {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'ロボットが 1 万時間ノンストップで動いた。ちょっと誇らしい',e:{ha:4}},
+  {st:['work','startup'],t:'展示会で、ロボットがお菓子を配る係になっていた',e:{}},
+  {st:['work'],y:[2016,9999],t:'えらい人に「AI でなんとかならないの？」と言われた',e:{ha:-1}},
+  {st:['work','startup'],t:'ロボットの製品名を決める会議が 3 時間つづいた',e:{ha:-1}},
+  {st:['work','startup'],t:'マニュアルを書いた。だれにも読まれなかった',e:{}},
+  {st:['work'],t:'保証期間がすぎた翌日に、故障の連絡が来た',e:{}},
+  {st:['work','startup'],t:'海外の展示会で、競合のロボットをじっくり観察した',e:{ne:2,sk:1}},
+  {st:['work','startup'],y:[2010,9999],f:s=>s.jc!=='CN',t:'中国の工場の立ち上げスピードに、目を見はった',e:{sk:1}},
+  {st:['work','startup'],t:'展示会でほかの会社のエンジニアと名刺交換して、なぜか仲良くなった',e:{ne:4}},
+  {st:['work'],t:'品質保証の部署と、仕様の読み方でもめた',e:{ha:-2}},
+  {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'大型連休中に、工場のロボットを総入れかえした',e:{he:-3,sk:2},r:ri.bind(null,10,40)},
+  {st:['work'],t:'社内表彰された。賞金で家族とごはんを食べた',e:{ha:5},k:'good',m:.02},
+  {st:['work'],f:s=>s.jc==='JP'||s.jc==='KR'||s.jc==='TW',t:'ボーナスが思ったより多かった。そのまま貯金した',e:{ha:3},m:.08},
+  {st:['work'],t:'ボーナスが思ったより少なかった',e:{ha:-3}},
+  {st:['work'],t:'営業についていったら、技術の質問にぜんぶ答えることになった',e:{ne:3}},
+  {st:['work'],t:'ロボットの不具合で、全国の客先をまわった',e:{he:-3,ne:2}},
+  {st:['work'],f:s=>s.age>=35,t:'新人のころ作ったロボットが、まだ工場で動いていた',e:{ha:5}},
+  {st:['work'],t:'会社の合併で、使うソフトがぜんぶ変わった',e:{ha:-3}},
+  {st:['work','startup'],y:[2020,2022],t:'在宅勤務になった。でもロボットは家に持って帰れなかった',e:{ha:-1}},
+  {st:['work'],t:'工場の人たちが、導入したロボットに名前をつけてかわいがってくれた',e:{ha:5}},
+  {st:['work','prof'],f:s=>s.age>=35,t:'後輩の設計レビューで、むかしの自分と同じ失敗を見つけた',e:{ne:1}},
+  {st:['work'],f:s=>s.flags.mgr,t:'部下が「やめたい」と相談してきた',e:{ha:-3}},
+  {st:['work'],f:s=>s.flags.mgr,t:'予算会議で、ロボットのよさを数字で説明するのに苦労した',e:{ha:-2}},
+  {st:['work','startup'],f:s=>s.age>=30,t:'採用面接で、学生のロボコン話に聞き入ってしまった',e:{ha:2}},
+  {st:['work'],t:'会社のロゴ入りロボットのぬいぐるみが届いた',e:{ha:1}},
+  {st:['work'],f:s=>['si','big'].includes(s.job.t),t:'客先で、自分よりロボットにくわしい工場のベテランに出会った',e:{sk:2}},
+  {st:['work'],t:'品質トラブルの報告書を 30 枚書いた',e:{ha:-2}},
+  {st:['work','startup'],t:'海外の顧客から、深夜にビデオ会議の招待が来た',e:{he:-1}},
+  {st:['work'],t:'ロボットの耐久試験を、一日中見守るだけの日があった',e:{}},
+  {st:['work'],t:'部品メーカーが倒産して、部品が手に入らなくなった',e:{ha:-3}},
+  {st:['work','startup'],y:[2021,2022],t:'半導体不足で、ロボットのコントローラーが届かない',e:{ha:-3}},
+  {st:['work','startup'],y:[2010,9999],t:'協働ロボットが、作業者の人とハイタッチできるようになった',e:{ha:3}},
+  {st:['work','startup'],y:[2012,9999],t:'倉庫のロボットが、床のシールのはがれで迷子になった',e:{}},
+  {st:['work','startup'],y:[2012,9999],t:'物流倉庫で、ロボットが通路で渋滞した',e:{sk:1}},
+  {st:['work','startup'],y:[2005,9999],t:'自動運転のテスト中、カラスに道をゆずられた',e:{}},
+  {st:['work','startup'],y:[2023,9999],t:'ヒューマノイドのデモで、ロボットが冷蔵庫をあけるのに 5 分かかった',e:{}},
+  {st:['work','startup'],y:[2023,9999],t:'ヒューマノイドの指が 1 本動かなくなり、ピースしかできなくなった',e:{}},
+  {st:['work','startup'],y:[2015,9999],t:'デモ動画を 10 倍速にしていいか、社内でもめた',e:{}},
+  {st:['work','startup','phd','postdoc'],y:[2016,9999],t:'遠隔操作用の VR ゴーグルで酔った',e:{he:-1}},
+  {st:['work','startup','phd','postdoc'],y:[2023,9999],t:'学習データが足りず、自分で 1000 回遠隔操作した',e:{he:-2,sk:2}},
+  {st:['work'],f:s=>['big','it'].includes(s.job.t),t:'会社の株価が上がって、持ち株会の分がふえた',e:{ha:3},m:.12},
+  {st:['work'],f:s=>s.job.t==='it',t:'株式報酬が入った。税金の計算がむずかしい',e:{ha:3},m:.35},
+  {st:['work'],f:s=>s.job.t==='start'&&s.year-s.job.since>=2,t:'勤めているスタートアップが買収され、ストックオプションが現金になった',e:{ha:8},m:s=>ri(1,6),once:'so',w:.25,k:'good'},
+  {st:['work'],f:s=>s.job.n.startsWith('Unitree')&&s.year===2026,t:'Unitree が上場した！ 持っていた株が大化けした',e:{ha:12},m:s=>ri(4,20),once:'unitree',w:20,k:'big'},
+  {st:['work'],t:'同期が転職して、年収が上がったという話を聞いた',e:{ha:-2}},
+  {st:['work'],c:['JP'],y:[2020,9999],t:'社員旅行の旅館で、配膳ロボットをじっくり観察した',e:{sk:1}},
+  {st:['work'],t:'朝、工場に着くと、ロボットだけが夜通し働いた成果がならんでいた',e:{ha:2}},
+  {st:['work'],f:s=>s.job.t==='lab',t:'研究所の成果発表会で、役員に「で、いくらもうかるの？」と聞かれた',e:{ha:-2}},
+  {st:['work'],t:'出張の経費精算をため込んで、3 か月分まとめてやった',e:{ha:-1}},
+  {st:['work','startup'],t:'ロボットの安全規格の文書を、端から端まで読んだ',e:{sk:2}},
+  // ---- スタートアップ
+  {st:['startup'],t:'オフィスは、だれかの家のガレージだった',e:{},f:s=>s.sy<=1},
+  {st:['startup'],t:'社長と開発と営業と掃除係を、全部ひとりでやっている',e:{he:-2,sk:1}},
+  {st:['startup'],t:'最初の社員が入った。給料を払えることに感動した',e:{ha:5},once:'first'},
+  {st:['startup'],t:'デモの前日、部品を電気街に買いに走った',e:{}},
+  {st:['startup'],t:'ピッチイベントで、ロボットが審査員にむかって走りだした',e:{ne:2}},
+  {st:['startup'],t:'投資家に「市場規模は？」と聞かれ、とりあえず大きな数字を言った',e:{}},
+  {st:['startup'],t:'資金調達が決まった日、みんなでピザを食べた（会社のお金で、自分の給料はそのまま）',e:{ha:6},k:'good'},
+  {st:['startup'],t:'大企業との実証実験が 3 年つづいている。実証実験地獄だ',e:{ha:-4}},
+  {st:['startup'],t:'ロボットの量産見積もりが、想定の 3 倍だった',e:{ha:-4}},
+  {st:['startup'],y:[2010,9999],t:'SNS で「すごいけど何に使うの？」と言われた',e:{ha:-1}},
+  {st:['startup'],t:'共同創業者とケンカした。翌日、ふつうに話した',e:{ne:-1}},
+  {st:['startup'],t:'国の補助金に採択された。会社の口座が少しだけ太った',e:{ha:3}},
+  {st:['startup'],t:'給料日の前に、会社の資金が尽きそうになった',e:{ha:-6,he:-2}},
+  {st:['startup'],t:'最初の顧客は、創業者の知り合いだった',e:{ne:1}},
+  {st:['startup'],t:'ロボットの名前を商標登録しようとしたら、もう取られていた',e:{}},
+  {st:['startup'],t:'自分の貯金を会社に貸した',e:{ha:-2},m:-.3,f:s=>s.assets>baseSal(s.jc,s.year)*.5},
+  // ---- 大学教員
+  {st:['prof'],f:s=>s.rank>=1,t:'研究室の学生が 20 人をこえ、名前と顔が一致しなくなった',e:{}},
+  {st:['prof'],t:'授業で学生の半分が寝ていた。ロボットを出したら全員起きた',e:{ha:2}},
+  {st:['prof'],t:'入試の監督の間、ずっとロボットのことを考えていた',e:{}},
+  {st:['prof'],f:s=>s.rank===2,t:'学科長になってしまった',e:{ha:-3,ne:3},once:'chair'},
+  {st:['prof','work'],t:'テレビ番組の監修をした。ロボットの描き方がまちがっていたが、言えなかった',e:{ne:2},m:.01},
+  {st:['prof'],t:'学生が国際会議で最優秀論文賞をとった',e:{ha:8,ne:4},k:'good',w:.4,p:1},
+  {st:['prof'],f:s=>s.age>=50,t:'研究室の OB 会。みんな立派になっていた',e:{ha:5}},
+  {st:['prof'],t:'大学の予算削減で、ロボットの修理ができない',e:{ha:-3}},
+  {st:['prof','work'],t:'高校に出張授業に行った。目をかがやかせる生徒がいた',e:{ha:4,ne:2}},
+  {st:['prof'],f:s=>s.rank>=1,t:'学会の委員長を引き受けた。メールが 1 日 200 通くる',e:{ne:4,he:-2}},
+  {st:['prof','postdoc'],t:'査読の依頼が 1 週間で 6 本来た',e:{he:-1}},
+  {st:['prof'],f:s=>s.rank>=1,t:'書いた教科書が出版された。印税は少しだけ',e:{ha:5,ne:3},m:.02,once:'book'},
+  {st:['prof'],t:'講演会によばれた。謝礼でロボットの部品を買った',e:{ne:2}},
+  // ---- くらし
+  {st:ALL,f:s=>s.age>=30&&s.age<=50&&s.assets>baseSal(s.jc,s.year)*.6,t:'家を買った。頭金を払って、ローンは 35 年',e:{ha:4},m:-.6,once:'house'},
+  {st:ALL,f:s=>s.age>=24&&s.sal>0,t:'車を買った。トランクにロボットが入る大きさにした',e:{ha:2},m:-.25,once:'car'},
+  {st:ALL,f:s=>s.age>=25&&s.assets>0,t:'つみたて投資をはじめた',e:{ha:1},once:'invest'},
+  {st:ALL,f:s=>s.age>=45,t:'親から、少しだけ遺産を相続した',e:{ha:-3},m:s=>.3+R()*.8,once:'inherit',w:.4},
+  {st:ALL,t:'ロボットの部品に散財した。後悔はしていない',e:{ha:3},m:-.03},
+  {st:ALL,f:s=>s.kids>0&&s.age>=40,t:'子どもの学費がかさむ',e:{ha:-1},m:-.15},
+  {st:ALL,f:s=>s.kids>0,t:'子どもが自由研究でロボットを作った。手伝いすぎた',e:{ha:3}},
+  {st:ALL,f:s=>s.kids>0,t:'子どもに仕事の内容を聞かれ、説明に 30 分かかった',e:{ha:1}},
+  {st:ALL,f:s=>s.kids>0,t:'家族旅行の行き先が、なぜかロボットの博物館になった',e:{ha:3},m:-.02},
+  {st:ALL,y:[2002,9999],t:'家電量販店のロボット掃除機売り場で、10 分立ちどまった',e:{}},
+  {st:ALL,t:'映画のロボットの動きに、ついツッコミを入れてしまう',e:{}},
+  {st:ALL,t:'ロボットアニメを見て、ひさしぶりに泣いた',e:{ha:3}},
+  {st:ALL,f:s=>s.age>=40,t:'メガネの度が強くなった',e:{he:-1}},
+  {st:ALL,f:s=>s.age>=25,t:'肩こりがひどくなった',e:{he:-2}},
+  {st:ALL,f:s=>s.age>=30,t:'昔の同級生の集まりで「まだロボットやってるの？」と言われた',e:{ne:1}},
+  {st:ALL,f:s=>s.age>=25,t:'友だちの結婚式で、ロボットの余興をたのまれた',e:{ne:2}},
+  {st:ALL,y:[2010,9999],f:s=>s.age>=40,t:'腰痛のため、アシストスーツを自分でためした',e:{he:1}},
+  {st:ALL,t:'ロボットが動かない夢を見て、夜中に目がさめた',e:{he:-1}},
+  {st:ALL,f:s=>s.age>=40,t:'ふるさとの町工場に、自分が関わったロボットが入っていた',e:{ha:5},w:.5},
+  {st:ALL,f:s=>s.age>=22,t:'休みにキャンプに行った。電波がなくて最高だった',e:{he:3,ha:3}},
+  {st:ALL,f:s=>s.sal>0&&s.assets>s.sal,t:'貯金が、はじめて年収をこえた',e:{ha:3},once:'savings'},
+  {st:ALL,f:s=>s.age>=25,t:'ジムに通いはじめた（3 か月で行かなくなった）',e:{he:1},m:-.01},
+  {st:ALL,f:s=>s.age>=25,t:'ペットを飼いはじめた。ロボット犬ではない',e:{ha:5},once:'pet'},
+  {st:ALL,f:s=>s.age>=55,t:'定年後のことを考えはじめた',e:{}},
+  {st:ALL,f:s=>s.age>=58,t:'年金の書類が届いた。ロボットにも年金はあるのだろうか',e:{}},
+  {st:ALL,f:s=>s.assets<0,t:'奨学金とローンの返済が、ずしりと重い',e:{ha:-2}},
+  {st:ALL,f:s=>s.age>=25,t:'スマホを落として画面を割った。自分で修理した',e:{sk:1}},
+  {st:ALL,t:'旅行先のホテルで、受付がロボットだった。思わず型番を確認した',e:{},y:[2015,9999]},
+  {st:ALL,f:s=>s.age>=35,t:'人間ドックで「運動してください」と言われた',e:{he:-1}},
+  {st:ALL,f:s=>s.partner,t:'パートナーの誕生日を、ロボットの納期と同じ日にしてしまい怒られた',e:{ha:-3}},
+  // ---- 国ごと
+  {st:['work','ms','phd','postdoc','prof'],c:['JP'],t:'新幹線の中で、ロボットのプログラムを直した',e:{sk:1}},
+  {st:['work','startup'],c:['JP'],y:[1974,9999],t:'国際ロボット展の人ごみで、同僚とはぐれた',e:{ne:1}},
+  {st:['work','startup','ms','phd'],c:['CN'],y:[2000,9999],t:'深圳の華強北で、1 日で部品をそろえた',e:{sk:2}},
+  {st:['work'],c:['CN'],y:[2010,9999],t:'朝 9 時から夜 9 時、週 6 日の働き方につかれた',e:{he:-4,ha:-2}},
+  {st:ALL,c:['CN','TW','HK','SG','KR','VN'],t:'旧正月の帰省で、親せきにロボットの動画を見せた',e:{ha:2}},
+  {st:['work','startup','phd','postdoc'],f:s=>s.jc==='US',t:'ベイエリアの家賃の高さに、めまいがした',e:{ha:-2},m:-.05},
+  {st:ALL,c:['US','CA'],t:'感謝祭の夕食で、家族にロボットの話をしすぎて引かれた',e:{}},
+  {st:['work'],f:s=>s.jc==='DE',t:'終業時間になったら、人もロボットもきっちり帰った',e:{ha:2,he:1}},
+  {st:['work','startup'],f:s=>s.jc==='DE',t:'ハノーバーメッセで、ソーセージとロボットを見てまわった',e:{ne:2}},
+  {st:ALL,c:['KR'],t:'徹夜明けにトッポッキを食べた',e:{ha:2}},
+  {st:['work','startup'],c:['IN'],y:[2005,9999],t:'ベンガルールの渋滞で、自動運転の難しさを思い知った',e:{sk:1}},
+  {st:['work'],f:s=>s.jc==='CH'||s.jc==='DK'||s.jc==='SE',t:'物価が高すぎて、外食はほとんどしなくなった',e:{},m:.02},
 ];
 
 /* ---------- 選択 ---------- */
 // 選択肢 {l:ラベル, d:説明, p:おまかせの重み, run:s=>結果の文}
+// 説明にのせる年収は、選んだあとの状態を実際に計算した値（calcSal）を使う
 function D(title, text, opts, kind){ return {decide:{title,text,opts,kind}}; }
-function L(t,k,e){ return {log:{t,k,e}}; }
+function L(t,k,e,y,a){ return {log:{t,k,e,y,a}}; }
+function pv(s, fn){ const t={...s, st:{...s.st}, flags:{...s.flags}, job:s.job?{...s.job}:null, path:[]}; fn(t); return calcSal(t); }
+function payNow(s){ return calcSal(s)*s.payF; }
+function payTo(s, fn){
+  const a=calcSal(s), b=pv(s,fn);
+  if(!b) return '給料なし';
+  return a>0 ? '年収 約'+yen(a)+' → 約'+yen(b) : '年収 約'+yen(b);
+}
 
 function dAfterUG(s){
   const msP = COUNTRIES[s.c].ms;
+  const co = pickCompany(s,s.c);
+  const job = t=>{t.deg='学部卒';setJob(t,co,s.c);};
+  const out = t=>{t.deg='学部卒';t.stage='left';};
   return D('卒業後の進路', s.uni+'を卒業する。どうする？', [
-    {l:'修士に進む', d:'研究室でもう 2 年。ロボット企業の研究開発職につきやすくなる', p:msP*100, run:s=>{s.stage='ms';s.sy=0;s.deg='学部卒';return '修士課程に進んだ';}},
-    {l:'ロボットの会社に就職する', d:'現場で手を動かしてロボットをつくる', p:(1-msP)*85, run:s=>{s.deg='学部卒';const co=pickCompany(s,s.c);setJob(s,co,s.c);return co[0]+'に就職した';}},
-    {l:'ロボットと関係ない会社に就職する', d:'ここで人生のルートが大きく変わる', p:(1-msP)*15, run:s=>{s.deg='学部卒';s.stage='left';s.path.push('ロボット以外の会社');return 'ロボットとは関係のない会社に就職した';}},
+    {l:'修士に進む', d:'研究室でもう 2 年（給料なし）。ロボット企業の研究開発職につきやすくなる', p:msP*100, run:s=>{s.stage='ms';s.sy=0;s.deg='学部卒';return '修士課程に進んだ';}},
+    {l:co[0]+'に就職する', d:'初任給 '+payTo(s,job)+'。現場で手を動かしてロボットをつくる', p:(1-msP)*85, run:s=>{job(s);return co[0]+'に就職した。初任給は年収 約'+yen(calcSal(s));}},
+    {l:'ロボットと関係ない会社に就職する', d:payTo(s,out)+'。ここで人生のルートが大きく変わる', p:(1-msP)*15, run:s=>{out(s);s.path.push('ロボット以外の会社');return 'ロボットとは関係のない会社に就職した';}},
   ]);
 }
 function dAfterMS(s){
   const phdP = s.tier===1?.25:.1;
   const abroad = abroadCountry(s);
+  const co = pickCompany(s,s.c);
+  const job = t=>{t.deg='修士';setJob(t,co,s.c);};
+  const phd = t=>{t.deg='修士';t.stage='phd';};
+  const phdA = t=>{t.deg='修士';t.stage='phd';t.jc=abroad;};
   return D('修士修了', '修士論文を出した。この先は？', [
-    {l:'ロボットの会社に就職する', d:'研究開発職として採用される', p:(1-phdP)*90, run:s=>{s.deg='修士';const co=pickCompany(s,s.c);setJob(s,co,s.c);return co[0]+'に就職した';}},
-    {l:'博士課程に進む', d:'3〜6 年かけて博士号をめざす。論文がすべて', p:phdP*100, run:s=>{s.deg='修士';s.stage='phd';s.sy=0;return '博士課程に進んだ。もう後もどりはできない';}},
-    {l:COUNTRIES[abroad].n+'の大学で博士をとる', d:'海外に出る。人脈と英語が鍛えられる', p:phdP*30, run:s=>{
-      s.deg='修士';s.stage='phd';s.sy=0;s.jc=abroad;
+    {l:co[0]+'に就職する', d:'初任給 '+payTo(s,job)+'。研究開発職として採用される', p:(1-phdP)*90, run:s=>{job(s);return co[0]+'に就職した。初任給は年収 約'+yen(calcSal(s));}},
+    {l:'博士課程に進む', d:'給付 '+payTo(s,phd)+'。3〜6 年かけて博士号をめざす', p:phdP*100, run:s=>{phd(s);s.sy=0;return '博士課程に進んだ。もう後もどりはできない';}},
+    {l:COUNTRIES[abroad].n+'の大学で博士をとる', d:'給付 '+payTo(s,phdA)+'。海外に出る。人脈と英語が鍛えられる', p:phdP*30, run:s=>{
+      phdA(s);s.sy=0;
       const u=wpick(UNIS[abroad].filter(x=>x[2]<=2),x=>x[1]); s.uni=uniName(u[0],s.year); s.tier=Math.min(s.tier,u[2]);
       s.path.push(s.uni+'（博士）'); s.st.ne=clamp(s.st.ne+6,0,100); return s.uni+'の博士課程に留学した';}},
   ]);
 }
 function dAfterPhD(s){
+  const co1 = pickCompany(s,s.jc,['big','lab','it']);
+  const co2 = pickCompany(s,s.jc,['start']);
+  const pd = t=>{t.deg='博士';t.stage='postdoc';};
+  const j1 = t=>{t.deg='博士';setJob(t,co1,s.jc);};
+  const j2 = t=>{t.deg='博士';setJob(t,co2,s.jc);};
   return D('博士号をとった！', '博士論文「'+pick(['不整地における脚ロボットの','柔らかいグリッパによる','人とロボットの協調における','視覚と触覚を使った','学習ベースの','少ないデータでの'])+pick(['歩行制御','把持計画','動作生成','自己位置推定','遠隔操作','物体操作'])+'に関する研究」が通った。', [
-    {l:'大学に残る（ポスドク）', d:'研究をつづける。いつか先生に。でも任期つき', p:35, run:s=>{s.deg='博士';s.stage='postdoc';s.sy=0;s.path.push('ポスドク');return 'ポスドクになった';}},
-    {l:'企業の研究所へ', d:'給料もロボットの予算も大きい', p:50, run:s=>{s.deg='博士';const co=pickCompany(s,s.jc,['big','lab','it']);setJob(s,co,s.jc);return co[0]+'の研究部門に入った';}},
-    {l:'スタートアップに飛びこむ', d:'給料は運しだい。ブームなら一攫千金', p:15+(s.year>=2023?20:0), run:s=>{s.deg='博士';const co=pickCompany(s,s.jc,['start']);setJob(s,co,s.jc);return co[0]+'に入った';}},
+    {l:'大学に残る（ポスドク）', d:payTo(s,pd)+'。研究をつづける。いつか先生に。でも任期つき', p:35, run:s=>{pd(s);s.sy=0;s.path.push('ポスドク');return 'ポスドクになった';}},
+    {l:co1[0]+'の研究部門へ', d:payTo(s,j1)+'。ロボットの予算も大きい', p:50, run:s=>{j1(s);return co1[0]+'の研究部門に入った';}},
+    {l:co2[0]+'に飛びこむ', d:payTo(s,j2)+'。スタートアップ。うまくいけば株で大きく増える', p:15+(s.year>=2023?20:0), run:s=>{j2(s);return co2[0]+'に入った';}},
   ], 'big');
 }
 function dOffer(s){
@@ -756,53 +1041,71 @@ function dOffer(s){
   const c = abroad ? abroadCountry(s) : s.jc;
   const boom = s.year>=2024 && s.year<=2034;
   const co = pickCompany(s, c, boom&&R()<.6?['start','it']:null, s.job?.n);
-  if(!co) return null;
-  return D('転職のさそい', (boom&&co[3]==='start'?'ヒューマノイドブームで、':'')+co[0]+(abroad?'（'+COUNTRIES[c].n+'）':'')+'から声がかかった。', [
-    {l:'うつる', d:abroad?'海外に引っ越す':'新しい職場でやりなおす', p:35, run:s=>{const old=s.job.n;setJob(s,co,c);s.exp=Math.max(0,s.exp-1);if(boom&&co[3]==='start'&&R()<.6)s.flags.humanoid=true;s.st.ne=clamp(s.st.ne+4,0,100);return old+'をやめて、'+co[0]+'に転職した';}},
-    {l:'いまの会社にのこる', d:'作りかけのロボットがある', p:65, run:s=>{s.st.ha=clamp(s.st.ha+1,0,100);return 'さそいをことわった。作りかけのロボットを完成させたい';}},
+  if(!co || co[0]===s.job?.n) return null;
+  const hot = boom && co[3]==='start';
+  const cur = calcSal(s);
+  const nat = pv(s, t=>setJob(t,co,c,1));
+  const raise = hot ? 1.2+R()*.4 : 1.05+R()*.25;
+  const pm = clamp(cur*raise/nat, 1, 2);
+  const move = t=>{setJob(t,co,c,pm); if(hot) t.flags.humanoid=true;};
+  const up = Math.round((pv(s,move)/cur-1)*100);
+  return D('転職のさそい', (hot?'ヒューマノイドブームで、':'')+co[0]+(abroad?'（'+COUNTRIES[c].n+'）':'')+'から声がかかった。年収は '+(up>=0?up+'% アップ':-up+'% ダウン')+'の提示。', [
+    {l:'うつる', d:payTo(s,move)+'。'+(abroad?'海外に引っ越す':'新しい職場でやりなおす'), p:35, run:s=>{const old=s.job.n;move(s);s.st.ne=clamp(s.st.ne+4,0,100);return old+'をやめて、'+co[0]+'に転職した。年収は 約'+yen(calcSal(s));}},
+    {l:'いまの会社にのこる', d:'年収 約'+yen(cur)+' のまま。作りかけのロボットがある', p:65, run:s=>{s.st.ha=clamp(s.st.ha+1,0,100);return 'さそいをことわった。作りかけのロボットを完成させたい';}},
   ]);
 }
 function dMgr(s){
+  const m = t=>{t.flags.mgr=true;}, x = t=>{t.flags.expert=true;t.st.sk=clamp(t.st.sk+5,0,100);};
   return D('昇進の話', '部長にならないか、と言われた。', [
-    {l:'マネージャーになる', d:'給料は上がる。ロボットにさわる時間は減る', p:55, run:s=>{s.flags.mgr=true;s.path.push('部長');return '部長になった。会議が 1 日 6 本になった';}},
-    {l:'技術一筋でいく', d:'エキスパート職として、手を動かしつづける', p:45, run:s=>{s.flags.expert=true;s.st.sk=clamp(s.st.sk+5,0,100);return '技術一筋でいくことにした';}},
+    {l:'マネージャーになる', d:payTo(s,m)+'。ロボットにさわる時間は減る', p:55, run:s=>{m(s);s.path.push('部長');return '部長になった。会議が 1 日 6 本になった';}},
+    {l:'技術一筋でいく', d:payTo(s,x)+'。エキスパート職として手を動かしつづける', p:45, run:s=>{x(s);return '技術一筋でいくことにした';}},
   ]);
 }
 function dFound(s){
+  const f = t=>{t.stage='startup';t.flags.exitRich=false;};
   return D('起業のチャンス', '仲間から「いっしょに会社を作らないか」とさそわれた。', [
-    {l:'起業する', d:'自分の会社でロボットをつくる。うまくいく保証はない', p:30, run:s=>{s.own=startupName();s.stage='startup';s.sy=0;s.flags.founded=true;s.path.push(s.own+'を創業');return s.own+'を創業した！';}},
-    {l:'やめておく', d:'安定もだいじ', p:70, run:s=>'起業の話はことわった。少しだけ夜ねむれなかった'},
+    {l:'起業する', d:payTo(s,f)+'（創業者の給料は安い）。うまくいけば株で大きく増える', p:30, run:s=>{f(s);s.own=startupName();s.sy=0;s.flags.founded=true;s.path.push(s.own+'を創業');return s.own+'を創業した！ 自分の給料は 約'+yen(calcSal(s));}},
+    {l:'やめておく', d:'年収 約'+yen(calcSal(s))+' のまま。安定もだいじ', p:70, run:s=>'起業の話はことわった。少しだけ夜ねむれなかった'},
   ], 'big');
 }
 function dBurnout(s){
+  const out = t=>{t.stage='left';};
   return D('もう限界かも', '燃えつきてしまった。どうする？', [
-    {l:'休職して休む', d:'半年休む。健康と幸福がもどる', p:55, run:s=>{s.flags.burnout=false;s.st.he=clamp(s.st.he+18,0,100);s.st.ha=clamp(s.st.ha+15,0,100);s.st.sk=clamp(s.st.sk-3,0,100);return '半年休んだ。ロボットのことを少しずつ好きにもどれた';}},
-    {l:'ロボットの仕事をやめる', d:'ほかの業界にうつる。人生はつづく', p:15, run:s=>{s.flags.burnout=false;s.stage='left';s.path.push(pick(['Web 業界','金融業界','実家の商売','IT コンサル']));return 'ロボットの仕事をやめた';}},
-    {l:'走りつづける', d:'このままがんばる', p:30, run:s=>{s.flags.burnout=false;s.st.he=clamp(s.st.he-6,0,100);return 'そのまま走りつづけた'; }},
+    {l:'休職して休む', d:'半年休む。今年の年収は半分（約'+yen(calcSal(s)*.5)+'）。健康と幸福がもどる', p:55, run:s=>{s.flags.burnout=false;s.payF=Math.min(s.payF,.5);s.st.he=clamp(s.st.he+18,0,100);s.st.ha=clamp(s.st.ha+15,0,100);s.st.sk=clamp(s.st.sk-3,0,100);return '半年休んだ。ロボットのことを少しずつ好きにもどれた';}},
+    {l:'ロボットの仕事をやめる', d:payTo(s,out)+'。ほかの業界にうつる', p:15, run:s=>{s.flags.burnout=false;out(s);s.path.push(pick(['Web 業界','金融業界','実家の商売','IT コンサル']));return 'ロボットの仕事をやめた';}},
+    {l:'走りつづける', d:'年収 約'+yen(calcSal(s))+' のまま。健康がさらにへる', p:30, run:s=>{s.flags.burnout=false;s.st.he=clamp(s.st.he-6,0,100);return 'そのまま走りつづけた'; }},
   ], 'bad');
 }
 function dReturn(s){
-  return D('母国に帰る？', COUNTRIES[s.jc].n+'で働いて '+(s.year-s.job.since)+' 年。'+cInfo(s.home).n+'の会社から声がかかった。', [
-    {l:'帰国する', d:'家族の近くで働く', p:40, run:s=>{if(!COUNTRIES[s.home]) return 'さそいの話は流れた';const co=pickCompany(s,s.home);setJob(s,co,s.home);return cInfo(s.home).n+'に帰り、'+co[0]+'に入った';}},
-    {l:'のこる', d:'ここが自分の場所だ', p:60, run:s=>'このまま'+COUNTRIES[s.jc].n+'でがんばることにした'},
+  const co = pickCompany(s,s.home);
+  const back = t=>setJob(t,co,s.home);
+  return D('母国に帰る？', COUNTRIES[s.jc].n+'で働いて '+(s.year-s.job.since)+' 年。'+cInfo(s.home).n+'の'+co[0]+'から声がかかった。', [
+    {l:'帰国する', d:payTo(s,back)+'。家族の近くで働く', p:40, run:s=>{back(s);return cInfo(s.home).n+'に帰り、'+co[0]+'に入った';}},
+    {l:'のこる', d:'年収 約'+yen(calcSal(s))+' のまま。ここが自分の場所だ', p:60, run:s=>'このまま'+COUNTRIES[s.jc].n+'でがんばることにした'},
   ]);
 }
 function dFaculty(s){
+  const co = pickCompany(s,s.jc,['big','lab','it','start']);
+  const fac = t=>{t.stage='prof';t.rank=0;}, job = t=>setJob(t,co,s.jc);
   return D('教員のポスト', s.uni+'で助教の公募に通った！', [
-    {l:'助教になる', d:'研究室をもてる。学生と研究費の世界へ', p:70, run:s=>{s.stage='prof';s.rank=0;s.sy=0;s.path.push(s.uni+' 助教');return '助教になった';}},
-    {l:'企業に行く', d:'安定と高い給料', p:30, run:s=>{const co=pickCompany(s,s.jc,['big','lab','it','start']);setJob(s,co,s.jc);return co[0]+'に入った';}},
+    {l:'助教になる', d:payTo(s,fac)+'。研究室をもてる。学生と研究費の世界へ', p:70, run:s=>{fac(s);s.sy=0;s.path.push(s.uni+' 助教');return '助教になった';}},
+    {l:co[0]+'に行く', d:payTo(s,job)+'。任期のない仕事', p:30, run:s=>{job(s);return co[0]+'に入った';}},
   ], 'big');
 }
 function dPostdocEnd(s){
+  const co = pickCompany(s,s.jc,['big','lab','it','start']);
+  const job = t=>setJob(t,co,s.jc);
   return D('ポスドク '+s.sy+' 年目', '任期が切れる。次のポストはまだない。', [
-    {l:'企業に行く', d:'博士の経験を生かす', p:65, run:s=>{const co=pickCompany(s,s.jc,['big','lab','it','start']);setJob(s,co,s.jc);return co[0]+'に入った';}},
-    {l:'もう 1 回ポスドク', d:'別の研究室で任期つき。チャンスを待つ', p:35, run:s=>{s.sy=0;s.st.ha=clamp(s.st.ha-4,0,100);return '別の研究室でポスドクをつづけることにした';}},
+    {l:co[0]+'に行く', d:payTo(s,job)+'。博士の経験を生かす', p:65, run:s=>{job(s);return co[0]+'に入った';}},
+    {l:'もう 1 回ポスドク', d:'年収 約'+yen(calcSal(s))+' のまま。別の研究室で任期つき', p:35, run:s=>{s.sy=0;s.st.ha=clamp(s.st.ha-4,0,100);return '別の研究室でポスドクをつづけることにした';}},
   ]);
 }
 function dStartupFail(s){
+  const co = pickCompany(s,s.jc,['big','it','start']);
+  const job = t=>setJob(t,co,s.jc);
   return D(s.own+'がたおれた', '資金がつきて、会社をたたむことになった。', [
-    {l:'もう一度起業する', d:'失敗は経験だ', p:30, run:s=>{s.own=startupName();s.sy=0;s.path.push(s.own+'を創業');s.st.sk=clamp(s.st.sk+3,0,100);return '懲りずに'+s.own+'を作った';}},
-    {l:'会社員にもどる', d:'経験を買ってくれる会社がある', p:70, run:s=>{const co=pickCompany(s,s.jc,['big','it','start']);setJob(s,co,s.jc);return co[0]+'に入った';}},
+    {l:'もう一度起業する', d:'年収 約'+yen(calcSal(s))+'（創業者の給料）。失敗は経験だ', p:30, run:s=>{s.own=startupName();s.sy=0;s.path.push(s.own+'を創業');s.st.sk=clamp(s.st.sk+3,0,100);return '懲りずに'+s.own+'を作った';}},
+    {l:co[0]+'に入る', d:payTo(s,job)+'。経験を買ってくれる', p:70, run:s=>{job(s);return co[0]+'に入った';}},
   ], 'bad');
 }
 
@@ -861,16 +1164,16 @@ function stageStep(s){
       if(s.sy>=1 && r < .16-good*.08) return dStartupFail(s);
       if(s.sy>=3 && r < .16-good*.08 + .03 + good*.03 + (s.year>=2024?.02:0)){
         const buyer = pickCompany(s,s.jc,['big','it']) || ['大手メーカー',0,0,'big',1];
-        s.flags.exit='acq'; const money=Math.round(baseSal(s.jc,s.year)*ri(5,60)); s.earn+=money;
-        setJob(s,buyer,s.jc);
-        return L(buyer[0]+'に会社を買収された！ 手元に '+usd(money)+'（約'+yen(money)+'）','big',{ha:12});
+        s.flags.exit='acq'; const money=Math.round(baseSal(s.jc,s.year)*ri(5,60));
+        setJob(s,buyer,s.jc,1.2);
+        return L(buyer[0]+'に会社を買収された！ 株を売って、資産が 約'+yen(money)+' ふえた。年収は 約'+yen(calcSal(s)),'big',{ha:12,as:money});
       }
       if(s.sy>=5 && r < .16-good*.08 + .03 + good*.03 + (s.year>=2024?.02:0) + .008 + good*.015){
-        s.flags.exit='ipo'; s.flags.exitRich=true; const money=Math.round(baseSal(s.jc,s.year)*ri(40,400)); s.earn+=money;
+        s.flags.exit='ipo'; s.flags.exitRich=true; const money=Math.round(baseSal(s.jc,s.year)*ri(40,400));
         s.path.push('上場');
-        return L(s.own+'が上場した！ 鐘を鳴らした。資産は '+usd(money)+'（約'+yen(money)+'）','big',{ha:15,ne:10});
+        return L(s.own+'が上場した！ 鐘を鳴らした。持ち株の価値で資産が 約'+yen(money)+' ふえた','big',{ha:15,ne:10,as:money});
       }
-      if(R()<.4) return L(pick([s.own+'が資金調達に成功した','顧客が 1 社ふえた',s.own+'の社員が '+ri(5,40)+' 人になった','事業をピボットした。3 回目だ','オフィスが少し広くなった']),'');
+      if(R()<.4) return L(pick([s.own+'が資金調達に成功した（会社のお金で、自分の給料は変わらない）','顧客が 1 社ふえた',s.own+'の社員が '+ri(5,40)+' 人になった','事業をピボットした。3 回目だ','オフィスが少し広くなった']),'');
       break;
     }
   }
@@ -902,7 +1205,10 @@ function randomEvent(s){
   if(ev.r) s.robots += typeof ev.r==='function'?ev.r():ev.r;
   if(ev.p) s.papers += ev.p;
   if(ev.pt) s.patents += ev.pt;
-  return L(typeof ev.t==='function'?ev.t(s):ev.t, ev.k||'', ev.e);
+  let e = ev.e;
+  if(ev.m){ e = {...(ev.e||{}), as: Math.round(baseSal(s.jc,s.year)*(typeof ev.m==='function'?ev.m(s):ev.m))}; }
+  if(ev.pay!==undefined) s.payF = Math.min(s.payF, ev.pay);
+  return L(typeof ev.t==='function'?ev.t(s):ev.t, ev.k||'', e);
 }
 const FOCUS = {
   make:{sk:2,he:-1}, paper:{sk:1,ne:1,ha:-1}, people:{ne:3,ha:1}, rest:{he:4,ha:3,sk:-1},
@@ -919,13 +1225,18 @@ function endYear(s){
   const rm = s.focus==='make'?1.6:1;
   const rRate = {ug:.4,ms:.7,phd:.8,postdoc:.8,prof:1.5,work:s.job&&['si','big'].includes(s.job.t)?ri(3,25):1.2,startup:2,left:.1}[s.stage]||0;
   s.robots += Math.floor(rRate*rm + R());
-  // 給料
-  s.sal = calcSal(s) * (0.95+R()*.1);
-  s.earn += s.sal; s.maxSal = Math.max(s.maxSal, s.sal);
-  if(['work','startup','prof','postdoc'].includes(s.stage)) s.exp++;
   // 体調
   let out = null;
-  if(s.st.he<=0){ s.st.he=30; s.st.ha=clamp(s.st.ha-10,0,100); out=L('体をこわして、半年休んだ','bad'); }
+  if(s.st.he<=0){ s.st.he=30; s.st.ha=clamp(s.st.ha-10,0,100); s.payF=Math.min(s.payF,.5); out=L('体をこわして、半年休んだ。今年の年収は半分になった','bad'); }
+  // 給料（画面に出している年収と同じ calcSal を使う）
+  const full = calcSal(s);
+  s.sal = full*s.payF;
+  s.earn += s.sal; s.maxSal = Math.max(s.maxSal, full);
+  if(['work','startup','prof','postdoc'].includes(s.stage)) s.exp++;
+  // 資産：貯金と運用
+  const crash = updateAssets(s);
+  if(crash && !out) out = L(crash,'bad');
+  s.payF = 1;
   const q = 0.0001*Math.exp(0.08*(s.age-18)) * (s.st.he<25?3: s.st.he<45?1.6:1);
   if(R()<q){
     s.ended=true; s.endWhy='death';
@@ -934,20 +1245,47 @@ function endYear(s){
   }
   s.snaps[s.age]=snap(s);
   s.year++; s.age++; s.sy++;
-  if(s.age>s.ret){ s.ended=true; s.endWhy='retire'; }
+  if(s.age>s.ret){
+    s.ended=true; s.endWhy='retire';
+    if(['work','prof'].includes(s.stage) && ['JP','KR','TW'].includes(s.jc)){
+      const sev = Math.round(baseSal(s.jc,s.year)*Math.min(30,s.year-(s.job?s.job.since:s.year))*.07);
+      if(sev>0){ s.assets += sev; return L('定年退職。退職金で資産が 約'+yen(sev)+' ふえた','big',null,s.year-1,s.age-1); }
+    }
+    return L('定年退職の日。'+pick(['花束をもらった','最後にロボットの電源を自分で切った','後輩たちがロボットで見送ってくれた']),'big',null,s.year-1,s.age-1);
+  }
   else if(s.stage==='left'){
     // ロボット業界の外でのくらしは、まとめて早送りする
     const yrs = s.ret - s.age + 1;
-    s.earn += baseSal(s.c, s.year)*.9*yrs;
+    for(let i=0;i<yrs;i++){ const pay=calcSal(s); s.earn+=pay; s.maxSal=Math.max(s.maxSal,pay); s.assets = s.assets>0 ? s.assets*1.04 + pay*.12 : s.assets*1.04 + pay*.12; s.year++; }
     const hobby = R()<.5 ? ri(1,12) : 0;
     s.robots += hobby;
-    s.age += yrs; s.year += yrs;
+    s.age += yrs;
     s.ended=true; s.endWhy='left';
     return L('その後 '+(s.ret)+' 歳まで、'+s.path[s.path.length-1]+'で働いた。'+(hobby?'週末には趣味でロボットを '+hobby+' 台つくった。':'ロボットのことは、ときどき思い出した。'),'big');
   }
   return out;
 }
 function snap(s){ return {lbl:stageLabel(s), f:cInfo(s.jc).f}; }
+// 株価の大きな動き（実際の年）
+const MARKET = {1973:-.17,1974:-.3,1987:-.05,1990:-.1,2000:-.1,2001:-.13,2002:-.22,2008:-.38,2011:-.02,2018:-.06,2020:.16,2022:-.19,2023:.24,2024:.23};
+function updateAssets(s){
+  const base = baseSal(s.jc, s.year);
+  let flow;
+  if(s.stage==='ug'||s.stage==='ms') flow = -base*(s.jc==='US'?.18:s.jc==='GB'?.12:.04); // 学費と生活費
+  else {
+    let rate = .09 - s.kids*.02 + (s.job&&s.job.t==='it'?.03:0) + (s.flags.mgr?.02:0);
+    flow = s.sal*rate;
+  }
+  const mk = MARKET[s.year]!==undefined ? MARKET[s.year] : .035 + (R()-.5)*.2;
+  let note = null;
+  if(s.assets>0){
+    const d = s.assets*.5*mk;
+    s.assets += d;
+    if(mk<-.15 && d < -base*.05) note = '株価が大きく下がり、資産が 約'+yen(-d)+' へった';
+  } else s.assets *= 1.04; // 借金の利息
+  s.assets += flow;
+  return note;
+}
 
 /* ---------- ひと息 ---------- */
 const ASKS = {
@@ -991,39 +1329,87 @@ function simulate(s){
     for(const step of buildYear(s)){
       const r = step(s);
       if(r && r.decide){ const o=autoChoose(r.decide); const t=o.run(s); s.moments.push({y:s.year,a:s.age,t}); }
-      else if(r && r.log && r.log.k==='big') s.moments.push({y:s.year,a:s.age,t:r.log.t});
+      else if(r && r.log && r.log.k==='big') s.moments.push({y:r.log.y||s.year,a:r.log.a||s.age,t:r.log.t});
       if(r && r.log && r.log.e) applyFx(s,r.log.e);
       if(s.ended) break;
     }
   }
   return s;
 }
-function applyFx(s,e){ for(const k in e){ let v=e[k]; if(k==='sk'&&v>0) v=Math.max(1,Math.round(v*(1-s.st.sk/140))); s.st[k]=clamp(s.st[k]+v,0,100); } }
+function applyFx(s,e){ for(const k in e){ let v=e[k]; if(k==='as'){ s.assets+=v; continue; } if(k==='sk'&&v>0) v=Math.max(1,Math.round(v*(1-s.st.sk/140))); s.st[k]=clamp(s.st[k]+v,0,100); } }
 
 /* =========================================================
    画面
    ========================================================= */
 const $ = id=>document.getElementById(id);
 let ERA='any', AUTO=false, SPEED=1, SKIP=false;
-let S=null, PEERS=[], Q=[], timer=null, waiting=false, lastSpeed=1;
+let S=null, PEERS=[], Q=[], timer=null, waiting=false, lastSpeed=1, curYear=null;
 
 function show(id){ ['title','birth','game','end'].forEach(x=>$(x).classList.toggle('hidden',x!==id)); window.scrollTo(0,0); }
 
 // ---- タイトル
 document.querySelectorAll('#eraSeg button').forEach(b=>b.onclick=()=>{
   ERA=b.dataset.era; document.querySelectorAll('#eraSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  renderCountryBars();
 });
 $('autoSw').onclick=()=>{ AUTO=!AUTO; $('autoSw').setAttribute('aria-pressed',AUTO); };
 $('startBtn').onclick=startBirth;
 
+// グラフの色（国ごとに固定。順位で色を変えない）
+const SERIES = [['CN','#3987e5'],['US','#d95926'],['JP','#199e70'],['DE','#c98500'],['KR','#d55181'],['IN','#9085e9']];
+const OTHER_COL = '#5b6785';
+const colOf = k=>(SERIES.find(x=>x[0]===k)||[0,OTHER_COL])[1];
+const ERA_TXT = {any:'どの時代でも（1965〜2026年入学）', now:'いま（2026年入学）', past:'むかし（1965〜2015年入学）'};
 function renderCountryBars(){
-  const y=2026, ks=Object.keys(COUNTRIES).sort((a,b)=>countryWeight(b,y)-countryWeight(a,y)).slice(0,10);
-  const tot=Object.keys(COUNTRIES).reduce((a,k)=>a+countryWeight(k,y),0);
-  const max=countryWeight(ks[0],y)/tot;
-  $('countryBars').innerHTML = ks.map(k=>{
-    const p=countryWeight(k,y)/tot;
-    return `<span>${COUNTRIES[k].f} ${COUNTRIES[k].n}</span><span><i style="width:${(p/max*100).toFixed(1)}%"></i></span><span>${(p*100).toFixed(0)}%</span>`;
-  }).join('');
+  const d = eraDist(ERA);
+  const ks = Object.keys(d).sort((a,b)=>d[b]-d[a]).slice(0,10);
+  const max = d[ks[0]];
+  $('distLbl').textContent = ERA_TXT[ERA]+'に入学したとき、その国になる確率（上位 10 か国）';
+  $('countryBars').innerHTML = ks.map(k=>`<span>${COUNTRIES[k].f} ${COUNTRIES[k].n}</span><span><i style="width:${(d[k]/max*100).toFixed(1)}%;background:${colOf(k)}"></i></span><span>${(d[k]*100).toFixed(d[k]<.1?1:0)}%</span>`).join('');
+  renderTrend();
+}
+function shareAt(y){
+  const t=Object.keys(COUNTRIES).reduce((a,k)=>a+countryWeight(k,y),0);
+  const r=SERIES.map(([k])=>countryWeight(k,y)/t);
+  r.push(1-r.reduce((a,b)=>a+b,0));
+  return r;
+}
+function renderTrend(){
+  const W=600,H=220,L=34,Rr=18,T=8,B=24, y0=1965,y1=2026;
+  const X=y=>L+(y-y0)/(y1-y0)*(W-L-Rr), Y=v=>T+(1-v)*(H-T-B);
+  const years=range(y0,y1), sh=years.map(shareAt);
+  const cols=[...SERIES.map(x=>x[1]),OTHER_COL];
+  let paths='';
+  for(let i=0;i<cols.length;i++){
+    const lo=sh.map(r=>r.slice(0,i).reduce((a,b)=>a+b,0)), hi=lo.map((v,j)=>v+sh[j][i]);
+    const top=years.map((y,j)=>`${X(y).toFixed(1)},${Y(hi[j]).toFixed(1)}`).join(' L');
+    const bot=years.map((y,j)=>`${X(y).toFixed(1)},${Y(lo[j]).toFixed(1)}`).reverse().join(' L');
+    paths+=`<path d="M${top} L${bot} Z" fill="${cols[i]}" stroke="#151f36" stroke-width="2" stroke-linejoin="round"/>`;
+  }
+  // 選んだ時代の外を暗くする
+  const er = ERA==='now'?[2026,2026]: ERA==='past'?[1965,2015]:[1965,2026];
+  let shade='';
+  if(er[0]>y0) shade+=`<rect x="${L}" y="${T}" width="${X(er[0])-L}" height="${H-T-B}" fill="#151f36" opacity=".72"/>`;
+  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${T}" width="${W-Rr-X(er[1])}" height="${H-T-B}" fill="#151f36" opacity=".72"/>`;
+  if(ERA==='now') shade=`<rect x="${L}" y="${T}" width="${X(2025.2)-L}" height="${H-T-B}" fill="#151f36" opacity=".72"/>`;
+  let axis='';
+  for(const v of [0,.25,.5,.75,1]) axis+=`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="#93a1c6">${v*100}%</text>`;
+  for(const y of [1965,1980,1995,2010,2026]) axis+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle" font-size="11" fill="#93a1c6">${y}</text>`;
+  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="1965年から2026年までの、ロボットエンジニアの国別の比率の変化">${paths}${shade}${axis}<line id="tx" y1="${T}" y2="${H-B}" stroke="#e9eefb" stroke-width="1" opacity="0"/><rect id="thit" x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
+  $('trendLegend').innerHTML = SERIES.map(([k,c])=>`<span><i style="background:${c}"></i>${COUNTRIES[k].n}</span>`).join('')+`<span><i style="background:${OTHER_COL}"></i>その他</span>`;
+  const svg=$('trend').querySelector('svg'), tip=$('ttip'), line=svg.querySelector('#tx');
+  const move=ev=>{
+    const r=svg.getBoundingClientRect(), px=(ev.clientX-r.left)/r.width*W;
+    const y=clamp(Math.round(y0+(px-L)/(W-L-Rr)*(y1-y0)),y0,y1), v=shareAt(y);
+    line.setAttribute('x1',X(y)); line.setAttribute('x2',X(y)); line.setAttribute('opacity','.8');
+    const names=[...SERIES.map(([k])=>COUNTRIES[k].n),'その他'];
+    tip.innerHTML=`<b>${y}年</b>`+names.map((n,i)=>`<span><i style="background:${cols[i]}"></i>${n} ${(v[i]*100).toFixed(0)}%</span>`).join('');
+    tip.classList.remove('hidden');
+    const tx=X(y)/W*r.width; tip.style.left=(tx>r.width/2? tx-tip.offsetWidth-8 : tx+8)+'px';
+  };
+  svg.addEventListener('pointermove',move);
+  svg.addEventListener('pointerdown',move);
+  svg.addEventListener('pointerleave',()=>{tip.classList.add('hidden');line.setAttribute('opacity','0');});
 }
 const HKEY='robolife.history.v1';
 function loadHist(){ try{ return JSON.parse(localStorage.getItem(HKEY))||[]; }catch(e){ return []; } }
@@ -1083,7 +1469,7 @@ function revealBirth(){
 // ---- プレイ
 function startLife(){
   show('game');
-  $('logInner').innerHTML='';
+  $('logInner').innerHTML=''; curYear=null;
   Q=[]; waiting=false; SKIP=false;
   setSpeed(1);
   setFocus(S.focus);
@@ -1102,7 +1488,7 @@ function setSpeed(v){
   document.querySelectorAll('#ctrl button[data-sp]').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.sp===v));
   if(v>0 && !waiting) schedule(150);
 }
-function yearMs(){ return 6500 / (SPEED||1); }
+function yearMs(){ return 13000 / (SPEED||1); }
 function schedule(ms){
   clearTimeout(timer);
   if(SPEED===0 || waiting) return;
@@ -1121,7 +1507,7 @@ function tick(){
   if(r.log){
     if(r.log.e) applyFx(S,r.log.e);
     addLine(r.log.t, r.log.k, r.log.e);
-    if(r.log.k==='big') S.moments.push({y:S.year,a:S.age,t:r.log.t});
+    if(r.log.k==='big') S.moments.push({y:r.log.y||S.year,a:r.log.a||S.age,t:r.log.t});
     renderHead();
     if(r.log.k==='year') renderPeers();
     if(S.ended && !Q.length) { Q=[]; schedule(delay); return; }
@@ -1133,15 +1519,18 @@ function tick(){
   if(r.ask){ showAsk(r.ask); return; }
   schedule(delay);
 }
-const FXN={sk:'技術',he:'健康',ha:'幸福',ne:'人脈'};
+const FXN={sk:'技術',he:'健康',ha:'幸福',ne:'人脈',as:'資産'};
 function addLine(t,k,e){
   const d=document.createElement('div');
   d.className='ln '+(k||'');
   let fx='';
-  if(e){ fx=Object.keys(e).filter(x=>e[x]).map(x=>FXN[x]+(e[x]>0?'+':'')+e[x]).join(' '); }
+  if(e){ fx=Object.keys(e).filter(x=>e[x]).map(x=>x==='as'?'資産'+(e[x]>0?'+':'')+yen(e[x]):FXN[x]+(e[x]>0?'+':'')+e[x]).join(' '); }
   d.innerHTML = esc(t)+(fx?`<span class="fx">${fx}</span>`:'');
-  const box=$('logInner'); box.appendChild(d);
-  const lg=$('log'); lg.scrollTop=lg.scrollHeight;
+  // 新しい年のかたまりを一番上に積む。年の中は上から順に読める
+  const box=$('logInner');
+  if(k==='year' || !curYear){ curYear=document.createElement('div'); curYear.className='yr'; box.prepend(curYear); }
+  curYear.appendChild(d);
+  const lg=$('log'); if(lg.scrollTop<120) lg.scrollTop=0;
 }
 function renderHead(){
   const s=S;
@@ -1153,7 +1542,8 @@ function renderHead(){
   const col={sk:'#38d6c4',he:'#7ee081',ha:'#ffb547',ne:'#b49cff'};
   $('hStats').innerHTML = ['sk','he','ha','ne'].map(k=>`<div class="stat"><span>${FXN[k]}</span><span class="bar"><i style="width:${s.st[k]}%;background:${col[k]}"></i></span><span class="v">${s.st[k]}</span></div>`).join('');
   const sal = calcSal(s);
-  $('hMoney').innerHTML = `年収 <b>${sal?usd(sal):'—'}</b>${sal?'（約'+yen(sal)+'）':''}　<span>🤖 <b>${s.robots.toLocaleString()}</b> 台</span>　<span>📄 <b>${s.papers}</b> 本</span>`;
+  const cut = s.payF<1 ? `<small>（今年は${s.payF?'半分':'ゼロ'}）</small>` : '';
+  $('hMoney').innerHTML = `<span>年収 <b>${sal?'約'+yen(sal):'なし'}</b>${cut}</span><span>資産 <b class="${s.assets<0?'neg':''}">約${yen(s.assets)}</b></span><span>🤖 <b>${s.robots.toLocaleString()}</b> 台</span><span>📄 <b>${s.papers}</b> 本</span>`;
 }
 function renderPeers(){
   const a=S.age;
@@ -1217,13 +1607,14 @@ function finish(){
       <h2>${COUNTRIES[s.c].f} ${esc(s.name)}</h2>
       <span class="ttl">${esc(title)}</span>
       <div class="path">${esc(s.path.join(' → '))}</div>
+      <div class="note">${s.partner?'結婚した':'独身'}・子ども ${s.kids} 人</div>
       <div class="nums">
         <div><b>${s.robots.toLocaleString()}</b><span>関わったロボット</span></div>
         <div><b>${s.papers}</b><span>論文</span></div>
         <div><b>${s.patents}</b><span>特許</span></div>
         <div><b>${s.maxSal?yen(s.maxSal):'—'}</b><span>最高年収</span></div>
-        <div><b>${yen(s.earn)}</b><span>生涯の収入</span></div>
-        <div><b>${s.kids}</b><span>子ども</span></div>
+        <div><b>${yen(s.earn)}</b><span>生涯の給料</span></div>
+        <div><b>${yen(s.assets)}</b><span>最後の資産</span></div>
       </div>
       <div class="note">おもなできごと</div>
       <ul class="moments">${mom.map(m=>`<li>${m.y}年（${m.a}歳）${esc(m.t)}</li>`).join('')}</ul>
@@ -1236,7 +1627,7 @@ function finish(){
     </div>
     <button class="big" id="againBtn">もう一度入学する</button>
     <p style="text-align:center"><button class="btn2" id="topBtn">タイトルへ</button></p>`;
-  const share = `#100万分の1 ロボットエンジニア人生\n${COUNTRIES[s.c].f}${s.name}（${s.entry}年 ${s.uni}入学）\n${s.path.slice(1).join('→')}\n称号「${title}」${why}\n🤖${s.robots}台 📄${s.papers}本`;
+  const share = `#100万分の1 ロボットエンジニア人生\n${COUNTRIES[s.c].f}${s.name}（${s.entry}年 ${s.uni}入学）\n${s.path.slice(1).join('→')}\n称号「${title}」${why}\n🤖${s.robots}台 📄${s.papers}本 💰資産 約${yen(s.assets)}`;
   $('copyBtn').onclick=()=>{ navigator.clipboard?.writeText(share+'\n'+location.href).then(()=>toast('コピーしました'),()=>toast('コピーできませんでした')); };
   $('xBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(share)+'&url='+encodeURIComponent(location.href);
   $('againBtn').onclick=startBirth;
