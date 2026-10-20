@@ -19,7 +19,30 @@
     --f-body:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",Meiryo,system-ui,sans-serif;
     --f-display:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
     --f-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --accent-ink:#FFFFFF;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#6250d6; --so:#aab5b1;
+    --sky:#cfe6ef;
+    color-scheme:light;
   }
+  /* ダークモード（原作と同じ色） */
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --paper:#0D1316; --card:#141D21; --card2:#1A2428;
+    --ink:#E1E9E6; --ink2:#A3B2AF; --ink3:#8A9A96;
+    --rule:#2A383D; --rule2:#1D282C;
+    --accent:#E2678A; --accent-ink:#0D1316; --accent-soft:#3A1C26;
+    --stamp:#4CC0AF; --stamp-soft:#12302D;
+    --gold:#D9AF59; --good:#5CC38B; --bad:#F07B6B;
+    --shadow:0 1px 0 rgba(0,0,0,.2), 0 8px 24px -12px rgba(0,0,0,.6);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#9085e9; --so:#4d5a5e;
+    --sky:#0f1a24; color-scheme:dark; } }
+  :root[data-theme="dark"]{ --paper:#0D1316; --card:#141D21; --card2:#1A2428;
+    --ink:#E1E9E6; --ink2:#A3B2AF; --ink3:#8A9A96;
+    --rule:#2A383D; --rule2:#1D282C;
+    --accent:#E2678A; --accent-ink:#0D1316; --accent-soft:#3A1C26;
+    --stamp:#4CC0AF; --stamp-soft:#12302D;
+    --gold:#D9AF59; --good:#5CC38B; --bad:#F07B6B;
+    --shadow:0 1px 0 rgba(0,0,0,.2), 0 8px 24px -12px rgba(0,0,0,.6);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#9085e9; --so:#4d5a5e;
+    --sky:#0f1a24; color-scheme:dark; }
   *{box-sizing:border-box;}
   html,body{margin:0;}
   body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;}
@@ -37,25 +60,27 @@
   .note{color:var(--ink3);font-size:13px;line-height:1.7;}
   .label{color:var(--ink3);font-size:12px;font-weight:700;}
   hr.rule{border:none;border-top:1px dashed var(--rule);margin:14px 0;}
-  .cta{display:block;width:100%;border:none;border-radius:6px;background:var(--accent);color:#fff;font-weight:800;font-size:18px;padding:14px;box-shadow:var(--shadow);}
+  .cta{display:block;width:100%;border:none;border-radius:6px;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:18px;padding:14px;box-shadow:var(--shadow);}
   .cta:active{filter:brightness(.92);}
   .btn{border:1px solid var(--rule);background:var(--card);border-radius:6px;padding:10px 16px;font-size:14px;color:var(--ink);}
   .seg{display:grid;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--card);}
   .seg button{border:none;border-right:1px solid var(--rule);background:transparent;padding:11px 6px;font-size:14px;color:var(--ink2);}
   .seg button:last-child{border-right:none;}
-  .seg button[aria-pressed="true"]{background:var(--ink);color:#fff;font-weight:700;}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper);font-weight:700;}
   .seg.c2{grid-template-columns:1fr 1fr;} .seg.c3{grid-template-columns:1fr 1fr 1fr;} .seg.c4{grid-template-columns:repeat(4,1fr);}
   .field{margin:18px 0 0;}
   .field > .label{display:block;margin-bottom:6px;font-size:13px;}
   .field .note{margin-top:6px;}
-  .stickybar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:rgba(247,250,248,.96);border-top:1px solid var(--rule2);padding:10px 16px calc(10px + env(safe-area-inset-bottom));}
+  .stickybar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--card);border-top:1px solid var(--rule2);padding:10px 16px calc(10px + env(safe-area-inset-bottom));}
   .stickybar .in{width:min(640px,100%);margin:0 auto;display:flex;gap:10px;}
   .stickybar .btn{flex:0 0 auto;}
   .stickybar .cta{flex:1;}
 
   /* タイトル */
   .hero{margin:-16px -16px 0;}
+  .hero{position:relative;}
   .hero img{width:100%;height:auto;display:block;}
+  .themeBtn{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--rule);background:var(--card);font-size:18px;line-height:1;color:var(--ink);box-shadow:var(--shadow);}
   .meta{color:var(--stamp);font-family:var(--f-mono);font-size:12px;margin:14px 0 2px;}
   .logo{font-family:var(--f-display);font-weight:800;font-size:clamp(46px,14vw,72px);line-height:1.1;margin:0 0 14px;letter-spacing:-.01em;}
   .logo em{font-style:normal;color:var(--accent);}
@@ -63,13 +88,13 @@
   .counter{margin:0 0 12px;}
   .counter b{display:block;font-family:var(--f-display);font-size:38px;line-height:1.1;}
   .counter span{color:var(--ink3);font-size:13px;}
-  .pill{display:inline-block;background:var(--stamp);color:#fff;border-radius:999px;padding:1px 10px;font-size:13px;font-weight:700;margin-right:6px;}
+  .pill{display:inline-block;background:var(--stamp);color:var(--paper);border-radius:999px;padding:1px 10px;font-size:13px;font-weight:700;margin-right:6px;}
   .theme{font-size:14px;color:var(--ink2);margin:8px 0 18px;}
   .theme b{color:var(--ink);}
   .bars{display:grid;grid-template-columns:7.5em 1fr 3.6em;gap:8px 10px;font-size:14px;align-items:center;margin-top:12px;}
   .bars .bt{height:10px;background:var(--rule2);border-radius:2px;overflow:hidden;}
   .bars .bt i{display:block;height:100%;background:var(--stamp);transition:width .35s;}
-  .bars .bt i.o{background:#7fb3ae;}
+  .bars .bt i.o{background:var(--stamp);opacity:.5;}
   .bars .pc{text-align:right;font-family:var(--f-mono);font-size:13px;}
   .trend{position:relative;margin-top:10px;}
   .trend svg{display:block;width:100%;height:auto;touch-action:pan-y;}
@@ -89,7 +114,7 @@
 
   /* 入学届 */
   .doc{background:var(--card);border:1px solid var(--rule);border-radius:6px;box-shadow:var(--shadow);overflow:hidden;margin:16px 0 14px;}
-  .doc .hd{background:var(--accent);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;}
+  .doc .hd{background:var(--accent);color:var(--accent-ink);display:flex;justify-content:space-between;align-items:center;padding:14px 22px;}
   .doc .hd b{font-size:20px;}
   .doc .hd span{font-family:var(--f-mono);font-size:12px;opacity:.9;}
   .doc .bd{padding:18px 22px 20px;}
@@ -107,7 +132,7 @@
   .rtgrid button:nth-child(4n){border-right:none;}
   .rtgrid button:nth-child(n+5){border-bottom:none;}
   .rtgrid button .px{width:40px;height:40px;}
-  .rtgrid button[aria-pressed="true"]{background:var(--ink);color:#fff;font-weight:700;}
+  .rtgrid button[aria-pressed="true"]{background:var(--ink);color:var(--paper);font-weight:700;}
   .rtgrid button:disabled{opacity:.35;}
   .rtgrid small{font-family:var(--f-mono);font-size:10px;opacity:.85;}
   .rtdesc{margin-top:8px;font-size:14px;color:var(--ink2);}
@@ -132,7 +157,8 @@
   .prog{height:4px;background:var(--rule2);border-radius:2px;margin:6px 0 8px;overflow:hidden;}
   .prog i{display:block;height:100%;background:var(--accent);transition:width .4s;}
   .ctrls{display:flex;gap:6px;}
-  .ctrls .seg{flex:1;grid-template-columns:repeat(5,1fr);}
+  .ctrls .seg{flex:1 1 0;min-width:0;grid-template-columns:repeat(5,minmax(0,1fr));}
+  .ctrls > .btn{flex:none;min-width:40px;text-align:center;}
   .ctrls .seg button{padding:7px 0;font-size:13px;}
   .ctrls .btn{padding:6px 10px;font-size:13px;}
   .scene{padding:0;overflow:hidden;}
@@ -165,9 +191,9 @@
   .rec .fx{font-family:var(--f-mono);font-size:11px;color:var(--ink3);margin-left:6px;white-space:nowrap;font-weight:400;}
   @keyframes pop{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
   .idc{padding:0;overflow:hidden;}
-  .idc .hd{background:var(--accent);color:#fff;font-family:var(--f-mono);font-size:13px;display:flex;justify-content:space-between;padding:8px 18px;}
+  .idc .hd{background:var(--accent);color:var(--accent-ink);font-family:var(--f-mono);font-size:13px;display:flex;justify-content:space-between;padding:8px 18px;}
   .idc .bd{display:flex;gap:16px;padding:16px 18px 10px;}
-  .idc .ph{width:72px;height:90px;background:#cfe6ef;border:1px solid var(--rule2);border-radius:3px;flex:none;}
+  .idc .ph{width:72px;height:90px;background:var(--sky);border:1px solid var(--rule2);border-radius:3px;flex:none;}
   .idc .nm{font-family:var(--f-display);font-weight:800;font-size:22px;line-height:1.3;margin-bottom:4px;}
   .idc dl{display:grid;grid-template-columns:auto 1fr;gap:1px 14px;margin:0;font-size:14px;}
   .idc dt{color:var(--ink3);} .idc dd{margin:0;}
@@ -192,7 +218,7 @@
   .opt span.d{display:block;font-size:13px;color:var(--ink2);margin-top:2px;}
   .opt:hover,.opt:focus-visible{border-color:var(--accent);outline:none;}
   .sheet .auto{display:block;margin:6px auto 0;}
-  .sheet textarea{width:100%;min-height:72px;border-radius:4px;border:1px solid var(--rule);background:#fff;color:var(--ink);padding:10px;font:inherit;font-size:16px;}
+  .sheet textarea{width:100%;min-height:72px;border-radius:4px;border:1px solid var(--rule);background:var(--card2);color:var(--ink);padding:10px;font:inherit;font-size:16px;}
   .sheet .act{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
 
   /* おわり */
@@ -210,7 +236,7 @@
   .answers i{color:var(--ink3);font-style:normal;font-size:12px;}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
   .btnrow > *{flex:1 1 140px;text-align:center;text-decoration:none;}
-  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;z-index:20;}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:999px;font-size:13px;z-index:20;}
   footer{color:var(--ink3);font-size:12px;text-align:center;margin-top:20px;}
 </style>
 
@@ -219,7 +245,7 @@
 
 <!-- ===== タイトル ===== -->
 <section id="title" class="wrap">
-  <div class="hero"><img id="titleScene" class="px" alt="キャンパスにならぶ 8 種類のロボットのピクセルアート"></div>
+  <div class="hero"><img id="titleScene" class="px" alt="キャンパスにならぶ 8 種類のロボットのピクセルアート"><button class="themeBtn" id="themeBtn" aria-label="明るい色と暗い色を切りかえる"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg></button></div>
   <p class="meta">v1.3 · 無料のロボットエンジニア人生シミュレーション · 24か国の推計にもとづく</p>
   <h1 class="logo">100万分の<em>1</em></h1>
   <p class="lead">世界には、およそ100万人のロボットエンジニアがいます。そのひとりとして大学に入学し、たった一度のエンジニア人生を定年まで生きてみます。どの国の、どの大学に入るかは選べません。</p>
@@ -275,7 +301,7 @@
       <li>入学したら、つくるロボットの種類（ヒューマノイド・犬型・アームなど 8 種）をえらぶ</li>
       <li>毎年の「重点」をえらぶと、技術・健康・幸福・人脈が変わる</li>
       <li>進学・就職・転職・起業などの大きな決断は、自分でえらぶ。選んだあとの年収も見える</li>
-      <li>年収・資産・作ったロボット・売れたロボットが毎年変わる</li>
+      <li>年収・資産・携わったロボットの機種数・売れたロボットの台数が毎年変わる</li>
       <li>同じ年に入学した 4 人も、同じ統計で同時に人生を歩む</li>
     </ul>
     <p class="note" style="margin:10px 0 0">元ネタは人生シミュレーター『<a href="https://1in8b.life/ja/" target="_blank" rel="noopener">80億分の1</a>』。この作品はそのパロディで、数字は公開データからのざっくり推計、できごとは業界あるあるの創作です。</p>
@@ -301,6 +327,7 @@
       <button class="btn" id="pauseBtn" aria-label="一時停止">❚❚</button>
       <div class="seg" id="spSeg"><button data-sp="1" aria-pressed="true">1×</button><button data-sp="2">2×</button><button data-sp="4">4×</button><button data-sp="8">8×</button><button data-sp="16">16×</button></div>
       <button class="btn" id="skipBtn">次へ »</button>
+      <button class="btn" id="themeBtn2" aria-label="明るい色と暗い色を切りかえる"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg></button>
     </div>
   </div></div>
   <div class="wrap" style="padding-bottom:40px">
@@ -1442,7 +1469,7 @@ function randomEvent(s){
   s.recent.push(ev); if(s.recent.length>14) s.recent.shift();
   if(ev.once) s.flags['o_'+ev.once]=true;
   if(ev.do) ev.do(s);
-  if(ev.r) s.robots += typeof ev.r==='function'?ev.r():ev.r;
+  if(ev.r && R()<.2) s.robots++; // 新しい機種にかかわるできごと
   if(ev.p) s.papers += ev.p;
   if(ev.pt) s.patents += ev.pt;
   let e = ev.e;
@@ -1462,9 +1489,10 @@ function endYear(s){
   const pm = s.focus==='paper'?1.7:1;
   const pRate = {ms:.4,phd:1.1,postdoc:1.8,prof:1.5+s.rank*1.5,work:s.job&&s.job.t==='lab'?.6:.06,startup:.05}[s.stage]||0;
   s.papers += Math.floor(pRate*pm*(0.5+s.st.sk/100) + R());
-  const rm = s.focus==='make'?1.6:1;
-  const rRate = {ug:.4,ms:.7,phd:.8,postdoc:.8,prof:1.5,work:s.job&&['si','big'].includes(s.job.t)?ri(3,25):1.2,startup:2,left:.1}[s.stage]||0;
-  s.robots += Math.floor(rRate*rm + R());
+  // 携わったロボットの機種数（新しい機種の開発に加わるのは数年に一度）
+  const rm = s.focus==='make'?1.5:1;
+  const rRate = {ug:.08,ms:.18,phd:.2,postdoc:.2,prof:.2,work:({big:.11,si:.16,lab:.16,it:.11,start:.2})[s.job&&s.job.t]||.12,startup:.2}[s.stage]||0;
+  if(R()<rRate*rm) s.robots++;
   s.sold += yearSales(s);
   // 体調
   let out = null;
@@ -1498,11 +1526,11 @@ function endYear(s){
     // ロボット業界の外でのくらしは、まとめて早送りする
     const yrs = s.ret - s.age + 1;
     for(let i=0;i<yrs;i++){ const pay=calcSal(s); s.earn+=pay; s.maxSal=Math.max(s.maxSal,pay); s.assets = s.assets>0 ? s.assets*1.04 + pay*.12 : s.assets*1.04 + pay*.12; s.year++; }
-    const hobby = R()<.5 ? ri(1,12) : 0;
+    const hobby = R()<.5 ? ri(1,3) : 0;
     s.robots += hobby;
     s.age += yrs;
     s.ended=true; s.endWhy='left';
-    return L('その後 '+(s.ret)+' 歳まで、'+s.path[s.path.length-1]+'で働いた。'+(hobby?'週末には趣味でロボットを '+hobby+' 台つくった。':'ロボットのことは、ときどき思い出した。'),'big');
+    return L('その後 '+(s.ret)+' 歳まで、'+s.path[s.path.length-1]+'で働いた。'+(hobby?'週末には趣味のロボットを '+hobby+' 機種つくった。':'ロボットのことは、ときどき思い出した。'),'big');
   }
   return out;
 }
@@ -1544,11 +1572,11 @@ function lifeTitle(s){
   if(s.stage==='prof' && s.rank===2 && s.papers>=120) return 'ロボット学の世界的権威';
   if(s.stage==='prof' && s.rank===2) return 'ロボット学の教授';
   if(s.flags.exit==='acq') return '会社を売ったエンジニア';
-  if(s.stage==='left') return s.robots>5?'ロボットを忘れられない元エンジニア':'ロボットの道を降りた人';
+  if(s.stage==='left') return s.robots>3?'ロボットを忘れられない元エンジニア':'ロボットの道を降りた人';
   if(s.stage==='postdoc') return '永遠のポスドク';
   if(s.stage==='startup') return '最後まで起業家';
   if(s.sold>=100000) return '10万台のロボットを世に出した人';
-  if(s.robots>=800) return '工場をロボットでうめた人';
+  if(s.robots>=15) return '15機種以上に携わった名エンジニア';
   if(s.papers>=40) return '論文を書きまくる企業研究者';
   if(s.flags.mgr) return 'ロボット部門の部長';
   if(s.flags.expert && s.st.sk>=90) return '現場のレジェンド';
@@ -1596,10 +1624,10 @@ function pxURL(key, w, h, draw){
   return PXC[key]=c.toDataURL();
 }
 function pxImg(src, cls, alt){ return `<img class="px ${cls}" src="${src}" alt="${esc(alt||'')}">`; }
-const K='#0b0f1a';
+const K='#22262e';
 const SKIN=[['#f6d5b8','#e2b895'],['#e9b892','#cf9a73'],['#c98d64','#ad7450'],['#94603e','#7a4c2f'],['#5e3b25','#4a2d1b']];
 const HAIR=['#1d1a1e','#5a3a22','#c9963a','#8a3b1e'];
-const SHIRT=['#3b82c4','#d1495b','#2a9d8f','#e9a23b','#7b5ea7','#4a5a6a'];
+const SHIRT=['#5b7fa8','#a85a66','#4a8a7e','#c2a05a','#7d6c9a','#5c6670'];
 // 人：16×20。年齢で髪が白くなり、服は立場で変わる
 function personURL(look, age, outfit){ return pxURL(personKey(look,age,outfit),16,20,P=>drawPerson(P,look,age,outfit)); }
 function personKey(look, age, outfit){ return ['p',look.skin,look.hair,look.style,look.glasses,look.beard,look.bald,look.shirt,age>=58?2:age>=45?1:0,age>=30?1:0,outfit].join('_'); }
@@ -1612,7 +1640,7 @@ function drawPerson(P, look, age, outfit){ {
     P(2,15,12,5,K); P(3,16,10,4,shirt); P(3,15,10,1,shirt);
     if(outfit==='hoodie'){ P(5,14,6,1,shirt); P(6,16,1,2,'#f2f2f2'); P(9,16,1,2,'#f2f2f2'); }
     if(outfit==='suit'){ P(7,15,2,1,'#f2f2f2'); P(7,16,2,3,'#c0392b'); }
-    if(outfit==='lab'){ P(6,15,1,4,'#b8c2d0'); P(9,15,1,4,'#b8c2d0'); P(10,17,2,1,'#5b8bd9'); }
+    if(outfit==='lab'){ P(6,15,1,4,'#b8c2d0'); P(9,15,1,4,'#b8c2d0'); P(10,17,2,1,'#5d7fae'); }
     if(outfit==='uniform'){ P(4,17,2,1,'#f2f2f2'); P(3,15,10,1,'#6a7d96'); }
     if(outfit==='tee'){ P(7,17,2,2,'#38d6c4'); }
     // 首と顔
@@ -1641,40 +1669,40 @@ function drawPerson(P, look, age, outfit){ {
   }
 }
 // 建物：24×20
-function hashCol(name){ let h=0; for(const ch of String(name)) h=(h*31+ch.charCodeAt(0))>>>0; return ['#e94f37','#3b82c4','#2a9d8f','#e9a23b','#7b5ea7','#d1495b','#38d6c4','#f08a24'][h%8]; }
+function hashCol(name){ let h=0; for(const ch of String(name)) h=(h*31+ch.charCodeAt(0))>>>0; return ['#b5583f','#4f78a8','#3f8a7c','#c09a45','#7a6a9e','#a8566a','#5a9e94','#c07a42'][h%8]; }
 function buildingURL(kind, tint){ tint=tint||'#38d6c4'; return pxURL('b_'+kind+'_'+tint,24,20,P=>{ P(0,18,24,2,'#c7d2ce'); drawBuilding(P,kind,tint); }); }
 function drawBuilding(P, kind, tint){ {
     if(kind==='uni1'){ // ドームのある本館
       P(10,0,1,3,K); P(11,0,3,1,tint);
-      P(8,3,7,1,K); P(7,4,9,3,'#7aa0c4'); P(8,4,3,1,'#a7c4e0');
+      P(8,3,7,1,K); P(7,4,9,3,'#86a3bd'); P(8,4,3,1,'#b3c7d8');
       P(5,7,13,1,K); P(4,8,15,1,'#e6dfcc'); P(3,9,17,1,K);
       P(3,10,17,7,'#d8d0bb'); for(const x of [5,8,11,14,17]) P(x,10,1,7,'#a59d88');
       P(2,17,19,1,'#bdb39c');
     } else if(kind==='uni2'){ // 時計台のあるレンガ校舎
       P(10,0,4,1,K); P(10,1,4,7,'#a65b3b'); P(11,3,2,2,'#f2f2f2'); P(11,3,1,1,K);
       P(2,7,20,11,'#a65b3b'); P(2,7,20,1,'#7d4029');
-      for(let y=9;y<17;y+=3) for(let x=4;x<21;x+=3) P(x,y,2,2,'#f3d28b');
+      for(let y=9;y<17;y+=3) for(let x=4;x<21;x+=3) P(x,y,2,2,'#e2cb93');
       P(10,14,4,4,'#4a2a1c');
     } else if(kind==='uni3'){ // ふつうの校舎
       P(3,6,18,12,'#c7ccd6'); P(3,6,18,1,'#9aa3b2');
-      for(let y=8;y<16;y+=3) for(let x=5;x<20;x+=3) P(x,y,2,2,'#6fa8dc');
+      for(let y=8;y<16;y+=3) for(let x=5;x<20;x+=3) P(x,y,2,2,'#86a7c4');
       P(10,14,4,4,'#4b5a75'); P(11,4,1,2,K); P(12,4,2,1,tint);
     } else if(kind==='factory'){ // 大手メーカーの工場
       P(18,1,3,8,'#6b5d55'); P(19,0,2,1,'#cfd6e0'); P(17,0,1,1,'#cfd6e0');
       for(let i=0;i<4;i++){ const x=1+i*4; for(let k=0;k<4;k++) P(x+k,5+(3-k),1,k+1,'#9aa3b2'); P(x+3,5,1,4,'#6c7586'); }
-      P(1,9,22,9,'#8b94a6'); P(3,11,18,2,'#ffd66b'); P(10,14,4,4,'#3b4252'); P(1,9,22,1,tint);
+      P(1,9,22,9,'#8b94a6'); P(3,11,18,2,'#dcc070'); P(10,14,4,4,'#3b4252'); P(1,9,22,1,tint);
     } else if(kind==='tower'){ // 巨大 IT のビル
-      P(6,1,12,17,'#4f7cc4'); for(let y=2;y<17;y+=2) P(7,y,10,1,'#9ec3ff'); P(11,0,2,1,K);
+      P(6,1,12,17,'#5a7ba6'); for(let y=2;y<17;y+=2) P(7,y,10,1,'#a9c2d9'); P(11,0,2,1,K);
       P(1,10,5,8,'#5d6b85'); for(let y=11;y<17;y+=2) P(2,y,3,1,'#c9d6ea'); P(15,3,2,2,tint);
     } else if(kind==='garage' || kind==='own'){ // スタートアップのガレージ
-      for(let k=0;k<6;k++) P(6-k+3,3+k,6+k*2,1, kind==='own'?'#e94f37':'#5b6785');
+      for(let k=0;k<6;k++) P(6-k+3,3+k,6+k*2,1, kind==='own'?'#b5583f':'#5b6785');
       P(3,9,18,9,'#e3d3b4'); P(6,11,12,7,'#8a93a3'); for(let y=12;y<18;y+=2) P(6,y,12,1,'#6c7586');
-      P(19,10,1,2,'#ffd66b');
+      P(19,10,1,2,'#dcc070');
       if(kind==='own'){ P(11,0,1,4,K); P(12,0,4,2,tint); }
     } else if(kind==='lab'){ // 研究所
       P(14,3,7,6,'#cfd8e3'); P(15,2,5,1,'#cfd8e3'); P(17,3,1,4,'#5b6785');
       P(4,5,1,4,K); P(2,3,5,2,'#cfd8e3');
-      P(2,9,20,9,'#eef2f7'); P(2,9,20,1,'#b8c2d0'); for(let x=4;x<20;x+=4) P(x,11,2,3,'#6fa8dc'); P(10,14,4,4,'#4b5a75'); P(19,15,2,1,tint);
+      P(2,9,20,9,'#eef2f7'); P(2,9,20,1,'#b8c2d0'); for(let x=4;x<20;x+=4) P(x,11,2,3,'#86a7c4'); P(10,14,4,4,'#4b5a75'); P(19,15,2,1,tint);
     } else if(kind==='workshop'){ // インテグレーターの工房
       P(2,7,20,11,'#9aa3b2'); P(2,6,20,1,'#6c7586');
       P(4,9,5,5,tint); P(5,8,3,1,tint); P(5,14,3,1,tint); P(3,10,1,3,tint); P(9,10,1,3,tint); P(6,11,1,1,'#9aa3b2');
@@ -1687,31 +1715,31 @@ function drawBuilding(P, kind, tint){ {
 // ロボット：16×16
 function robotURL(kind){ return pxURL('r_'+kind,16,16,P=>drawRobot(P,kind)); }
 function drawRobot(P, kind){ {
-    const A='#38d6c4', M='#c9d1de', D='#5f6b80';
+    const A='#5ec4b4', M='#c4cbd3', D='#68737f';
     if(kind==='humanoid'){
       P(5,0,6,5,K); P(6,1,4,3,M); P(6,2,4,1,A);
       P(7,5,2,1,D); P(4,6,8,5,K); P(5,6,6,5,M); P(7,7,2,2,A);
       P(2,6,2,5,D); P(12,6,2,5,D); P(5,11,2,4,D); P(9,11,2,4,D); P(4,15,3,1,K); P(9,15,3,1,K);
     } else if(kind==='dog'){
-      P(2,5,10,5,K); P(3,6,8,3,'#e0b84a'); P(11,3,4,4,K); P(12,4,2,2,'#3a3f4b'); P(14,4,1,1,A);
+      P(2,5,10,5,K); P(3,6,8,3,'#c9a85a'); P(11,3,4,4,K); P(12,4,2,2,'#3b4048'); P(14,4,1,1,A);
       for(const x of [3,5,9,11]){ P(x,10,1,2,D); P(x+(x<7?-1:1),12,1,2,D); P(x+(x<7?-1:1),14,2,1,K); }
       P(1,5,1,2,D);
     } else if(kind==='wheel'){
       P(6,2,4,3,K); P(7,3,2,1,A);
-      P(2,5,12,7,K); P(3,6,10,5,'#5b8bd9'); P(3,9,10,1,'#ffd66b');
+      P(2,5,12,7,K); P(3,6,10,5,'#5d7fae'); P(3,9,10,1,'#dcc070');
       P(3,12,3,3,K); P(10,12,3,3,K); P(4,13,1,1,M); P(11,13,1,1,M);
     } else if(kind==='arm'){
       P(3,13,9,3,K); P(5,11,5,2,D);
-      P(6,5,3,6,'#f08a24'); P(5,4,5,2,K); P(8,2,6,3,'#f08a24'); P(8,2,6,1,'#c96b12');
+      P(6,5,3,6,'#cf8a4f'); P(5,4,5,2,K); P(8,2,6,3,'#cf8a4f'); P(8,2,6,1,'#a8693a');
       P(14,0,1,2,K); P(14,5,1,2,K); P(13,1,1,5,K); P(6,7,1,1,A);
     } else if(kind==='drone'){
       P(6,6,4,3,K); P(7,7,2,1,A); P(2,7,12,1,D);
       P(0,5,5,1,M); P(11,5,5,1,M); P(2,6,1,1,D); P(13,6,1,1,D);
-      P(6,9,1,2,D); P(9,9,1,2,D); P(5,11,2,1,K); P(9,11,2,1,K); P(7,9,2,1,'#e94f37');
+      P(6,9,1,2,D); P(9,9,1,2,D); P(5,11,2,1,K); P(9,11,2,1,K); P(7,9,2,1,'#b5583f');
     } else if(kind==='car'){
       P(7,2,2,2,K); P(7,2,2,1,A);
-      P(4,4,8,4,K); P(5,5,6,3,'#9ec3ff');
-      P(1,8,14,5,K); P(2,8,12,4,'#e8ecf2'); P(14,9,1,1,'#ffd66b'); P(1,9,1,1,'#e94f37');
+      P(4,4,8,4,K); P(5,5,6,3,'#a9c2d9');
+      P(1,8,14,5,K); P(2,8,12,4,'#e8ecf2'); P(14,9,1,1,'#dcc070'); P(1,9,1,1,'#b5583f');
       P(3,12,3,3,K); P(10,12,3,3,K);
     } else if(kind==='vacuum'){
       P(3,8,10,1,K); P(2,9,12,4,K); P(3,9,10,3,'#2f3440'); P(4,9,8,1,'#4c5566'); P(7,10,2,1,A);
@@ -1732,20 +1760,25 @@ function iconURL(key, name){
 function placeURL(s){ return iconURL(placeIcon(s), s.stage==='startup'?s.own:(s.job?s.job.n:s.uni)); }
 
 const offP=(P,ox,oy)=>(x,y,w,h,c)=>P(x+ox,y+oy,w,h,c);
+// 場面の色（原作のようなくすんだ色。暗い色の画面では夜になる）
+const DAY = {sky:'#cfe3e8',sky2:'#bcd8e2',cloud:'#f4f7f6',hill:'#a9c8b0',grass:'#7fa86a',ground:'#8d7353',dot:'#715b40',trunk:'#6e5139',leaf:'#5f9468'};
+const NIGHT = {sky:'#1d2a36',sky2:'#16212c',cloud:'#2c3a46',hill:'#24363a',grass:'#35553f',ground:'#3b3229',dot:'#2c251e',trunk:'#4a3a2a',leaf:'#2f5a44'};
+function isDark(){ const t=document.documentElement.getAttribute('data-theme'); return t ? t==='dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
 // 場面の絵：120×44。左に今いる場所、右に自分とロボット
 function sceneURL(s, ageOverride, outfitOverride){
   const age = ageOverride||s.age, out = outfitOverride||outfitOf(s);
   const place = placeIcon(s), tint = hashCol(s.stage==='startup'?s.own:(s.job?s.job.n:s.uni));
-  const night = s.flags && s.flags.burnout;
+  const night = isDark() || (s.flags && s.flags.burnout);
   const key = ['sc',place,tint,personKey(s.look,age,out),s.rt,night?1:0].join('|');
   return pxURL(key,120,44,P=>{
-    P(0,0,120,36, night?'#2d3550':'#cfe6ef'); P(0,0,120,12, night?'#232a42':'#b9dbe9');
-    if(night){ for(const [x,y] of [[20,5],[44,9],[70,4],[96,8],[110,14],[58,15]]) P(x,y,1,1,'#f3e2b3'); P(100,4,4,4,'#f3e2b3'); P(101,4,3,3,'#2d3550'); }
-    else { P(14,5,5,5,'#fff3b0'); P(13,6,7,3,'#fff3b0'); P(32,7,14,3,'#ffffff'); P(35,5,8,2,'#ffffff'); P(78,9,12,3,'#ffffff'); P(81,7,6,2,'#ffffff'); }
-    P(0,28,120,8, night?'#3c5a52':'#a8cfb0'); P(36,24,34,4, night?'#3c5a52':'#a8cfb0'); P(62,22,40,6, night?'#3c5a52':'#a8cfb0');
-    P(0,35,120,2,'#6aa84f'); P(0,37,120,7,'#8a6a45');
-    for(let x=3;x<120;x+=9) P(x,40+(x%3),1,1,'#6e5235');
-    P(48,28,2,8,'#6b4a2b'); P(45,22,8,7,'#4f9a5a'); P(46,21,6,1,'#4f9a5a');
+    const C = night ? NIGHT : DAY;
+    P(0,0,120,36,C.sky); P(0,0,120,12,C.sky2);
+    if(night){ for(const [x,y] of [[20,5],[44,9],[70,4],[96,8],[110,14],[58,15],[8,12],[84,3]]) P(x,y,1,1,'#d9cfa6'); P(100,4,4,4,'#d9cfa6'); P(101,4,3,3,C.sky2); P(30,8,16,3,C.cloud); P(33,6,9,2,C.cloud); }
+    else { P(14,5,5,5,'#f6eab0'); P(13,6,7,3,'#f6eab0'); P(32,7,14,3,C.cloud); P(35,5,8,2,C.cloud); P(78,9,12,3,C.cloud); P(81,7,6,2,C.cloud); }
+    P(0,28,120,8,C.hill); P(36,24,34,4,C.hill); P(62,22,40,6,C.hill);
+    P(0,35,120,2,C.grass); P(0,37,120,7,C.ground);
+    for(let x=3;x<120;x+=9) P(x,40+(x%3),1,1,C.dot);
+    P(48,28,2,8,C.trunk); P(45,22,8,7,C.leaf); P(46,21,6,1,C.leaf);
     drawBuilding(offP(P,8,16), place, tint);
     drawPerson(offP(P,70,16), s.look, age, out);
     drawRobot(offP(P,92, s.rt==='drone'?8:20), s.rt);
@@ -1753,11 +1786,13 @@ function sceneURL(s, ageOverride, outfitOverride){
 }
 // タイトルの絵：キャンパスに 8 種類のロボット
 function titleSceneURL(){
-  return pxURL('title',160,40,P=>{
-    P(0,0,160,30,'#cfe6ef'); P(0,0,160,10,'#b9dbe9');
-    P(20,5,14,3,'#fff'); P(23,3,8,2,'#fff'); P(110,7,16,3,'#fff'); P(114,5,8,2,'#fff');
-    P(0,24,160,8,'#a8cfb0'); P(40,20,50,4,'#a8cfb0');
-    P(0,31,160,2,'#6aa84f'); P(0,33,160,7,'#8a6a45');
+  const night=isDark(), C=night?NIGHT:DAY;
+  return pxURL('title'+(night?'n':'d'),160,40,P=>{
+    P(0,0,160,30,C.sky); P(0,0,160,10,C.sky2);
+    if(night){ for(const [x,y] of [[12,4],[40,8],[66,3],[98,6],[130,4],[150,9],[84,12]]) P(x,y,1,1,'#d9cfa6'); P(140,3,4,4,'#d9cfa6'); P(141,3,3,3,C.sky2); }
+    P(20,5,14,3,C.cloud); P(23,3,8,2,C.cloud); P(110,7,16,3,C.cloud); P(114,5,8,2,C.cloud);
+    P(0,24,160,8,C.hill); P(40,20,50,4,C.hill);
+    P(0,31,160,2,C.grass); P(0,33,160,7,C.ground);
     RT_KEYS.forEach((k,i)=>drawRobot(offP(P,4+i*19, k==='drone'?6:16), k));
   });
 }
@@ -1788,8 +1823,8 @@ document.querySelectorAll('#autoSeg button').forEach(b=>b.onclick=()=>{
 });
 $('startBtn').onclick=startBirth; $('startBtn2').onclick=startBirth;
 
-const SERIES = [['CN','#2a78d6'],['US','#eb6834'],['JP','#1baf7a'],['DE','#eda100'],['KR','#e87ba4'],['IN','#6250d6']];
-const OTHER_COL = '#aab5b1';
+const SERIES = [['CN','var(--s1)'],['US','var(--s2)'],['JP','var(--s3)'],['DE','var(--s4)'],['KR','var(--s5)'],['IN','var(--s6)']];
+const OTHER_COL = 'var(--so)';
 const ERA_TITLE = {any:'どの時代かに入学する学生だったら', now:'いま入学する学生だったら', past:'むかし入学した学生だったら'};
 const ERA_SUB = {any:'1965〜2026年入学の重みづけ平均 · 上位 9 か国', now:'2026年入学 · 上位 9 か国', past:'1965〜2015年入学の重みづけ平均 · 上位 9 か国'};
 function renderCountryBars(){
@@ -1820,16 +1855,16 @@ function renderTrend(){
     const lo=sh.map(r=>r.slice(0,i).reduce((a,b)=>a+b,0)), hi=lo.map((v,j)=>v+sh[j][i]);
     const top=years.map((y,j)=>`${X(y).toFixed(1)},${Y(hi[j]).toFixed(1)}`).join(' L');
     const bot=years.map((y,j)=>`${X(y).toFixed(1)},${Y(lo[j]).toFixed(1)}`).reverse().join(' L');
-    paths+=`<path d="M${top} L${bot} Z" fill="${cols[i]}" stroke="#F7FAF8" stroke-width="2" stroke-linejoin="round"/>`;
+    paths+=`<path d="M${top} L${bot} Z" style="fill:${cols[i]};stroke:var(--card)" stroke-width="2" stroke-linejoin="round"/>`;
   }
   const er = ERA==='now'?[2025.2,2026]: ERA==='past'?[1965,2015]:[1965,2026];
   let shade='';
-  if(er[0]>y0) shade+=`<rect x="${L}" y="${T}" width="${X(er[0])-L}" height="${H-T-B}" fill="#F7FAF8" opacity=".72"/>`;
-  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${T}" width="${W-Rr-X(er[1])}" height="${H-T-B}" fill="#F7FAF8" opacity=".72"/>`;
+  if(er[0]>y0) shade+=`<rect x="${L}" y="${T}" width="${X(er[0])-L}" height="${H-T-B}" style="fill:var(--card)" opacity=".72"/>`;
+  if(er[1]<y1) shade+=`<rect x="${X(er[1])}" y="${T}" width="${W-Rr-X(er[1])}" height="${H-T-B}" style="fill:var(--card)" opacity=".72"/>`;
   let axis='';
-  for(const v of [0,.25,.5,.75,1]) axis+=`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="#5F6E72" font-family="monospace">${v*100}%</text>`;
-  for(const y of [1965,1980,1995,2010,2026]) axis+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle" font-size="11" fill="#5F6E72" font-family="monospace">${y}</text>`;
-  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="1965年から2026年までの、ロボットエンジニアの国別の比率の変化">${paths}${shade}${axis}<line id="tx" y1="${T}" y2="${H-B}" stroke="#13212A" stroke-width="1" opacity="0"/><rect x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
+  for(const v of [0,.25,.5,.75,1]) axis+=`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" style="fill:var(--ink3)" font-family="monospace">${v*100}%</text>`;
+  for(const y of [1965,1980,1995,2010,2026]) axis+=`<text x="${X(y)}" y="${H-6}" text-anchor="middle" font-size="11" style="fill:var(--ink3)" font-family="monospace">${y}</text>`;
+  $('trend').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="1965年から2026年までの、ロボットエンジニアの国別の比率の変化">${paths}${shade}${axis}<line id="tx" y1="${T}" y2="${H-B}" style="stroke:var(--ink)" stroke-width="1" opacity="0"/><rect x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent"/></svg><div class="tip hidden" id="ttip"></div>`;
   $('trendLegend').innerHTML = SERIES.map(([k,c])=>`<span><i style="background:${c}"></i>${COUNTRIES[k].n}</span>`).join('')+`<span><i style="background:${OTHER_COL}"></i>その他</span>`;
   const svg=$('trend').querySelector('svg'), tip=$('ttip'), line=svg.querySelector('#tx');
   const move=ev=>{
@@ -2013,7 +2048,7 @@ function addLine(t,k,e,age){
   $('logList').prepend(d);
   while($('logList').children.length>140) $('logList').lastChild.remove();
 }
-const STAT_COL = {sk:'#0F6E68',he:'#2B7A4E',ha:'#9C7020',ne:'#8C1D3C'};
+const STAT_COL = {sk:'var(--stamp)',he:'var(--good)',ha:'var(--gold)',ne:'var(--accent)'};
 function render(){
   const s=S;
   $('gAge').textContent = s.age;
@@ -2027,7 +2062,7 @@ function render(){
   $('gMoney').innerHTML = `
     <div><span class="label">年収（日本円で）</span><b>${sal?'約'+yen(sal):'—'}</b>${cut}${sal?'':'<span class="note">学生なので給料はありません</span>'}</div>
     <div><span class="label">資産（日本円で）</span><b class="${s.assets<0?'neg':''}">約${yen(s.assets)}</b></div>
-    <div><span class="label">作ったロボット</span><b>${s.robots.toLocaleString()} 台</b></div>
+    <div><span class="label">携わったロボット</span><b>${s.robots} 機種</b></div>
     <div><span class="label">売れたロボット</span><b>${s.sold.toLocaleString()} 台</b></div>
     <div><span class="label">論文</span><b>${s.papers} 本</b></div>
     <div><span class="label">特許</span><b>${s.patents} 件</b></div>`;
@@ -2104,7 +2139,7 @@ function showAsk(age){
   $('sheet').innerHTML = `<div class="hd"><span>ひと息</span><span class="mono">${S.age}歳 · ${S.year}年</span></div>
     <div class="bd"><h3>${esc(ASKS[age])}</h3><p>時間が止まっています。ひとことだけ、のこしておけます。人生のさいごに読みかえせます。</p>
     <textarea id="askT" maxlength="80" placeholder="（空でもかまいません）"></textarea>
-    <div class="act"><button class="btn" id="askSkip">とばす</button><button class="btn" id="askOk" style="background:var(--accent);color:#fff;border-color:var(--accent)">のこす</button></div></div>`;
+    <div class="act"><button class="btn" id="askSkip">とばす</button><button class="btn" id="askOk" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent)">のこす</button></div></div>`;
   $('modal').classList.remove('hidden');
   const done=(save)=>{
     const v=$('askT').value.trim();
@@ -2126,7 +2161,7 @@ function lifeStory(s, lastAge){
   if(s.flags.mgr) t+='部長になりました。';
   if(s.flags.founded) t+=`自分の会社を${s.flags.exit==='ipo'?'上場させました。':s.flags.exit==='acq'?'つくり、売却しました。':'つくりました。'}`;
   if(s.home!==s.c) t+=`${cInfo(s.home).n}から海をわたった人生でした。`;
-  t+=`生涯で ${s.robots.toLocaleString()} 台のロボットをつくり、${s.sold.toLocaleString()} 台が売れました。`;
+  t+=`生涯で ${s.robots} 機種のロボットに携わり、${s.sold.toLocaleString()} 台が売れました。`;
   if(s.partner) t+= s.kids?`結婚し、${s.kids}人の子どもを育てました。`:'結婚しました。';
   if(s.endWhy==='death') t+=`${lastAge}歳のとき、病気で亡くなりました。`;
   else if(s.endWhy==='left') t+=`ロボットの道を降り、${lastAge}歳で定年をむかえました。`;
@@ -2152,7 +2187,7 @@ function finish(){
         <p class="story">${esc(story)}</p>
         ${trail}
         <div class="nums">
-          <div><b>${s.robots.toLocaleString()}</b><span>作ったロボット</span></div>
+          <div><b>${s.robots} 機種</b><span>携わったロボット</span></div>
           <div><b>${s.sold.toLocaleString()}</b><span>売れたロボット</span></div>
           <div><b>${s.papers}</b><span>論文</span></div>
           <div><b>${s.maxSal?yen(s.maxSal):'—'}</b><span>最高年収</span></div>
@@ -2174,7 +2209,7 @@ function finish(){
     <div class="btnrow"><button class="btn" id="copyBtn">結果をコピー</button><a class="btn" id="xBtn" target="_blank" rel="noopener">X でシェア</a><button class="btn" id="topBtn">はじめの画面へ</button></div>
     <div class="stickybar"><div class="in"><button class="cta" id="againBtn">もう一度入学する</button></div></div>`;
   renderMap(s,$('endMap'),lastAge);
-  const share = `#100万分の1 ロボットエンジニア人生\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\n${RTYPES[s.rt].n}　称号「${title}」\n🔧作った${s.robots}台 🛒売れた${s.sold.toLocaleString()}台 📄${s.papers}本 💰資産 約${yen(s.assets)}`;
+  const share = `#100万分の1 ロボットエンジニア人生\n${s.name}（${COUNTRIES[s.c].n}・${s.uni}・${s.entry}年入学）\n${RTYPES[s.rt].n}　称号「${title}」\n🔧携わった${s.robots}機種 🛒売れた${s.sold.toLocaleString()}台 📄${s.papers}本 💰資産 約${yen(s.assets)}`;
   $('copyBtn').onclick=()=>{ navigator.clipboard?.writeText(share+'\n'+location.href).then(()=>toast('コピーしました'),()=>toast('コピーできませんでした')); };
   $('xBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(share)+'&url='+encodeURIComponent(location.href);
   $('againBtn').onclick=startBirth;
@@ -2183,7 +2218,22 @@ function finish(){
 }
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),1600); }
 
-$('titleScene').src = titleSceneURL();
+const TKEY='robolife.theme';
+function applyTheme(){
+  try{ const t=localStorage.getItem(TKEY); if(t) document.documentElement.setAttribute('data-theme',t); }catch(e){}
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', isDark()?'#0D1316':'#EBF0ED');
+  $('titleScene').src = titleSceneURL();
+  if(S && !$('game').classList.contains('hidden')) render();
+}
+function toggleTheme(){
+  const next = isDark()?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  try{ localStorage.setItem(TKEY,next); }catch(e){}
+  applyTheme();
+}
+$('themeBtn').onclick=toggleTheme; $('themeBtn2').onclick=toggleTheme;
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+applyTheme();
 renderCountryBars();
 renderPast();
 </script>
