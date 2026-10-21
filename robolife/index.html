@@ -296,7 +296,7 @@
   </div>
   <div class="field">
     <span class="label">プレイ時間</span>
-    <div class="note" style="margin-top:0">定年までおよそ 10 分。1 年は約 13 秒で進み、止めたり早送りしたりできます。</div>
+    <div class="note" style="margin-top:0">定年までおよそ 20 分。1 年は約 26 秒で進み、止めたり早送りしたりできます。</div>
   </div>
   <div style="margin:18px 0 6px;max-width:220px"><button class="cta" id="startBtn">入学する</button></div>
   <p class="note" style="margin:0 0 22px">設定を変えずに、このまま始めても大丈夫です。</p>
@@ -1980,7 +1980,7 @@ const HTML_EN = {
   '自動':'Automatic',
   '自動にすると、進学・就職・転職などの分かれ道も、統計にしたがって自動で決まります。':'With Automatic, crossroads like grad school and job changes are decided for you by the statistics.',
   'プレイ時間':'Play time',
-  '定年までおよそ 10 分。1 年は約 13 秒で進み、止めたり早送りしたりできます。':'About 10 minutes to retirement. A year passes in about 13 seconds; you can pause or fast-forward.',
+  '定年までおよそ 20 分。1 年は約 26 秒で進み、止めたり早送りしたりできます。':'About 20 minutes to retirement. A year passes in about 26 seconds; you can pause or fast-forward.',
   '入学する':'Enroll',
   '設定を変えずに、このまま始めても大丈夫です。':'The defaults are fine — start whenever you like.',
   'これまでのキャリア':'Previous careers',
@@ -2194,7 +2194,7 @@ function revealBirth(){
         <div class="who">${pxImg(personURL(s.look,18,'hoodie'),'',T('あなたのキャラクター','Your character'))}<div><span class="label">${T('名前','Name')}</span><div class="name">${esc(s.name)}</div></div></div>
         <p class="story">${esc(storyBirth(s))}</p>
         <div class="unirow">${pxImg(buildingURL('uni'+s.tier,hashCol(s.uni)),'',s.uni)}<div><b>${esc(s.uni)}</b><br><span class="note">${COUNTRIES[s.c].n} · ${TIER_TXT[s.tier]}</span></div></div>
-        <p class="note" style="margin:0">${T('定年までは 10 分ほど（1 年はおよそ 13 秒）。止めたり早送りしたりもできます。','About 10 minutes to retirement (a year ≈ 13 s). Pause or fast-forward any time.')}</p>
+        <p class="note" style="margin:0">${T('定年までは 20 分ほど（1 年はおよそ 26 秒）。止めたり早送りしたりもできます。','About 20 minutes to retirement (a year ≈ 26 s). Pause or fast-forward any time.')}</p>
         <hr class="rule">
         <div class="kv">
           <div><span class="label">${T('性別','Sex')}</span><b>${GEN(s.g)}</b></div>
@@ -2252,7 +2252,7 @@ function setSpeed(v){
   document.querySelectorAll('#spSeg button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.sp===v));
   if(!waiting) schedule(150);
 }
-function yearMs(){ return 13000 / SPEED; }
+function yearMs(){ return 26000 / SPEED; }
 function schedule(ms){
   clearTimeout(timer);
   if(PAUSED || waiting) return;
