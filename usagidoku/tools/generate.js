@@ -73,9 +73,9 @@ function logicSolveFrom(n,g,st0){
   const cellUnits=[...Array(N)].map((_,i)=>[ (i/n)|0, n+i%n, 2*n+g[i] ]);
   function place(i,s){ s[i]=2; for(const u of cellUnits[i]) for(const j of units[u]) if(j!==i&&s[j]===0) s[j]=1; for(const j of nb(i)) if(s[j]===0) s[j]=1; }
   function contradiction(s){ for(const u of units){ let ok=false; for(const j of u) if(s[j]!==1){ok=true;break;} if(!ok) return true; } return false; }
-  let score=0, level=0;
+  let score=0, level=0, hard=0; // hard: 2 つ以上の くぎり・列を くみあわせた推理の回数
   for(let iter=0;iter<500;iter++){
-    if(st.filter(x=>x===2).length===n) return {solved:true,score,level};
+    if(st.filter(x=>x===2).length===n) return {solved:true,score,level,hard};
     let prog=false;
     // L1: single candidate in unit
     for(const u of units){ if(u.some(j=>st[j]===2)) continue; const c=u.filter(j=>st[j]===0); if(c.length===1){ place(c[0],st); prog=true; score+=1; } }
@@ -98,7 +98,7 @@ function logicSolveFrom(n,g,st0){
           }
           // inverse: k lines fully inside k regions
         }
-        if(prog){ score+=4*k; level=Math.max(level,2+k); break; }
+        if(prog){ score+=4*k; level=Math.max(level,2+k); if(k>=2) hard++; break; }
       }
       if(prog) break;
       // lines confined to regions
@@ -111,12 +111,12 @@ function logicSolveFrom(n,g,st0){
           if(rs.size===k){ for(const reg of rs) for(const j of units[2*n+reg]) if(st[j]===0){ const L=axis?j%n:(j/n)|0; if(!cb.includes(L)){ st[j]=1; prog=true; } } }
           if(prog) break;
         }
-        if(prog){ score+=4*k; level=Math.max(level,2+k); break; }
+        if(prog){ score+=4*k; level=Math.max(level,2+k); if(k>=2) hard++; break; }
       }
     }
-    if(!prog) return {solved:false,score,level};
+    if(!prog) return {solved:false,score,level,hard};
   }
-  return {solved:false,score,level};
+  return {solved:false,score,level,hard};
 }
 
 function findAlt(n,g,q){
@@ -139,7 +139,7 @@ function connected(n,g,reg){
   while(st.length){ const i=st.pop(); const r=(i/n)|0,c=i%n; for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){const rr=r+dr,cc=c+dc; if(rr<0||cc<0||rr>=n||cc>=n) continue; const j=rr*n+cc; if(g[j]===reg&&!seen.has(j)){seen.add(j);st.push(j);}}}
   return seen.size===cells.length;
 }
-function gen2(n, minLevel){
+function gen2(n, minLevel, minHard=0){
   for(let t=0;t<100000;t++){
     const q=placeQueens(n); const g=growRegions(n,q);
     if(g.includes(-1)) continue;
@@ -160,8 +160,8 @@ function gen2(n, minLevel){
       if(!changed) break;
     }
     if(!ok) continue;
-    const ls=logicSolve(n,g); if(!ls.solved || ls.level<minLevel) continue;
-    return {n,g,q,score:ls.score,level:ls.level,tries:t};
+    const ls=logicSolve(n,g); if(!ls.solved || ls.level<minLevel || ls.hard<minHard) continue;
+    return {n,g,q,score:ls.score,level:ls.level,hard:ls.hard,tries:t};
   }
 }
 function gen(n){
@@ -218,8 +218,10 @@ function pickSpread(list,k){
   const step=list.length/k; const pick=[]; for(let i=0;i<k;i++) pick.push(list[Math.floor(i*step+step/2)]);
   return pick;
 }
-const A='ABCDEFGHIJK';
-if(process.argv[2]==='--rocks'){
+const A='ABCDEFGHIJKL';
+module.exports={logicSolveFrom,countRock,countSolutions,gen2,setSeed:x=>{seed=x;}};
+if(require.main!==module){}
+else if(process.argv[2]==='--rocks'){
   // node tools/generate.js --rocks out.json
   seed=20261016;
   const plan=[[8,10],[9,15],[10,15],[11,10]];
@@ -233,6 +235,23 @@ if(process.argv[2]==='--rocks'){
   }
   // いわのマスは小文字。列は 36 進数（11×11 の 10 は a）
   const enc=out.map(p=>p.g.map((x,i)=>p.rock[i]?A[x].toLowerCase():A[x]).join('')+'|'+p.q.map(c=>c.toString(36)).join(''));
+  require('fs').writeFileSync(process.argv[3], JSON.stringify(enc));
+} else if(process.argv[2]==='--hard'){
+  // だい3しょう: いわなしで、3 つ以上の くぎりを くみあわせる推理が 2 回以上いるものだけ
+  // node tools/generate.js --hard out.json [大きさ]（大きさをわけて べつべつに うごかせる）
+  const plan=[[9,6],[10,8],[11,8],[12,8]].filter(([n])=>!process.argv[4]||n===+process.argv[4]);
+  const out=[];
+  for(const [n,k] of plan){
+    seed=20261025+n;
+    const list=[]; const t0=Date.now();
+    for(let i=0;i<k*2;i++) list.push(gen2(n,5,2));
+    // むずかしいほうから k こえらんで、やさしい順にならべる
+    list.sort((a,b)=>b.level-a.level||b.hard-a.hard||b.score-a.score);
+    const pick=list.slice(0,k).sort((a,b)=>a.level-b.level||a.hard-b.hard||a.score-b.score);
+    console.error(n, Date.now()-t0+'ms', pick.map(p=>p.level+':'+p.hard+':'+p.score).join(' '));
+    out.push(...pick);
+  }
+  const enc=out.map(p=>p.g.map(x=>A[x]).join('')+'|'+p.q.map(c=>c.toString(36)).join(''));
   require('fs').writeFileSync(process.argv[3], JSON.stringify(enc));
 } else {
 const plan=[[5,10],[6,15],[7,20],[8,20],[9,20],[10,15]];
