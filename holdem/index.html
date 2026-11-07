@@ -1132,7 +1132,7 @@ function renderHero(){
     }
     return;
   }
-  if (ctl._mode === 'act:'+G.handNo+':'+G.street+':'+G.currentBet) return;
+  if (ctl._mode === 'raise' || ctl._mode === 'act:'+G.handNo+':'+G.street+':'+G.currentBet) return;
   ctl._mode = 'act:'+G.handNo+':'+G.street+':'+G.currentBet;
   const L = legal(p);
   const callLbl = L.toCall === 0 ? 'チェック' : (L.toCall >= p.stack ? 'オールイン' : 'コール');
