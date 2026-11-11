@@ -197,7 +197,8 @@ a.pill{color:#fff;text-decoration:none;font-size:14px}
 import * as THREE from 'three';
 
 /* ================= データ ================= */
-const HW = 7;                 // コースの半分の幅 (m)
+const HW = 7;                 // 道の半分の幅 (m)
+const XMAX = HW+22;           // ここより外は山で進めない
 const UPS = [
   {id:'pull',  ic:'🏹', nm:'ひっぱり力', sub:'発射の速さ',  w:1.25, desc:'パチンコが強くなり、発射スピードが上がる'},
   {id:'tire',  ic:'🛞', nm:'タイヤ',     sub:'ころがり',   w:1.0,  desc:'よく転がるようになり、ぬかるみにも強くなる'},
@@ -236,7 +237,7 @@ function stageInfo(n){
   return {nm:'エクストラ'+(n-STAGES.length)+' '+THEMES[th].nm, th};
 }
 const goalCache={};
-const goalOf = n => n<=GOALS.length?GOALS[n-1]:1200+120*(n-GOALS.length);
+const goalOf = n => n<=GOALS.length?GOALS[n-1]:2700+250*(n-GOALS.length);
 
 /* ================= セーブ ================= */
 const KEY='pyoncar-v1';
@@ -253,10 +254,10 @@ function stats(up=S.up){
   const f=formOf(up);
   return {
     form:f,
-    v0: (11 + 1.0*up.pull) * (1+0.08*f),
-    crr: 0.07 / (1+0.06*up.tire) * (1-0.04*f),
+    v0: (17 + 1.5*up.pull) * (1+0.08*f),
+    crr: 0.04 / (1+0.06*up.tire) * (1-0.04*f),
     mud: 0.42 * Math.max(0.35, 1-0.03*up.tire),
-    bump: 1.25 / (1+0.22*up.susp),
+    bump: 0.9 / (1+0.22*up.susp),
     land: 0.05 / (1+0.25*up.susp),
     drag: 0.0028 / (1+0.08*up.body) * (1-0.04*f),
     steer: 3.2 + 0.45*up.handle,
@@ -273,7 +274,7 @@ function makeCourse(n,goalOv){
   const goal=goalOv||goalOf(n), L=goal+70;
   const A=Math.min(0.35+n*0.07,1.3)*th.hill;
   const comps=[0,1,2].map(i=>({a:A*(0.35+R()*0.5)/(i+1)*1.4, f:2*Math.PI/(26+R()*60)*(1+i*.7), p:R()*6.28}));
-  const grade=0.012+R()*0.008;
+  const grade=0.015+R()*0.008;
   const feats=[], coins=[], rocks=[];
   const lvl=Math.min(1,(n-1)/10);
   let s=36;
@@ -309,10 +310,11 @@ function makeCourse(n,goalOv){
   };
   const edge=(x,f,e=.7)=>sstep(f.x0-e,f.x0+e,x)*(1-sstep(f.x1-e,f.x1+e,x))*sstep(f.s0-e,f.s0+e*2,0)*1;
   // 物理用の高さ（でこぼこを含まない）
+  const side=(x,s)=>{const d=Math.abs(x)-HW+1;if(d<=0)return 0;return (d<23?0.016*d*d:8.46+0.25*(d-23))+Math.sin(x*.23+s*.17)*Math.min(d,8)*.12;};
   const hs=(x,s)=>{
-    let h=base(s);
+    let h=base(s)+side(x,s);
     for(const f of near(s)){
-      if(f.t==='tilt'){const w=sstep(f.s0,f.s0+6,s)*(1-sstep(f.s1-6,f.s1,s));h+=f.k*x*w;}
+      if(f.t==='tilt'){const w=sstep(f.s0,f.s0+6,s)*(1-sstep(f.s1-6,f.s1,s));h+=f.k*Math.max(-HW,Math.min(HW,x))*w;}
       else if(f.t==='ramp'&&s>=f.s0&&s<=f.s1+0.6){const e=sstep(f.x0-.4,f.x0+.2,x)*(1-sstep(f.x1-.2,f.x1+.4,x));
         const up=s<=f.s1?(s-f.s0)/(f.s1-f.s0):1-(s-f.s1)/0.6;h+=f.h*up*e;}
     }
@@ -322,8 +324,8 @@ function makeCourse(n,goalOv){
   const rough=(x,s)=>{let a=0;for(const f of near(s))if(f.t==='bump'&&s>f.s0&&s<f.s1){const e=sstep(f.x0-.6,f.x0+.6,x)*(1-sstep(f.x1-.6,f.x1+.6,x))*sstep(f.s0,f.s0+2,s)*(1-sstep(f.s1-2,f.s1,s));a=Math.max(a,f.amp*e);}return a;};
   const bumpH=(x,s)=>{const a=rough(x,s);return a?a*Math.sin(x*1.35)*Math.sin(s*0.95):0;};
   const hv=(x,s)=>hs(x,s)+bumpH(x,s);
-  const surf=(x,s)=>{for(const f of near(s)){if(s<f.s0||s>f.s1||x<f.x0||x>f.x1)continue;if(f.t==='mud')return 'mud';if(f.t==='boost')return 'boost';if(f.t==='ramp')return 'ramp';}return '';};
-  return {n,info,th,goal,L,feats,coins,rocks,hs,hv,rough,surf,near};
+  const surf=(x,s)=>{if(Math.abs(x)>HW)return 'grass';for(const f of near(s)){if(s<f.s0||s>f.s1||x<f.x0||x>f.x1)continue;if(f.t==='mud')return 'mud';if(f.t==='boost')return 'boost';if(f.t==='ramp')return 'ramp';}return '';};
+  return {n,info,th,goal,L,feats,coins,rocks,hs,hv,rough,surf,near,side};
 }
 
 /* ================= 物理 ================= */
@@ -340,7 +342,7 @@ function step(R,C,st,dt){
     const sl=(C.hs(R.x,R.s+0.4)-C.hs(R.x,R.s-0.4))/0.8;
     const hx=(C.hs(R.x+0.3,R.s)-C.hs(R.x-0.3,R.s))/0.6;
     let a=-g*sl/Math.sqrt(1+sl*sl);
-    const crr=(sf==='mud'?st.mud:st.crr)*C.th.crr;
+    const crr=(sf==='mud'?st.mud:sf==='grass'?st.crr*1.8+0.012:st.crr)*C.th.crr;
     a-=g*crr*Math.sign(R.v);
     const ro=C.rough(R.x,R.s);
     if(ro>0)a-=ro*st.bump*R.v;
@@ -357,7 +359,7 @@ function step(R,C,st,dt){
     const tgt=R.steer*st.steer*0.5;R.vx+=(tgt-R.vx)*Math.min(1,dt*2);
   }
   R.s+=R.v*dt; R.x+=R.vx*dt;
-  if(Math.abs(R.x)>HW-1.1){R.x=Math.sign(R.x)*(HW-1.1);if(Math.abs(R.vx)>1.2){R.v*=0.93;R.events.push('wall');}R.vx=-R.vx*0.3;}
+  if(Math.abs(R.x)>XMAX){R.x=Math.sign(R.x)*XMAX;R.vx=0;}
   const ny=C.hs(R.x,R.s);
   if(!R.air){
     const vyg=(ny-R.y)/dt;
@@ -370,7 +372,7 @@ function step(R,C,st,dt){
   }
   // 岩
   if(R.y-ny<0.8)for(const k of C.rocks){if(Math.abs(k.s-R.s)>2.5)continue;const dx=R.x-k.x,ds=R.s-k.s;
-    if(!k.hit && dx*dx+ds*ds<(k.r+0.9)**2){R.lastHit=R.t;R.v*=0.68;R.vx=Math.sign(dx||1)*4;k.hit=true;k.hitS=R.s;R.events.push('rock');}}
+    if(!k.hit && dx*dx+ds*ds<(k.r+0.9)**2){R.lastHit=R.t;R.v*=0.78;R.vx=Math.sign(dx||1)*4;k.hit=true;k.hitS=R.s;R.events.push('rock');}}
   // コイン
   for(const c of C.coins){if(c.got||Math.abs(c.s-R.s)>st.magnet+1)continue;const dx=R.x-c.x,ds=R.s-c.s;
     if(dx*dx+ds*ds<st.magnet*st.magnet && Math.abs(R.y+0.8-(C.hs(c.x,c.s)+1.1))<2.2){c.got=true;R.coins++;R.events.push('coin');}}
@@ -381,8 +383,8 @@ function step(R,C,st,dt){
 // 自動運転（調整・デモ用）: 前方を見て通りやすい位置へ寄せる
 function autoSteer(R,C,skill=1,rnd=Math.random){
   let best=R.x,bv=-1e9;
-  for(let x=-HW+1.5;x<=HW-1.5;x+=0.5){
-    let v=-Math.abs(x-R.x)*0.15;
+  for(let x=-HW-4;x<=HW+4;x+=0.5){
+    let v=-Math.abs(x-R.x)*0.15-(Math.abs(x)>HW-0.5?2.5:0);
     const LA=Math.max(26,R.v*1.6);for(let d=4;d<=LA;d+=LA/12){const s=R.s+d;const sf=C.surf(x,s);if(sf==='mud')v-=3;if(sf==='boost')v+=4;if(sf==='ramp')v+=0.5;v-=C.rough(x,s)*4;
       for(const k of C.rocks)if(Math.abs(k.s-s)<1&&Math.abs(k.x-x)<k.r+1.2)v-=12;
       for(const c of C.coins)if(!c.got&&Math.abs(c.s-s)<1&&Math.abs(c.x-x)<1.2)v+=1.2;}
@@ -393,8 +395,8 @@ function autoSteer(R,C,skill=1,rnd=Math.random){
 }
 
 // ゴール距離: 目安の強化レベルで自動運転したときの距離から決める
-const GOALS=[100,150,200,260,330,400,480,570,670,780,900,1050,1200];
-const SEEDV=[8,1,8,5,1,0,6,0,14,4,12,3,0];
+const GOALS=[250,400,550,700,850,1000,1200,1400,1600,1850,2100,2400,2700];
+const SEEDV=[0,1,4,13,18,2,1,20,0,2,6,0,21];
 const lvTarget=n=>Math.min(25,Math.round(1.7*(n-1)));
 function calibrate(n){
   const lv=lvTarget(n),up={};UPS.forEach(u=>up[u.id]=lv);const st=stats(up);const ds=[];
@@ -512,37 +514,29 @@ function buildCourseScene(C){
   // 道
   const nx=40, ds=0.5, ns=Math.ceil((L-sStart)/ds);
   const pos=new Float32Array((nx+1)*(ns+1)*3), col=new Float32Array((nx+1)*(ns+1)*3);
-  const cRoad=new THREE.Color(th.road), cMud=new THREE.Color(0x6b4a2b), cBoost=new THREE.Color(0xffc93d), cRamp=new THREE.Color(0xff8a3d), cEdge=new THREE.Color(0xffffff), cGoal=new THREE.Color(0xffffff), cGoal2=new THREE.Color(0x222222), tmp=new THREE.Color();
+  const cRoad=new THREE.Color(th.road), cMud=new THREE.Color(0x6b4a2b), cBoost=new THREE.Color(0xffc93d), cRamp=new THREE.Color(0xff8a3d), cEdge=new THREE.Color(0xffffff),cGround=new THREE.Color(th.ground), cGoal=new THREE.Color(0xffffff), cGoal2=new THREE.Color(0x222222), tmp=new THREE.Color();
   let k=0;
   for(let j=0;j<=ns;j++){const s=sStart+j*ds;for(let i=0;i<=nx;i++){const x=-HW+i*(2*HW/nx);
     pos[k]=x;pos[k+1]=C.hv(x,s);pos[k+2]=-s;
     const sf=C.surf(x,s);
-    if(Math.abs(x)>HW-0.36)tmp.copy(cEdge);
-    else if(Math.abs(s-C.goal)<1.5)tmp.copy(((Math.floor((x+HW)/1.4)+Math.floor((s-C.goal+1.5)/1.5))%2)?cGoal:cGoal2);
+    if(Math.abs(s-C.goal)<1.5)tmp.copy(((Math.floor((x+HW)/1.4)+Math.floor((s-C.goal+1.5)/1.5))%2)?cGoal:cGoal2);
     else if(sf==='mud')tmp.copy(cMud).multiplyScalar(.9+.2*Math.sin(x*3+s*2));
     else if(sf==='boost')tmp.copy(cBoost);
     else if(sf==='ramp')tmp.copy((Math.floor(s*1.2)%2)?cRamp:cEdge);
     else {const r=C.rough(x,s);tmp.copy(cRoad).multiplyScalar(r>0?0.85+0.18*Math.sin(x*1.35)*Math.sin(s*.95):0.97+0.03*Math.sin(s*.7+x));}
+    if(Math.abs(x)>HW-1.2&&Math.abs(s-C.goal)>=1.5)tmp.lerp(cGround,sstep(HW-1.2,HW,Math.abs(x))*0.85);
     col[k]=tmp.r;col[k+1]=tmp.g;col[k+2]=tmp.b;k+=3;}}
   const idx=[];for(let j=0;j<ns;j++)for(let i=0;i<nx;i++){const a=j*(nx+1)+i,b=a+1,c=a+nx+1,d=c+1;idx.push(a,b,c,b,d,c);}
   const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(pos,3));rg.setAttribute('color',new THREE.BufferAttribute(col,3));rg.setIndex(idx);rg.computeVertexNormals();
   const road=new THREE.Mesh(rg,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.9}));road.receiveShadow=true;sc.add(road);
   // 加速パネルの矢印
   for(const f of C.feats)if(f.t==='boost'){for(let s=f.s0+1;s<f.s1;s+=1.8){const a=new THREE.Mesh(new THREE.ConeGeometry(.8,1.2,3),MB(0xff6a1f));a.rotation.x=-Math.PI/2;a.scale.y=.25;const x=(f.x0+f.x1)/2;a.position.set(x,C.hs(x,s)+.1,-s);sc.add(a);}}
-  // 両わきの地面
-  for(const sg of[-1,1]){const W=70,gx=24,gs=Math.ceil((L-sStart+40)/2);const g=new THREE.PlaneGeometry(W,(L-sStart+40),gx,gs);g.rotateX(-Math.PI/2);const p=g.attributes.position;
-    for(let i=0;i<p.count;i++){const x=p.getX(i)+sg*(HW+W/2-0.2),z=p.getZ(i)-(L+sStart+40)/2+20;const s=-z;const d=Math.abs(x)-HW;
-      const eh=C.hs(sg*HW,Math.max(sStart,Math.min(L,s)));p.setX(i,x);p.setZ(i,z);p.setY(i,eh+0.15+Math.min(d,30)*0.12+Math.sin(x*.25+s*.18)*Math.min(d,8)*.22);}
+  // 両わきの野原（道の外も走れる）
+  for(const sg of[-1,1]){const W=70,gx=56,gs=Math.ceil((L-sStart+40)/1.5);const g=new THREE.PlaneGeometry(W,(L-sStart+40),gx,gs);g.rotateX(-Math.PI/2);const p=g.attributes.position;
+    for(let i=0;i<p.count;i++){const x=p.getX(i)+sg*(HW+W/2-0.3),z=p.getZ(i)-(L+sStart+40)/2+20;const s=-z;
+      p.setX(i,x);p.setZ(i,z);p.setY(i,C.hs(x,Math.max(sStart,Math.min(L+20,s)))-0.02);}
     g.computeVertexNormals();const m=new THREE.Mesh(g,M(th.ground));m.receiveShadow=true;sc.add(m);}
-  // さく
-  const nPost=Math.ceil((L-sStart)/4)*2;
-  const posts=new THREE.InstancedMesh(new THREE.BoxGeometry(.2,.9,.2),M(0xffffff),nPost);
-  const rails=new THREE.InstancedMesh(new THREE.BoxGeometry(.12,.12,4.05),M(0xff4d4d),nPost);
-  const mt=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),one=new THREE.Vector3(1,1,1),v3=new THREE.Vector3();
-  let pi=0;for(let s=sStart;s<L;s+=4)for(const sg of[-1,1]){const x=sg*(HW+.25);const h0=C.hs(sg*HW,s),h1=C.hs(sg*HW,s+4);
-    mt.compose(v3.set(x,h0+.45,-s),q.identity(),one);posts.setMatrixAt(pi,mt);
-    e.set(Math.atan2(h1-h0,4),0,0);mt.compose(v3.set(x,(h0+h1)/2+.8,-s-2),q.setFromEuler(e),one);rails.setMatrixAt(pi,mt);pi++;}
-  posts.castShadow=true;sc.add(posts);sc.add(rails);
+  const mt=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),v3=new THREE.Vector3();
   // 景色
   const R=rng(C.n*31+5);const nP=Math.round((L-sStart)/2.2);
   const trunk=new THREE.InstancedMesh(new THREE.CylinderGeometry(.2,.28,1.3,6),M(th.prop==='cactus'?0x4c9a4a:th.prop==='lava'||th.prop==='crater'?th.ground:0x8a5a2b),nP);
@@ -553,15 +547,15 @@ function buildCourseScene(C){
   else topGeo=new THREE.ConeGeometry(1.2,th.prop==='pine'?3.6:2.8,7);
   const topMat=th.prop==='lava'?M(0x2a2222):th.prop==='crater'?M(0x8a8c98):th.prop==='snowtree'?M(0xffffff):M(th.leaf);
   const tops=new THREE.InstancedMesh(topGeo,topMat,nP);
-  for(let i=0;i<nP;i++){const s=sStart+R()*(L-sStart+30);const sg=R()<.5?-1:1;const d=2.5+Math.pow(R(),1.6)*34;const x=sg*(HW+d);
-    const y=C.hs(sg*HW,Math.min(L,s))+0.15+Math.min(d,30)*0.12+Math.sin(x*.25+s*.18)*Math.min(d,8)*.22;const sz=.8+R()*.7;
+  for(let i=0;i<nP;i++){const s=sStart+R()*(L-sStart+30);const sg=R()<.5?-1:1;const d=9+Math.pow(R(),1.3)*40;const x=sg*(HW+d);
+    const y=C.hs(x,Math.min(L+20,s))-0.1;const sz=.8+R()*.7;
     if(th.prop==='crater'){mt.compose(v3.set(x,y+.05,-s),q.setFromEuler(e.set(Math.PI/2,0,0)),new THREE.Vector3(sz,sz,sz*.6));tops.setMatrixAt(i,mt);mt.makeScale(0,0,0);trunk.setMatrixAt(i,mt);}
     else if(th.prop==='lava'){mt.compose(v3.set(x,y+.3,-s),q.setFromEuler(e.set(R(),R(),R())),new THREE.Vector3(sz,sz*.8,sz));tops.setMatrixAt(i,mt);mt.makeScale(0,0,0);trunk.setMatrixAt(i,mt);}
     else{mt.compose(v3.set(x,y+.65*sz,-s),q.identity(),new THREE.Vector3(sz,sz,sz));trunk.setMatrixAt(i,mt);
       mt.compose(v3.set(x,y+(th.prop==='cactus'?1.6:2.3)*sz,-s),q.identity(),new THREE.Vector3(sz,sz,sz));tops.setMatrixAt(i,mt);}}
   tops.castShadow=true;sc.add(trunk);sc.add(tops);
   if(th.prop==='lava'){for(let i=0;i<14;i++){const s=R()*L;const sg=R()<.5?-1:1;const p=new THREE.Mesh(new THREE.CircleGeometry(2+R()*3,10),MB(0xff5a1f));p.rotation.x=-Math.PI/2;
-    const x=sg*(HW+8+R()*20);p.position.set(x,C.hs(sg*HW,s)+0.2+(Math.abs(x)-HW)*0.12+0.3,-s);sc.add(p);}}
+    const x=sg*(HW+12+R()*20);p.position.set(x,C.hs(x,s)+0.15,-s);sc.add(p);}}
   if(th.prop==='crater'){const sg=new THREE.BufferGeometry();const sp=[];for(let i=0;i<600;i++){const a=Math.random()*6.28,b=Math.random()*1.3;sp.push(Math.cos(a)*Math.cos(b)*300,Math.sin(b)*300+20,Math.sin(a)*Math.cos(b)*300-100);}
     sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));sc.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.2,fog:false})));
     const earth=new THREE.Mesh(new THREE.SphereGeometry(14,24,16),MB(0x3b8cff,{fog:false}));earth.position.set(-60,70,-250);sc.add(earth);}
@@ -814,9 +808,9 @@ function frame(now){
       if(carObj.userData.flames)carObj.userData.flames.forEach(f=>{f.scale.set(1,0.6+Math.random()*.6+R.v*0.03,1);});
       if(!R.air&&R.v>3&&Math.random()<dt*9)puff(R,course.th.prop==='snowtree'?0xffffff:0xeadfcc);
       // カメラ
-      const tx=R.x*0.75, ty=Math.max(R.y,course.hs(R.x,R.s-8))+4.4, ts=R.s-8.5;
+      const tx=R.x*0.92, ty=Math.max(R.y,course.hs(R.x,R.s-8))+4.4, ts=R.s-8.5;
       camPos.lerp(new THREE.Vector3(tx,ty,-ts),Math.min(1,dt*4));
-      camLook.lerp(new THREE.Vector3(R.x*0.85,course.hs(R.x*.5,R.s+10)+0.6,-(R.s+10)),Math.min(1,dt*5));
+      camLook.lerp(new THREE.Vector3(R.x*0.95,course.hs(R.x,R.s+10)+0.6,-(R.s+10)),Math.min(1,dt*5));
       // HUD
       $('dDist').textContent=Math.floor(R.s);$('dSpd').textContent=Math.round(Math.max(0,R.v)*3.6)+' km/h';$('dCoin').textContent=R.coins;
       $('dBar').style.width=Math.min(100,R.s/course.goal*100)+'%';
