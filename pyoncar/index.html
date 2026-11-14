@@ -234,12 +234,12 @@ const FORMS = [
 ];
 const FORM_BONUS = ['','発射 +8%・ころがり +6%・コイン +10%'];
 const THEMES = {
-  grass:  {nm:'草原', sky:0x87cfff, fog:0xa8dcff, road:0xc9a774, ground:0x7ccf5a, prop:'tree',  leaf:0x3e9a4a, crr:1,   g:9.8, grip:1,   hill:1},
-  desert: {nm:'砂漠', sky:0xffd9a0, fog:0xffe3b8, road:0xe8c27a, ground:0xf0cf86, prop:'cactus',leaf:0x4c9a4a, crr:1.15,g:9.8, grip:.9,  hill:1.2},
-  forest: {nm:'森',   sky:0x9fd9c0, fog:0xb5e3cd, road:0xa98a62, ground:0x4fa24a, prop:'pine',  leaf:0x2c7a3a, crr:1.05,g:9.8, grip:1,   hill:1.1},
-  snow:   {nm:'雪山', sky:0xcfe6ff, fog:0xe4f0ff, road:0xdfe9f5, ground:0xf6fbff, prop:'snowtree',leaf:0x2f7a5a,crr:.75,g:9.8, grip:.55, hill:1.35},
-  volcano:{nm:'火山', sky:0xff9a7a, fog:0xd9826a, road:0x5a4a4a, ground:0x3d3434, prop:'lava',  leaf:0xff5a1f, crr:1.1, g:9.8, grip:1,   hill:1.45},
-  moon:   {nm:'月面', sky:0x0b1030, fog:0x1a2050, road:0xb7b9c4, ground:0x9a9ca8, prop:'crater',leaf:0x777a88, crr:.9,  g:4.2, grip:.8,  hill:1.5},
+  grass:  {nm:'草原', sky:0x87cfff, fog:0xa8dcff, road:0xc9a774, ground:0x7ccf5a, prop:'tree',  leaf:0x3e9a4a, mtn:0x5f9c6a, crr:1,   g:9.8, grip:1,   hill:1},
+  desert: {nm:'砂漠', sky:0xffd9a0, fog:0xffe3b8, road:0xe8c27a, ground:0xf0cf86, prop:'cactus',leaf:0x4c9a4a, mtn:0xd69a5a, crr:1.15,g:9.8, grip:.9,  hill:1.2},
+  forest: {nm:'森',   sky:0x9fd9c0, fog:0xb5e3cd, road:0xa98a62, ground:0x4fa24a, prop:'pine',  leaf:0x2c7a3a, mtn:0x3f7a5a, snowcap:1, crr:1.05,g:9.8, grip:1,   hill:1.1},
+  snow:   {nm:'雪山', sky:0xcfe6ff, fog:0xe4f0ff, road:0xdfe9f5, ground:0xf6fbff, prop:'snowtree',leaf:0x2f7a5a,mtn:0x8fa8c8,snowcap:1,crr:.75,g:9.8, grip:.55, hill:1.35},
+  volcano:{nm:'火山', sky:0xff9a7a, fog:0xd9826a, road:0x5a4a4a, ground:0x3d3434, prop:'lava',  leaf:0xff5a1f, mtn:0x3a2a2a, crr:1.1, g:9.8, grip:1,   hill:1.45},
+  moon:   {nm:'月面', sky:0x0b1030, fog:0x1a2050, road:0xb7b9c4, ground:0x9a9ca8, prop:'crater',leaf:0x777a88, mtn:0x5a5c6a, crr:.9,  g:4.2, grip:.8,  hill:1.5},
 };
 const STAGES = [
   ['草原の道','grass'],['なだらかな丘','grass'],['でこぼこ道','grass'],
@@ -294,19 +294,29 @@ function makeCourse(n,goalOv){
   const A=Math.min(0.35+n*0.07,1.3)*th.hill;
   const comps=[0,1,2].map(i=>({a:A*(0.35+R()*0.5)/(i+1)*1.4, f:2*Math.PI/(26+R()*60)*(1+i*.7), p:R()*6.28}));
   const grade=0.015+R()*0.008;
+  // 道の曲がり（左右にくねる）: 傾きの最大をステージで決める
+  const slopeMax=Math.min(0.32,0.12+0.025*n);
+  const bends=[0,1].map(i=>{const lam=110+R()*140;return {lam,a:slopeMax*lam/(2*Math.PI)*(i?0.45:0.75),p:R()*6.28};});
+  const cen0=s=>{let c=0;for(const b of bends)c+=b.a*(Math.sin(2*Math.PI*s/b.lam+b.p)-Math.sin(b.p));return c;};
+  const cen=s=>s<30?0:cen0(s)*sstep(30,90,s);
   const feats=[], coins=[], rocks=[];
   const lvl=Math.min(1,(n-1)/10);
+  // 吊り橋の場所
+  const nBr=n<2?0:n<6?1:n<10?2:3;const bridges=[];
+  for(let i=0;i<nBr;i++){const s0=Math.round(160+(goalOf(n)-260)*(i+0.3+R()*0.4)/nBr);const len=28+R()*18;bridges.push({t:'bridge',s0,s1:s0+len,hw:2.6,sag:0.8+R()*0.6,x0:-2.6,x1:2.6});}
   let s=36;
   const rangeX=(w)=>{const c=(R()*2-1)*(HW-1-w/2);return [c-w/2,c+w/2];};
   while(s<L-12){
     const len=14+R()*16;
+    const br=bridges.find(b=>b.s0<s+len+14&&b.s1>s-6);
+    if(br){feats.push(br);for(let i=0;i<Math.floor((br.s1-br.s0)/2.6);i++)coins.push({x:0,s:br.s0+2+i*2.6,got:false});s=br.s1+12;continue;}
     const r=R();
     const pick = r<0.26?'bump': r<0.44?'mud': r<0.58?'ramp': r<0.72?'boost': r<0.86?'rocks':'tilt';
     if(pick==='bump'){const w=6+R()*5;const [x0,x1]=rangeX(w);feats.push({t:'bump',s0:s,s1:s+len,x0,x1,amp:0.3+0.25*R()+0.2*lvl});}
     else if(pick==='mud'){const w=5+R()*5;const [x0,x1]=rangeX(w);feats.push({t:'mud',s0:s+2,s1:s+len*0.8,x0,x1});}
     else if(pick==='ramp'){const [x0,x1]=rangeX(3.6);feats.push({t:'ramp',s0:s+4,s1:s+10,x0,x1,h:1.2+0.6*R()});
       if(R()<.7){const [m0,m1]=[Math.max(-HW+1,x0-2),Math.min(HW-1,x1+2)];feats.push({t:'mud',s0:s+11,s1:s+19,x0:m0,x1:m1});}}
-    else if(pick==='boost'){const [x0,x1]=rangeX(2.8);feats.push({t:'boost',s0:s+4,s1:s+9,x0,x1});}
+    else if(pick==='boost'){const [x0,x1]=rangeX(3.6);feats.push({t:'boost',s0:s+4,s1:s+14,x0,x1});}
     else if(pick==='rocks'){const k=1+Math.floor(R()*2+lvl*2);for(let i=0;i<k;i++)rocks.push({x:(R()*2-1)*(HW-1.5),s:s+3+(i+R())*len/k,r:0.7+R()*0.5,hit:false});}
     else {feats.push({t:'tilt',s0:s,s1:s+len+6,k:(R()<.5?-1:1)*(0.06+0.06*R()+0.05*lvl)});}
     if(R()<0.62){ // コインの列
@@ -327,24 +337,37 @@ function makeCourse(n,goalOv){
     if(k>0){let w=0;for(const c of comps)w+=c.a*(Math.sin(s*c.f+c.p)-Math.sin(12*c.f+c.p));h+=k*w-grade*Math.max(0,s-12);}
     return h;
   };
-  const edge=(x,f,e=.7)=>sstep(f.x0-e,f.x0+e,x)*(1-sstep(f.x1-e,f.x1+e,x))*sstep(f.s0-e,f.s0+e*2,0)*1;
-  // 物理用の高さ（でこぼこを含まない）
-  const side=(x,s)=>{const d=Math.abs(x)-HW+1;if(d<=0)return 0;return (d<23?0.016*d*d:8.46+0.25*(d-23))+Math.sin(x*.23+s*.17)*Math.min(d,8)*.12;};
+  const bridgeAt=s=>{for(const f of near(s))if(f.t==='bridge'&&s>=f.s0&&s<=f.s1)return f;return null;};
+  // 吊り橋の床の高さ（両端を結んでたわむ）
+  const deckH=(f,s)=>{const t=(s-f.s0)/(f.s1-f.s0);return base(f.s0)+(base(f.s1)-base(f.s0))*t-f.sag*Math.sin(Math.PI*t);};
+  // 以下 x は絶対座標。道の中心からのずれ xl に直して使う
+  const side=(xl,s)=>{const d=Math.abs(xl)-HW+1;if(d<=0)return 0;return (d<23?0.016*d*d:8.46+0.25*(d-23))+Math.sin(xl*.23+s*.17)*Math.min(d,8)*.12;};
   const hs=(x,s)=>{
-    let h=base(s)+side(x,s);
+    const xl=x-cen(s);
+    let h=base(s)+side(xl,s);
     for(const f of near(s)){
-      if(f.t==='tilt'){const w=sstep(f.s0,f.s0+6,s)*(1-sstep(f.s1-6,f.s1,s));h+=f.k*Math.max(-HW,Math.min(HW,x))*w;}
-      else if(f.t==='ramp'&&s>=f.s0&&s<=f.s1+0.6){const e=sstep(f.x0-.4,f.x0+.2,x)*(1-sstep(f.x1-.2,f.x1+.4,x));
+      if(f.t==='tilt'){const w=sstep(f.s0,f.s0+6,s)*(1-sstep(f.s1-6,f.s1,s));h+=f.k*Math.max(-HW,Math.min(HW,xl))*w;}
+      else if(f.t==='ramp'&&s>=f.s0&&s<=f.s1+0.6){const e=sstep(f.x0-.4,f.x0+.2,xl)*(1-sstep(f.x1-.2,f.x1+.4,xl));
         const up=s<=f.s1?(s-f.s0)/(f.s1-f.s0):1-(s-f.s1)/0.6;h+=f.h*up*e;}
+      else if(f.t==='bridge'&&s>=f.s0-0.5&&s<=f.s1+0.5){
+        const ins=sstep(f.s0-0.5,f.s0+0.8,s)*(1-sstep(f.s1-0.8,f.s1+0.5,s));
+        const on=1-sstep(f.hw-0.05,f.hw+0.25,Math.abs(xl));
+        const deck=deckH(f,Math.max(f.s0,Math.min(f.s1,s)));
+        const deep=base(s)-20;
+        h=h*(1-ins)+ins*(deck*on+deep*(1-on));}
     }
     return h;
   };
+  const gapAt=(x,s)=>{const f=bridgeAt(s);if(!f)return null;return Math.abs(x-cen(s))>f.hw+0.1&&s>f.s0+0.8&&s<f.s1-0.8?f:null;};
   // でこぼこの量 (0..amp)
-  const rough=(x,s)=>{let a=0;for(const f of near(s))if(f.t==='bump'&&s>f.s0&&s<f.s1){const e=sstep(f.x0-.6,f.x0+.6,x)*(1-sstep(f.x1-.6,f.x1+.6,x))*sstep(f.s0,f.s0+2,s)*(1-sstep(f.s1-2,f.s1,s));a=Math.max(a,f.amp*e);}return a;};
+  const rough=(x,s)=>{const xl=x-cen(s);let a=0;for(const f of near(s))if(f.t==='bump'&&s>f.s0&&s<f.s1){const e=sstep(f.x0-.6,f.x0+.6,xl)*(1-sstep(f.x1-.6,f.x1+.6,xl))*sstep(f.s0,f.s0+2,s)*(1-sstep(f.s1-2,f.s1,s));a=Math.max(a,f.amp*e);}return a;};
   const bumpH=(x,s)=>{const a=rough(x,s);return a?a*Math.sin(x*1.35)*Math.sin(s*0.95):0;};
   const hv=(x,s)=>hs(x,s)+bumpH(x,s);
-  const surf=(x,s)=>{if(Math.abs(x)>HW)return 'grass';for(const f of near(s)){if(s<f.s0||s>f.s1||x<f.x0||x>f.x1)continue;if(f.t==='mud')return 'mud';if(f.t==='boost')return 'boost';if(f.t==='ramp')return 'ramp';}return '';};
-  return {n,info,th,goal,L,feats,coins,rocks,hs,hv,rough,surf,near,side};
+  const surf=(x,s)=>{const xl=x-cen(s);for(const f of near(s)){if(s<f.s0||s>f.s1||xl<f.x0||xl>f.x1)continue;if(f.t==='bridge')return 'bridge';if(f.t==='mud')return 'mud';if(f.t==='boost')return 'boost';if(f.t==='ramp')return 'ramp';}if(Math.abs(xl)>HW)return 'grass';return '';};
+  // コインと岩は絶対座標に直す
+  for(const c of coins)c.x+=cen(c.s);
+  for(const k of rocks)k.x+=cen(k.s);
+  return {n,info,th,goal,L,feats,coins,rocks,hs,hv,rough,surf,near,side,cen,base,bridgeAt,gapAt,deckH};
 }
 
 /* ================= 物理 ================= */
@@ -369,20 +392,20 @@ function step(R,C,st,dt){
     a-=g*crr*Math.sign(R.v);
     const ro=C.rough(R.x,R.s);
     if(ro>0)a-=ro*st.bump*R.v;
-    if(sf==='boost'){a+=30;if(!R.onBoost){R.onBoost=true;R.events.push('boost');}}else R.onBoost=false;
+    if(sf==='boost'){a+=18;if(!R.onBoost){R.onBoost=true;R.events.push('boost');}}else R.onBoost=false;
     if(sf==='mud'&&R.v>2&&Math.random()<dt*3)R.events.push('mud');
     a-=st.drag*R.v*Math.abs(R.v);
     R.v+=a*dt;
-    const tgt=R.steer*st.steer*Math.min(1,Math.max(0,R.v)/4);
+    const tgt=R.steer*(st.steer+0.16*Math.max(0,R.v))*Math.min(1,Math.max(0,R.v)/4);
     R.vx+=(tgt-R.vx)*Math.min(1,dt*6*C.th.grip);
     R.vx-=g*hx*0.55*dt;
   }else{
     R.v-=st.drag*R.v*Math.abs(R.v)*dt;
     R.vy-=g*dt;
-    const tgt=R.steer*st.steer*0.5;R.vx+=(tgt-R.vx)*Math.min(1,dt*2);
+    const tgt=R.steer*(st.steer+0.16*Math.max(0,R.v))*0.5;R.vx+=(tgt-R.vx)*Math.min(1,dt*1.5);
   }
   R.s+=R.v*dt; R.x+=R.vx*dt;
-  if(Math.abs(R.x)>XMAX){R.x=Math.sign(R.x)*XMAX;R.vx=0;}
+  {const c=C.cen(R.s);if(Math.abs(R.x-c)>XMAX){R.x=c+Math.sign(R.x-c)*XMAX;R.vx=0;}}
   const ny=C.hs(R.x,R.s);
   if(!R.air){
     const vyg=(ny-R.y)/dt;
@@ -401,31 +424,35 @@ function step(R,C,st,dt){
   for(const c of C.coins){if(c.got||Math.abs(c.s-R.s)>st.magnet+1)continue;const dx=R.x-c.x,ds=R.s-c.s;
     if(dx*dx+ds*ds<st.magnet*st.magnet && Math.abs(R.y+0.8-(C.hs(c.x,c.s)+1.1))<2.2){c.got=true;R.coins++;R.events.push('coin');}}
   if(R.v>R.maxV)R.maxV=R.v;
+  {const f=C.bridgeAt(R.s);if(f&&R.y<C.deckH(f,R.s)-3.5){R.done=true;R.fell=true;R.events.push('fall');return;}}
   if(!R.cleared&&R.s>=C.goal){R.cleared=true;R.events.push('goal');}
   if(R.s>=C.L-8){R.s=C.L-8;R.v=0;}
   if(!R.air&&R.v<0.35){R.stopT+=dt;if(R.stopT>0.5||R.v<=0){R.done=true;R.v=Math.max(0,R.v);}}else R.stopT=0;
 }
 // 自動運転（調整・デモ用）: 前方を見て通りやすい位置へ寄せる
 function autoSteer(R,C,skill=1,rnd=Math.random){
-  let best=R.x,bv=-1e9;
-  for(let x=-HW-4;x<=HW+4;x+=0.5){
-    let v=-Math.abs(x-R.x)*0.15-(Math.abs(x)>HW-0.5?2.5:0);
-    const LA=Math.max(26,R.v*1.6);for(let d=4;d<=LA;d+=LA/12){const s=R.s+d;const sf=C.surf(x,s);if(sf==='mud')v-=3;if(sf==='boost')v+=4;if(sf==='ramp')v+=0.5;v-=C.rough(x,s)*4;
+  let best=0,bv=-1e9;const cx=R.x-C.cen(R.s);
+  const LA=Math.max(26,R.v*1.6);
+  for(let xl=-HW-4;xl<=HW+4;xl+=0.5){
+    let v=-Math.abs(xl-cx)*0.15-(Math.abs(xl)>HW-0.5?2.5:0);
+    for(let d=4;d<=LA;d+=LA/12){const s=R.s+d;const x=C.cen(s)+xl;const sf=C.surf(x,s);if(sf==='mud')v-=3;if(sf==='boost')v+=4;if(sf==='ramp')v+=0.5;v-=C.rough(x,s)*4;
+      if(C.gapAt(x,s))v-=40;
       for(const k of C.rocks)if(Math.abs(k.s-s)<1&&Math.abs(k.x-x)<k.r+1.2)v-=12;
       for(const c of C.coins)if(!c.got&&Math.abs(c.s-s)<1&&Math.abs(c.x-x)<1.2)v+=1.2;}
     v+=(rnd()-0.5)*(1-skill)*20;
-    if(v>bv){bv=v;best=x;}
+    if(v>bv){bv=v;best=xl;}
   }
-  R.steer=Math.max(-1,Math.min(1,(best-R.x)*0.8));
-  if(!R.air&&R.jumpT<=0){const d0=R.v*0.22,d1=R.v*0.4;let bad=false;
-    for(let d=d0;d<=d1;d+=1){const s=R.s+d;const sf=C.surf(R.x,s);if(sf==='mud'||C.rough(R.x,s)>0.2)bad=true;
-      for(const k of C.rocks)if(!k.hit&&Math.abs(k.s-s)<1&&Math.abs(k.x-R.x)<k.r+1)bad=true;}
+  const ahead=R.s+Math.max(3,R.v*0.35);const tx=C.cen(ahead)+best;
+  R.steer=Math.max(-1,Math.min(1,(tx-R.x)*0.5));
+  if(!R.air&&R.jumpT<=0&&!C.bridgeAt(R.s+R.v*0.3)){const d0=R.v*0.22,d1=R.v*0.4;let bad=false;
+    for(let d=d0;d<=d1;d+=1){const s=R.s+d;const x=R.x+R.vx*d/Math.max(1,R.v);const sf=C.surf(x,s);if(sf==='mud'||C.rough(x,s)>0.2)bad=true;
+      for(const k of C.rocks)if(!k.hit&&Math.abs(k.s-s)<1&&Math.abs(k.x-x)<k.r+1)bad=true;}
     if(bad)R.jumpReq=0.15;}
 }
 
 // ゴール距離: 目安の強化レベルで自動運転したときの距離から決める
 const GOALS=[300,450,600,780,950,1150,1350,1600,1850,2100,2400,2750,3100];
-const SEEDV=[13,6,4,13,15,1,1,20,9,7,20,13,0];
+const SEEDV=[0,26,1,27,10,1,1,39,3,28,38,27,13];
 const lvTarget=n=>Math.min(25,Math.round(1.7*(n-1)));
 function calibrate(n){
   const lv=lvTarget(n),up={};UPS.forEach(u=>up[u.id]=lv);const st=stats(up);const ds=[];
@@ -513,6 +540,37 @@ function buildCar(form){
   const outer=new THREE.Group();outer.add(c);outer.userData={wheels,wr,rabbit:rb,inner:c,flames:c.userData.flames};
   return outer;
 }
+// テーマごとの景色の小物（パーツを組み合わせてインスタンス描画）
+function propSet(th){
+  const G=THREE, P=(geo,col,off,o={})=>({geo,mat:o.basic?MB(col):M(col,o.mo||{}),off,scl:o.scl,rot:o.rot});
+  const tree=(leaf,h=1)=>({rate:.32,shadow:true,parts:[P(new G.CylinderGeometry(.18,.25,1.4*h,6),0x8a5a2b,[0,.7*h,0]),P(new G.IcosahedronGeometry(1.1,0),leaf,[0,1.9*h,0])]});
+  const house=(wall,roof)=>({rate:.035,dmin:13,smin:1,smax:1.4,shadow:true,parts:[P(new G.BoxGeometry(2.6,1.8,2.2),wall,[0,.9,0]),P(new G.ConeGeometry(2.1,1.3,4),roof,[0,2.45,0],{rot:[0,Math.PI/4,0]}),P(new G.BoxGeometry(.5,.9,.06),0x6a4426,[0,.45,1.11])]});
+  const flowers=(c)=>({rate:.25,dmin:1,dmax:30,smin:.6,smax:1.1,parts:[P(new G.CylinderGeometry(.03,.03,.5,4),0x3e9a4a,[0,.25,0]),P(new G.IcosahedronGeometry(.18,0),c,[0,.55,0],{basic:true})]});
+  const rock=(c,r=1)=>({rate:.12,smin:.5,smax:1.6,shadow:true,parts:[P(new G.DodecahedronGeometry(.8*r,0),c,[0,.3,0],{scl:[1,.7,1]})]});
+  switch(th.prop){
+    case 'tree':return[tree(th.leaf),house(0xfff3e0,0xe0503a),house(0xe3f1ff,0x3a74e0),flowers(0xff6fae),flowers(0xffe14d),
+      {rate:.02,dmin:16,smin:1.2,smax:1.6,shadow:true,parts:[P(new G.CylinderGeometry(.25,.45,5,6),0xffffff,[0,2.5,0]),P(new G.BoxGeometry(.25,4.4,.5),0xffe0e0,[0,5,.4],{rot:[0,0,.6]}),P(new G.BoxGeometry(.25,4.4,.5),0xffe0e0,[0,5,.4],{rot:[0,0,-.95]})]},
+      {rate:.05,dmin:6,smin:.8,smax:1.4,parts:[P(new G.IcosahedronGeometry(.7,0),0x5fb84a,[0,.35,0],{scl:[1.4,.7,1]})]}];
+    case 'cactus':return[{rate:.18,shadow:true,parts:[P(new G.CylinderGeometry(.3,.35,2.6,7),th.leaf,[0,1.3,0]),P(new G.CylinderGeometry(.2,.2,1,6),th.leaf,[.5,1.6,0],{rot:[0,0,-.9]}),P(new G.CylinderGeometry(.2,.2,.9,6),th.leaf,[.75,2.2,0])]},
+      {rate:.015,dmin:30,dmax:70,smin:4,smax:8,shadow:true,parts:[P(new G.ConeGeometry(2,1.6,4),0xe3b35f,[0,.8,0],{rot:[0,Math.PI/4,0]})]},
+      rock(0xc9884a,1.4),{rate:.06,dmin:4,smin:.5,smax:1,parts:[P(new G.IcosahedronGeometry(.6,0),0xb7a25a,[0,.3,0],{scl:[1.2,.6,1.2]})]},
+      {rate:.02,dmin:12,smin:1,smax:1.4,shadow:true,parts:[P(new G.CylinderGeometry(.6,.6,2.6,8),0xd6a35c,[0,1.3,0]),P(new G.SphereGeometry(.62,8,6,0,6.3,0,1.6),0xe8c27a,[0,2.6,0])]}];
+    case 'pine':return[{rate:.45,shadow:true,parts:[P(new G.CylinderGeometry(.18,.25,1.2,6),0x6a4426,[0,.6,0]),P(new G.ConeGeometry(1.3,2.4,7),th.leaf,[0,2.1,0]),P(new G.ConeGeometry(.9,1.8,7),0x379a48,[0,3.2,0])]},
+      {rate:.08,dmin:2,dmax:24,smin:.6,smax:1.4,parts:[P(new G.CylinderGeometry(.12,.16,.6,6),0xfff3e0,[0,.3,0]),P(new G.SphereGeometry(.5,10,6,0,6.3,0,1.6),0xe0303a,[0,.55,0])]},
+      {rate:.04,dmin:3,smin:.8,smax:1.3,shadow:true,parts:[P(new G.CylinderGeometry(.35,.35,3,8),0x8a5a2b,[0,.35,0],{rot:[0,0,Math.PI/2]})]},
+      flowers(0xffffff),rock(0x7a8a6a)];
+    case 'snowtree':return[{rate:.35,shadow:true,parts:[P(new G.CylinderGeometry(.18,.25,1.2,6),0x6a4426,[0,.6,0]),P(new G.ConeGeometry(1.3,2.6,7),th.leaf,[0,2.2,0]),P(new G.ConeGeometry(.75,1.1,7),0xffffff,[0,3.2,0])]},
+      {rate:.04,dmin:5,smin:.9,smax:1.3,shadow:true,parts:[P(new G.SphereGeometry(.7,10,8),0xffffff,[0,.6,0]),P(new G.SphereGeometry(.48,10,8),0xffffff,[0,1.55,0]),P(new G.ConeGeometry(.08,.4,5),0xff8a3d,[0,1.55,.6],{rot:[Math.PI/2,0,0]}),P(new G.CylinderGeometry(.3,.3,.4,8),0x333344,[0,2.1,0])]},
+      {rate:.02,dmin:12,smin:1.2,smax:1.7,shadow:true,parts:[P(new G.SphereGeometry(1.6,12,8,0,6.3,0,1.6),0xeaf4ff,[0,0,0]),P(new G.CylinderGeometry(.6,.6,1,8,1,false,0,3.2),0xd6e6f5,[0,.4,1.4],{rot:[Math.PI/2,0,0]})]},
+      {rate:.06,dmin:3,smin:.6,smax:1.4,parts:[P(new G.OctahedronGeometry(.5,0),0x9fe6ff,[0,.8,0],{scl:[.6,2,.6],mo:{emissive:0x3a7aa0,metalness:.3,roughness:.2}})]},rock(0xb5c3d6)];
+    case 'lava':return[{rate:.12,shadow:true,parts:[P(new G.CylinderGeometry(.1,.2,2.4,5),0x1e1818,[0,1.2,0]),P(new G.CylinderGeometry(.06,.08,1,4),0x1e1818,[.35,1.8,0],{rot:[0,0,-.8]})]},
+      rock(0x2a2222,1.3),{rate:.07,dmin:2,smin:.5,smax:1,parts:[P(new G.IcosahedronGeometry(.4,0),0xff7a2a,[0,.2,0],{basic:true})]},
+      {rate:.03,dmin:6,smin:1,smax:2,shadow:true,parts:[P(new G.CylinderGeometry(.3,.6,2.2,6),0x4a3a3a,[0,1.1,0]),P(new G.ConeGeometry(.35,1,6),0xff5a1f,[0,2.6,0],{basic:true})]}];
+    default:return[rock(0x8a8c98,1.2),{rate:.06,dmin:4,smin:1,smax:2.5,parts:[P(new G.TorusGeometry(1,.25,6,14),0x6f7180,[0,.05,0],{rot:[Math.PI/2,0,0]})]},
+      {rate:.02,dmin:10,smin:1,smax:1.3,shadow:true,parts:[P(new G.CylinderGeometry(.05,.05,2,4),0xdddddd,[0,1,0]),P(new G.BoxGeometry(1,.6,.03),0xff3d6d,[.5,1.7,0])]},
+      {rate:.03,dmin:8,smin:1,smax:1.4,shadow:true,parts:[P(new G.SphereGeometry(1.2,12,8,0,6.3,0,1.6),0xe8eaf2,[0,0,0],{mo:{metalness:.5,roughness:.3}}),P(new G.BoxGeometry(2.6,.1,1.2),0x3b6cff,[2.2,.8,0])]}];
+  }
+}
 function coinMesh(){return new THREE.CylinderGeometry(.45,.45,.12,16);}
 
 /* ---- ガレージの舞台 ---- */
@@ -534,7 +592,8 @@ let gCar=null,gCarForm=-1;
 function setGarageCar(f){if(gCar)gScene.remove(gCar);gCar=buildCar(f);gScene.add(gCar);gCarForm=f;}
 
 /* ---- コースの舞台 ---- */
-let cScene=null, course=null, carObj=null, coinInst=null, sling=null, dust=[], rockMeshes=[];
+let tilt={p:0,r:0,y:0};
+let cScene=null, course=null, carObj=null, coinInst=null, sling=null, dust=[], rockMeshes=[], boostArrows=[];
 const cSun=new THREE.DirectionalLight(0xffffff,2.3);cSun.castShadow=true;cSun.shadow.mapSize.set(1024,1024);
 Object.assign(cSun.shadow.camera,{left:-18,right:18,top:18,bottom:-18,near:1,far:120});
 function buildCourseScene(C){
@@ -542,68 +601,102 @@ function buildCourseScene(C){
   sc.background=new THREE.Color(th.sky);sc.fog=new THREE.Fog(th.fog,55,170);
   sc.add(new THREE.HemisphereLight(0xeef7ff,th.ground,1.05));sc.add(cSun);sc.add(cSun.target);
   const L=C.L, sStart=-30;
-  // 道
+  // 道（中心は C.cen(s) にそって曲がる）
   const nx=40, ds=L>2400?1:0.6, ns=Math.ceil((L-sStart)/ds);
   const pos=new Float32Array((nx+1)*(ns+1)*3), col=new Float32Array((nx+1)*(ns+1)*3);
-  const cRoad=new THREE.Color(th.road), cMud=new THREE.Color(0x6b4a2b), cBoost=new THREE.Color(0xffc93d), cRamp=new THREE.Color(0xff8a3d), cEdge=new THREE.Color(0xffffff),cGround=new THREE.Color(th.ground), cGoal=new THREE.Color(0xffffff), cGoal2=new THREE.Color(0x222222), tmp=new THREE.Color();
+  const cRoad=new THREE.Color(th.road), cMud=new THREE.Color(0x6b4a2b), cBoost=new THREE.Color(0x1550e0), cBoost2=new THREE.Color(0x1a78f0), cRamp=new THREE.Color(0xff8a3d), cEdge=new THREE.Color(0xffffff),cGround=new THREE.Color(th.ground), cGoal=new THREE.Color(0xffffff), cGoal2=new THREE.Color(0x222222), cWood=new THREE.Color(0xb07a45), cWood2=new THREE.Color(0x8a5a2b), cRock=new THREE.Color(0x7a6a5a), tmp=new THREE.Color();
   let k=0;
-  for(let j=0;j<=ns;j++){const s=sStart+j*ds;for(let i=0;i<=nx;i++){const x=-HW+i*(2*HW/nx);
+  for(let j=0;j<=ns;j++){const s=sStart+j*ds;const c0=C.cen(s);for(let i=0;i<=nx;i++){const xl=-HW+i*(2*HW/nx),x=c0+xl;
     pos[k]=x;pos[k+1]=C.hv(x,s);pos[k+2]=-s;
-    const sf=C.surf(x,s);
-    if(Math.abs(s-C.goal)<1.5)tmp.copy(((Math.floor((x+HW)/1.4)+Math.floor((s-C.goal+1.5)/1.5))%2)?cGoal:cGoal2);
+    const sf=C.surf(x,s);const br=C.bridgeAt(s);
+    if(br&&Math.abs(xl)<=br.hw+0.05)tmp.copy((Math.floor(s/0.7)%2)?cWood:cWood2);
+    else if(br)tmp.copy(cRock).multiplyScalar(.8+.2*Math.sin(x*2+s));
+    else if(Math.abs(s-C.goal)<1.5)tmp.copy(((Math.floor((xl+HW)/1.4)+Math.floor((s-C.goal+1.5)/1.5))%2)?cGoal:cGoal2);
     else if(sf==='mud')tmp.copy(cMud).multiplyScalar(.9+.2*Math.sin(x*3+s*2));
-    else if(sf==='boost')tmp.copy(cBoost);
+    else if(sf==='boost')tmp.copy((Math.floor(s/1.2)%2)?cBoost:cBoost2);
     else if(sf==='ramp')tmp.copy((Math.floor(s*1.2)%2)?cRamp:cEdge);
     else {const r=C.rough(x,s);tmp.copy(cRoad).multiplyScalar(r>0?0.85+0.18*Math.sin(x*1.35)*Math.sin(s*.95):0.97+0.03*Math.sin(s*.7+x));}
-    if(Math.abs(x)>HW-1.2&&Math.abs(s-C.goal)>=1.5)tmp.lerp(cGround,sstep(HW-1.2,HW,Math.abs(x))*0.85);
+    if(!br&&Math.abs(xl)>HW-1.2&&Math.abs(s-C.goal)>=1.5)tmp.lerp(cGround,sstep(HW-1.2,HW,Math.abs(xl))*0.85);
     col[k]=tmp.r;col[k+1]=tmp.g;col[k+2]=tmp.b;k+=3;}}
   const idx=[];for(let j=0;j<ns;j++)for(let i=0;i<nx;i++){const a=j*(nx+1)+i,b=a+1,c=a+nx+1,d=c+1;idx.push(a,b,c,b,d,c);}
   const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(pos,3));rg.setAttribute('color',new THREE.BufferAttribute(col,3));rg.setIndex(idx);rg.computeVertexNormals();
   const road=new THREE.Mesh(rg,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.9}));road.receiveShadow=true;sc.add(road);
-  // 加速パネルの矢印
-  for(const f of C.feats)if(f.t==='boost'){for(let s=f.s0+1;s<f.s1;s+=1.8){const a=new THREE.Mesh(new THREE.ConeGeometry(.8,1.2,3),MB(0xff6a1f));a.rotation.x=-Math.PI/2;a.scale.y=.25;const x=(f.x0+f.x1)/2;a.position.set(x,C.hs(x,s)+.1,-s);sc.add(a);}}
+  // 加速パネル: 平らな矢印が前へ流れるように光る
+  boostArrows=[];
+  const chev=new THREE.Shape();chev.moveTo(0,.75);chev.lineTo(1.1,-.05);chev.lineTo(1.1,-.6);chev.lineTo(0,.2);chev.lineTo(-1.1,-.6);chev.lineTo(-1.1,-.05);chev.closePath();
+  const chevGeo=new THREE.ShapeGeometry(chev);
+  for(const f of C.feats)if(f.t==='boost'){let i=0;for(let s=f.s0+1;s<f.s1-0.5;s+=1.6,i++){const xm=C.cen(s)+(f.x0+f.x1)/2;
+      const a=new THREE.Mesh(chevGeo,MB(0xffffff,{transparent:true}));a.rotation.order='YXZ';a.rotation.set(-Math.PI/2+Math.atan((C.hs(xm,s+.5)-C.hs(xm,s-.5))),Math.atan(C.cen(s+1)-C.cen(s-1))/2*0,0);
+      a.scale.setScalar(1.45);a.position.set(xm,C.hs(xm,s)+.06,-s);a.userData={i};sc.add(a);boostArrows.push(a);}
+    // 浮かんだ矢印（低い視点からも前向きの矢印に見えるよう、少し後ろへ倒す）
+    for(let j=0;j<3;j++){const ss=f.s0+2+j*3.2,xm=C.cen(ss)+(f.x0+f.x1)/2;const a=new THREE.Mesh(chevGeo,MB(0x8ae6ff,{transparent:true,side:THREE.DoubleSide,depthWrite:false}));
+      a.rotation.set(-1.2,0,0);a.scale.setScalar(.85);a.position.set(xm,C.hs(xm,ss)+1.1,-ss);a.userData={i:j*2.2};sc.add(a);boostArrows.push(a);}
+    // 両わきの光る柱
+    for(const xl of[f.x0-.2,f.x1+.2]){const x=C.cen(f.s0)+xl;const pl=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1.4,6),MB(0x8ae6ff));pl.position.set(x,C.hs(x,f.s0)+.7,-f.s0);sc.add(pl);
+      const tp=new THREE.Mesh(new THREE.SphereGeometry(.2,8,8),MB(0xffffff));tp.position.set(x,C.hs(x,f.s0)+1.45,-f.s0);sc.add(tp);}}
   // 両わきの野原（道の外も走れる）
-  for(const sg of[-1,1]){const W=70,gx=44,gs=Math.ceil((L-sStart+40)/2.5);const g=new THREE.PlaneGeometry(W,(L-sStart+40),gx,gs);g.rotateX(-Math.PI/2);const p=g.attributes.position;
-    for(let i=0;i<p.count;i++){const x=p.getX(i)+sg*(HW+W/2-0.3),z=p.getZ(i)-(L+sStart+40)/2+20;const s=-z;
-      p.setX(i,x);p.setZ(i,z);p.setY(i,C.hs(x,Math.max(sStart,Math.min(L+20,s)))-0.02);}
+  for(const sg of[-1,1]){const W=70,gx=44,gs=Math.ceil((L-sStart+40)/2);const g=new THREE.PlaneGeometry(W,(L-sStart+40),gx,gs);g.rotateX(-Math.PI/2);const p=g.attributes.position;
+    for(let i=0;i<p.count;i++){const xl=p.getX(i)+sg*(HW+W/2-0.3),z=p.getZ(i)-(L+sStart+40)/2+20;const s=-z;const sc2=Math.max(sStart,Math.min(L+20,s));const x=C.cen(sc2)+xl;
+      p.setX(i,x);p.setZ(i,z);p.setY(i,C.hs(x,sc2)-0.02);}
     g.computeVertexNormals();const m=new THREE.Mesh(g,M(th.ground));m.receiveShadow=true;sc.add(m);}
-  const mt=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),v3=new THREE.Vector3();
-  // 景色
-  const R=rng(C.n*31+5);const nP=Math.round((L-sStart)/2.2);
-  const trunk=new THREE.InstancedMesh(new THREE.CylinderGeometry(.2,.28,1.3,6),M(th.prop==='cactus'?0x4c9a4a:th.prop==='lava'||th.prop==='crater'?th.ground:0x8a5a2b),nP);
-  let topGeo;
-  if(th.prop==='cactus')topGeo=new THREE.CapsuleGeometry(.35,1.6,4,8);
-  else if(th.prop==='lava')topGeo=new THREE.DodecahedronGeometry(1.1);
-  else if(th.prop==='crater')topGeo=new THREE.TorusGeometry(1.6,.45,5,12);
-  else topGeo=new THREE.ConeGeometry(1.2,th.prop==='pine'?3.6:2.8,7);
-  const topMat=th.prop==='lava'?M(0x2a2222):th.prop==='crater'?M(0x8a8c98):th.prop==='snowtree'?M(0xffffff):M(th.leaf);
-  const tops=new THREE.InstancedMesh(topGeo,topMat,nP);
-  for(let i=0;i<nP;i++){const s=sStart+R()*(L-sStart+30);const sg=R()<.5?-1:1;const d=9+Math.pow(R(),1.3)*40;const x=sg*(HW+d);
-    const y=C.hs(x,Math.min(L+20,s))-0.1;const sz=.8+R()*.7;
-    if(th.prop==='crater'){mt.compose(v3.set(x,y+.05,-s),q.setFromEuler(e.set(Math.PI/2,0,0)),new THREE.Vector3(sz,sz,sz*.6));tops.setMatrixAt(i,mt);mt.makeScale(0,0,0);trunk.setMatrixAt(i,mt);}
-    else if(th.prop==='lava'){mt.compose(v3.set(x,y+.3,-s),q.setFromEuler(e.set(R(),R(),R())),new THREE.Vector3(sz,sz*.8,sz));tops.setMatrixAt(i,mt);mt.makeScale(0,0,0);trunk.setMatrixAt(i,mt);}
-    else{mt.compose(v3.set(x,y+.65*sz,-s),q.identity(),new THREE.Vector3(sz,sz,sz));trunk.setMatrixAt(i,mt);
-      mt.compose(v3.set(x,y+(th.prop==='cactus'?1.6:2.3)*sz,-s),q.identity(),new THREE.Vector3(sz,sz,sz));tops.setMatrixAt(i,mt);}}
-  tops.castShadow=true;sc.add(trunk);sc.add(tops);
+  const mt=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),v3=new THREE.Vector3(),sv=new THREE.Vector3();
+  // 吊り橋
+  for(const f of C.feats)if(f.t==='bridge'){
+    const water=new THREE.Mesh(new THREE.PlaneGeometry(160,f.s1-f.s0+2),MB(th.prop==='lava'?0xff5a1f:th.prop==='crater'?0x23284a:0x3aa0e8));water.rotation.x=-Math.PI/2;
+    water.position.set(C.cen((f.s0+f.s1)/2),C.base((f.s0+f.s1)/2)-17,-(f.s0+f.s1)/2);sc.add(water);
+    const wood=M(0x7a4a24),rope=M(0xe8d2a6);
+    const ends=[f.s0,f.s1];
+    for(const se of ends)for(const sg of[-1,1]){const x=C.cen(se)+sg*(f.hw+.25),y=C.deckH(f,se);
+      const t=new THREE.Mesh(new THREE.BoxGeometry(.4,4.2,.4),wood);t.position.set(x,y+1.6,-se);t.castShadow=true;sc.add(t);
+      const cap=new THREE.Mesh(new THREE.BoxGeometry(.6,.25,.6),wood);cap.position.set(x,y+3.75,-se);sc.add(cap);}
+    for(const sg of[-1,1]){
+      const top=[],hand=[];const N=24;
+      for(let i=0;i<=N;i++){const s=f.s0+(f.s1-f.s0)*i/N,t=i/N;const x=C.cen(s)+sg*(f.hw+.25),y=C.deckH(f,s);
+        top.push(new THREE.Vector3(x,y+3.6-2.6*Math.sin(Math.PI*t)+f.sag*Math.sin(Math.PI*t),-s));hand.push(new THREE.Vector3(x,y+1.1,-s));}
+      for(const pts of[top,hand]){const tube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),48,.06,5),rope);sc.add(tube);}
+      for(let i=1;i<N;i++){const a=top[i],b=hand[i];const h=a.y-b.y;if(h<0.1)continue;const hg=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,h,4),rope);hg.position.set(a.x,(a.y+b.y)/2,a.z);sc.add(hg);}}
+    // 床下の梁
+    for(let s=f.s0;s<=f.s1;s+=2.1){const x=C.cen(s);const b=new THREE.Mesh(new THREE.BoxGeometry(f.hw*2+.6,.15,.25),wood);b.position.set(x,C.deckH(f,s)-.12,-s);b.rotation.y=-Math.atan(C.cen(s+1)-C.cen(s-1))/2;sc.add(b);}
+  }
+  // 景色: テーマごとに数種類の小物を散らす
+  const R=rng(C.n*31+5);
+  const P=propSet(th);
+  const total=Math.round((L-sStart)/1.6);
+  for(const pr of P){
+    const cnt=Math.max(1,Math.round(total*pr.rate));
+    const inst=pr.parts.map(pt=>new THREE.InstancedMesh(pt.geo,pt.mat,cnt));
+    for(let i=0;i<cnt;i++){const s=sStart+R()*(L-sStart+40);const sg=R()<.5?-1:1;const d=(pr.dmin??9)+Math.pow(R(),1.3)*((pr.dmax??48)-(pr.dmin??9));const sc2=Math.min(L+20,s);const x=C.cen(sc2)+sg*(HW+d);
+      const y=C.hs(x,sc2)-0.05;const sz=(pr.smin??.8)+R()*((pr.smax??1.5)-(pr.smin??.8));const ry=R()*6.28;q.setFromEuler(e.set(0,ry,0));
+      pr.parts.forEach((pt,j)=>{const o=pt.off||[0,0,0];v3.set(o[0],o[1],o[2]).multiplyScalar(sz).applyQuaternion(q);
+        const qq=pt.rot?q.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...pt.rot))):q;
+        mt.compose(v3.add(sv.set(x,y,-s)),qq,sv.clone().set(1,1,1).multiplyScalar(sz).multiply(new THREE.Vector3(...(pt.scl||[1,1,1]))));inst[j].setMatrixAt(i,mt);});}
+    inst.forEach(m=>{m.castShadow=!!pr.shadow;sc.add(m);});
+  }
+  // 遠くの山なみ
+  const mtnMat=M(th.mtn??0x6a8fb0,{fog:false}),capMat=M(0xffffff,{fog:false});
+  for(let s=-60;s<L+300;s+=55)for(const sg of[-1,1]){const d=140+R()*80;const x=C.cen(Math.min(L,Math.max(0,s)))+sg*d;const h=30+R()*45,r=35+R()*30;
+    const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,6+Math.floor(R()*3)),mtnMat);m.position.set(x,C.base(Math.min(L,Math.max(0,s)))+h/2-8,-s);m.rotation.y=R()*3;sc.add(m);
+    if(th.snowcap){const cp=new THREE.Mesh(new THREE.ConeGeometry(r*.32,h*.32,m.geometry.parameters.radialSegments),capMat);cp.position.set(x,m.position.y+h*.34,-s);cp.rotation.y=m.rotation.y;sc.add(cp);}}
   if(th.prop==='lava'){for(let i=0;i<14;i++){const s=R()*L;const sg=R()<.5?-1:1;const p=new THREE.Mesh(new THREE.CircleGeometry(2+R()*3,10),MB(0xff5a1f));p.rotation.x=-Math.PI/2;
-    const x=sg*(HW+12+R()*20);p.position.set(x,C.hs(x,s)+0.15,-s);sc.add(p);}}
+    const x=C.cen(s)+sg*(HW+12+R()*20);p.position.set(x,C.hs(x,s)+0.15,-s);sc.add(p);}}
   if(th.prop==='crater'){const sg=new THREE.BufferGeometry();const sp=[];for(let i=0;i<600;i++){const a=Math.random()*6.28,b=Math.random()*1.3;sp.push(Math.cos(a)*Math.cos(b)*300,Math.sin(b)*300+20,Math.sin(a)*Math.cos(b)*300-100);}
     sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));sc.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.2,fog:false})));
     const earth=new THREE.Mesh(new THREE.SphereGeometry(14,24,16),MB(0x3b8cff,{fog:false}));earth.position.set(-60,70,-250);sc.add(earth);}
-  else{for(let i=0;i<12;i++){const c=new THREE.Group();for(let j=0;j<4;j++){const s=new THREE.Mesh(new THREE.IcosahedronGeometry(2.4+R()*1.8,0),M(0xffffff,{roughness:1,fog:false}));s.position.set(j*2.4,R(),R());c.add(s);}
-    c.position.set(-80+R()*160,35+R()*25,-R()*Math.max(200,L));sc.add(c);}}
+  else{for(let i=0;i<14;i++){const c=new THREE.Group();for(let j=0;j<4;j++){const s=new THREE.Mesh(new THREE.IcosahedronGeometry(2.4+R()*1.8,0),M(0xffffff,{roughness:1,fog:false}));s.position.set(j*2.4,R(),R());c.add(s);}
+    c.position.set(-90+R()*180,35+R()*25,-R()*Math.max(200,L));sc.add(c);}}
   // 岩
   rockMeshes=C.rocks.map(k=>{const m=new THREE.Mesh(new THREE.DodecahedronGeometry(k.r),M(th.prop==='snowtree'?0xb5c3d6:0x8d8f99));m.position.set(k.x,C.hs(k.x,k.s)+k.r*.55,-k.s);m.rotation.set(k.s,k.x,0);m.castShadow=true;sc.add(m);return m;});
   // コイン
   coinInst=new THREE.InstancedMesh(coinMesh(),M(0xffc93d,{metalness:.6,roughness:.3,emissive:0x664400}),Math.max(1,C.coins.length));coinInst.castShadow=true;sc.add(coinInst);
   // ゴールのゲート
-  for(const sg of[-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,7,8),M(0xffffff));p.position.set(sg*HW,C.hs(sg*HW,C.goal)+3.5,-C.goal);p.castShadow=true;sc.add(p);}
-  for(let i=0;i<8;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(2*HW/8,1.2,.25),M(i%2?0x222222:0xffffff));b.position.set(-HW+HW/8+i*2*HW/8,C.hs(0,C.goal)+6.2,-C.goal);sc.add(b);}
-  const ban=new THREE.Mesh(new THREE.BoxGeometry(2*HW,.5,.26),M(0xff3d6d));ban.position.set(0,C.hs(0,C.goal)+7,-C.goal);sc.add(ban);
+  {const gc=C.cen(C.goal);
+  for(const sg of[-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,7,8),M(0xffffff));p.position.set(gc+sg*HW,C.hs(gc+sg*HW,C.goal)+3.5,-C.goal);p.castShadow=true;sc.add(p);}
+  for(let i=0;i<8;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(2*HW/8,1.2,.25),M(i%2?0x222222:0xffffff));b.position.set(gc-HW+HW/8+i*2*HW/8,C.hs(gc,C.goal)+6.2,-C.goal);sc.add(b);}
+  const ban=new THREE.Mesh(new THREE.BoxGeometry(2*HW,.5,.26),M(0xff3d6d));ban.position.set(gc,C.hs(gc,C.goal)+7,-C.goal);sc.add(ban);}
   // 自己ベストの旗
   const best=S.best[C.n];
   if(best&&best<C.goal){const fl=new THREE.Group();const p=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,3.4,6),M(0xffffff));p.position.y=1.7;fl.add(p);
-    const f=new THREE.Mesh(new THREE.BoxGeometry(.05,.8,1.3),M(0xff3d6d));f.position.set(0,3,-.65);fl.add(f);fl.position.set(HW+.6,C.hs(HW,best),-best);sc.add(fl);}
+    const f=new THREE.Mesh(new THREE.BoxGeometry(.05,.8,1.3),M(0xff3d6d));f.position.set(0,3,-.65);fl.add(f);fl.position.set(C.cen(best)+HW+.6,C.hs(C.cen(best)+HW+.6,best),-best);sc.add(fl);}
   // スタート台とパチンコ
   const plat=new THREE.Mesh(new THREE.BoxGeometry(2*HW+1,.6,30),M(0x9a7a5a));plat.position.set(0,-.31,15);plat.receiveShadow=true;sc.add(plat);
   sling=new THREE.Group();const wd=M(0x8a5a2b);
@@ -747,7 +840,7 @@ window.addEventListener('keydown',e=>{keys[e.key]=true;
 window.addEventListener('keyup',e=>{keys[e.key]=false;if(mode==='launch'&&(e.key===' '||e.key==='Enter')&&pullState.kb){pullState.kb=false;if(pullState.pull>=0.12)fire();}});
 
 function fire(){
-  const st=stats();run=newRun(course,st,pullState.aim,pullState.pull);
+  const st=stats();run=newRun(course,st,pullState.aim,pullState.pull);tilt={p:0,r:0,y:0};
   pullState.anim=0.18;mode='drive';sling.userData.aimDots.forEach(d=>d.visible=false);show('drive');snd('launch');$('steerHint').style.opacity=1;setTimeout(()=>$('steerHint').style.opacity=0,3500);
   const b=S.best[curStage];$('dBest').style.display=b&&b<course.goal?'':'none';if(b)$('dBest').style.left=Math.min(100,b/course.goal*100)+'%';
   S.runs++;save();shake=0.25;fovKick=10;flash('#fff',0.35);spdMark=0;
@@ -774,7 +867,7 @@ function finishRun(){
   mode='result';show('result');
   $('rTitle').textContent=R.cleared?`ステージ${n} クリア！`:`ステージ${n} ${stageInfo(n).nm}`;
   const rec=$('rRec');rec.className='rec'+(R.cleared||newBest?'':' no');
-  rec.textContent=R.cleared?(firstClear?'★ はじめてのクリア ★':'★ ゴール到達 ★'):newBest?'★ 自己ベスト ★':`ゴールまで あと${Math.ceil(course.goal-R.s)}m`;
+  rec.textContent=R.cleared?(firstClear?'★ はじめてのクリア ★':'★ ゴール到達 ★'):R.fell?'橋から落ちた！'+(newBest?' ★自己ベスト★':` ゴールまで あと${Math.ceil(course.goal-R.s)}m`):newBest?'★ 自己ベスト ★':`ゴールまで あと${Math.ceil(course.goal-R.s)}m`;
   $('rDist').textContent=Math.floor(R.s);
   $('rRows').innerHTML=`<div class="row"><span>走った距離</span><b><span class="coin s"></span>${fmt(p.dist)}</b></div>
     <div class="row"><span>ひろったコイン ×${R.coins}</span><b><span class="coin s"></span>${fmt(p.coin)}</b></div>
@@ -782,7 +875,7 @@ function finishRun(){
     ${p.clear?`<div class="row"><span>クリアボーナス</span><b><span class="coin s"></span>${fmt(p.clear)}</b></div>`:''}
     <div class="row tot"><span>合計</span><b><span class="coin"></span>${fmt(p.total)}</b></div>`;
   $('rUnlock').textContent=firstClear?`🔓 ステージ${n+1}「${stageInfo(n+1).nm}」が開いた！`:'';
-  const tips=['ぬかるみと岩をよけると遠くまで行ける','黄色い加速パネルを通るとスピードアップ','ジャンプ台は着地の先をよく見よう','でこぼこ道はばねを強化すると楽になる','パチンコは目いっぱい引っぱろう','下り坂のほうへ寄ると加速する','ジャンプで岩やぬかるみを飛び越えよう','長く飛ぶとナイスジャンプのボーナス'];
+  const tips=['ぬかるみと岩をよけると遠くまで行ける','青い矢印の加速パネルを通るとスピードアップ','吊り橋は落ちないよう真ん中を走ろう','ジャンプ台は着地の先をよく見よう','でこぼこ道はばねを強化すると楽になる','パチンコは目いっぱい引っぱろう','下り坂のほうへ寄ると加速する','ジャンプで岩やぬかるみを飛び越えよう','長く飛ぶとナイスジャンプのボーナス'];
   $('rTip').textContent=R.cleared?'':'ヒント：'+tips[S.runs%tips.length];
   const canBuy=UPS.some(u=>S.up[u.id]<MAXLV&&S.money>=costOf(u.id,S.up[u.id]));
   $('rGarage').textContent=canBuy?'🔧 強化できる！':'🔧 ガレージ';
@@ -837,11 +930,23 @@ function frame(now){
       if(run.done)setTimeout(()=>{if(mode==='drive')finishRun();},900);
     }
     if(run){
-      const R=run;const sl=(course.hv(R.x,R.s+1)-course.hv(R.x,R.s-1))/2;const rl=(course.hv(R.x+.9,R.s)-course.hv(R.x-.9,R.s))/1.8;
-      const vis=R.air?R.y:course.hv(R.x,R.s);
+      const R=run;
+      if(R.done&&R.fell){R.vy-=9.8*dt;R.y+=R.vy*dt;R.s+=R.v*dt*0.4;R.v*=Math.pow(.3,dt);}
+      // 4つのタイヤの位置の高さから、車体のピッチとロールを計算する
+      const hd=Math.atan2(R.vx,Math.max(2,R.v)),fx_=Math.sin(hd),fs=Math.cos(hd),WB=1.2,TR=0.9;
+      const h0=course.hv(R.x,R.s),hw_=(a,b)=>Math.max(h0-0.8,course.hv(R.x+fx_*a+fs*b,R.s+fs*a-fx_*b));
+      const hFL=hw_(WB,-TR),hFR=hw_(WB,TR),hBL=hw_(-WB,-TR),hBR=hw_(-WB,TR);
+      const gP=Math.atan(((hFL+hFR)-(hBL+hBR))/2/(2*WB)),gR=Math.atan(((hFR+hBR)-(hFL+hBL))/2/(2*TR));
+      const lean=R.air?0:Math.max(-.12,Math.min(.12,R.steer*0.1*Math.min(1,R.v/25)));
+      const tP=R.air?Math.atan(R.vy/Math.max(4,R.v))*0.7:gP, tR=R.air?tilt.r*0.98:gR+lean;
+      const kk=R.air?Math.min(1,dt*3):Math.min(1,dt*14);
+      tilt.p+=(tP-tilt.p)*kk;tilt.r+=(tR-tilt.r)*kk;tilt.y+=(-hd-tilt.y)*Math.min(1,dt*10);
+      const vis=R.air||R.fell?R.y:Math.max(course.hv(R.x,R.s),(hFL+hFR+hBL+hBR)/4);
       if(flipT<FLIP){flipT+=dt;}
       const fk=Math.min(1,flipT/FLIP),flip=fk<1?-Math.PI*2*(fk<.5?2*fk*fk:1-Math.pow(-2*fk+2,2)/2):0;
-      placeCarAt(R.x,R.s,vis+(fk<1?Math.sin(fk*Math.PI)*0.4:0),(R.air?Math.atan(R.vy/Math.max(1,R.v))*0.8:Math.atan(sl))+flip,-Math.atan(rl),-Math.atan2(R.vx,Math.max(2,R.v))*0.8);
+      placeCarAt(R.x,R.s,vis+(fk<1?Math.sin(fk*Math.PI)*0.4:0),tilt.p+flip,tilt.r,tilt.y);
+      // 加速パネルの矢印を前へ流れるように光らせる
+      for(const a of boostArrows){if(Math.abs(-a.position.z-R.s)>140)continue;const ph=((a.userData.i*0.22-now/450)%1+1)%1;a.material.opacity=0.5+0.5*Math.pow(ph,3);a.material.color.setHSL(.5-.05*Math.pow(ph,3),1,.62+.38*Math.pow(ph,3));}
       const sq=squash>0?(squash-=dt,1-Math.sin(Math.min(1,squash/0.2)*Math.PI)*0.25):1;carObj.userData.inner.scale.set(1,sq,1);
       const wr=carObj.userData.wr;carObj.userData.wheels.forEach(w=>w.rotation.z-=R.v*dt/wr);
       const ears=carObj.userData.rabbit.userData.ears;ears.forEach((e,i)=>{e.rotation.z=.25+Math.min(1.1,R.v*0.05)+Math.sin(now/90+i)*0.05*R.v/10;});
@@ -849,9 +954,9 @@ function frame(now){
       if(!R.air&&R.v>3&&Math.random()<dt*9)puff(R,course.th.prop==='snowtree'?0xffffff:0xeadfcc);
       // カメラ
       const back=8.5+Math.min(2,R.v*0.04);
-      const tx=R.x*0.92, ty=Math.max(R.y,course.hs(R.x,R.s-back))+4.2, ts=R.s-back;
-      camPos.lerp(new THREE.Vector3(tx,ty,-ts),Math.min(1,dt*5));
-      camLook.lerp(new THREE.Vector3(R.x*0.95,course.hs(R.x,R.s+12)+0.6,-(R.s+12)),Math.min(1,dt*6));
+      const ts=R.s-back, tx=course.cen(ts)+(R.x-course.cen(R.s))*0.92, ty=Math.max(R.y,course.hs(tx,ts))+4.2;
+      {const k5=Math.min(1,dt*5);camPos.x+=(tx-camPos.x)*k5;camPos.y+=(ty-camPos.y)*k5;camPos.z+=(-ts-camPos.z)*Math.min(1,dt*14);}
+      {const lx=R.x+(course.cen(R.s+12)-course.cen(R.s))*0.6;camLook.lerp(new THREE.Vector3(lx,(R.fell?R.y:course.hs(lx,R.s+12))+0.6,-(R.s+12)),Math.min(1,dt*6));}
       const sp=R.v*3.6;
       if(R.onBoost){fovKick=Math.max(fovKick,14);if(Math.random()<dt*60)boostTrail(R);}
       if(R.v>25&&Math.random()<dt*R.v*0.6)windStreak(R);
@@ -914,6 +1019,7 @@ function fxEvent(ev,R){const [x,y,z]=carPos(R);const dustC=course.th.prop==='sno
   else if(ev==='nice'){snd('goal');toast('ナイスジャンプ！');burst(x,y+1.5,z,18,[0xff8adf,0x5ff0ff,0xffe14d],6,.8,.35);}
   else if(ev==='goal'){snd('goal');toast('ゴール！');flash('#fff',.6);shake=Math.max(shake,.3);
     for(let i=0;i<80;i++)emit(x+(Math.random()-.5)*14,y+5+Math.random()*4,z-6-Math.random()*8,(Math.random()-.5)*4,2+Math.random()*4,R.v*0.4,[0xff3d6d,0xffe14d,0x5ff0ff,0x7cff6b,0xff8adf][i%5],2.2,.35,4);}
+  else if(ev==='fall'){snd('rock');toast('落ちた！');shake=Math.max(shake,.5);burst(x,y-4,z-2,30,[0xffffff,0x9fe6ff,0x5ab8ff],8,.9,.4);}
   else if(ev==='mud'){puff(R,0x6b4a2b);emit(x+(Math.random()-.5)*1.6,y+.4,z+1.2,(Math.random()-.5)*3,3,1,0x5a3a20,.6,.4);}
 }
 // 2D の重ね描き: スピード線と画面のふち
@@ -951,7 +1057,7 @@ function simulate(opts={}){
   const out={log,runs,final:{...S.up},lv:totalLv(),form:formOf()};S=JSON.parse(save0);return out;
 }
 window.__cal=calibrate;window.__sim=simulate;window.__step=step;window.__as=autoSteer;window.__makeCourse=makeCourse;window.__stats=stats;
-window.__state=()=>({mode,run,S});
+window.__state=()=>({mode,run,S,course});
 window.__start=n=>startStage(n);
 
 load();
