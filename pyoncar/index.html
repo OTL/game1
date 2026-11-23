@@ -311,13 +311,19 @@ function makeCourse(n,goalOv){
     const br=bridges.find(b=>b.s0<s+len+14&&b.s1>s-6);
     if(br){feats.push(br);for(let i=0;i<Math.floor((br.s1-br.s0)/2.6);i++)coins.push({x:0,s:br.s0+2+i*2.6,got:false});s=br.s1+12;continue;}
     const r=R();
-    const pick = r<0.26?'bump': r<0.44?'mud': r<0.58?'ramp': r<0.72?'boost': r<0.86?'rocks':'tilt';
+    let pick = r<0.22?'bump': r<0.37?'mud': r<0.49?'ramp': r<0.61?'boost': r<0.73?'rocks': r<0.80?'tilt': r<0.88?'wave': r<0.94?'tramp':'tunnel';
+    if(pick==='tramp'&&n<2)pick='bump';
+    if(pick==='tunnel'){const tl=len+26;if(n<3||bridges.some(b=>b.s0<s+tl+14&&b.s1>s-6)||s+tl>L-20)pick='wave';
+      else{feats.push({t:'tunnel',s0:s,s1:s+tl,x0:-HW,x1:HW});for(let i=0;i<Math.floor(tl/3);i++)coins.push({x:Math.sin(i*.5)*3,s:s+3+i*3,got:false});s+=tl+6+R()*6;continue;}}
     if(pick==='bump'){const w=6+R()*5;const [x0,x1]=rangeX(w);feats.push({t:'bump',s0:s,s1:s+len,x0,x1,amp:0.3+0.25*R()+0.2*lvl});}
     else if(pick==='mud'){const w=5+R()*5;const [x0,x1]=rangeX(w);feats.push({t:'mud',s0:s+2,s1:s+len*0.8,x0,x1});}
     else if(pick==='ramp'){const [x0,x1]=rangeX(3.6);feats.push({t:'ramp',s0:s+4,s1:s+10,x0,x1,h:1.2+0.6*R()});
       if(R()<.7){const [m0,m1]=[Math.max(-HW+1,x0-2),Math.min(HW-1,x1+2)];feats.push({t:'mud',s0:s+11,s1:s+19,x0:m0,x1:m1});}}
     else if(pick==='boost'){const [x0,x1]=rangeX(3.6);feats.push({t:'boost',s0:s+4,s1:s+14,x0,x1});}
     else if(pick==='rocks'){const k=1+Math.floor(R()*2+lvl*2);for(let i=0;i<k;i++)rocks.push({x:(R()*2-1)*(HW-1.5),s:s+3+(i+R())*len/k,r:0.7+R()*0.5,hit:false});}
+    else if(pick==='wave'){feats.push({t:'wave',s0:s,s1:s+len+18,amp:0.55+0.45*R()+0.35*lvl,lam:10+R()*5,x0:-99,x1:99});}
+    else if(pick==='tramp'){const [x0,x1]=rangeX(3.2);feats.push({t:'tramp',s0:s+4,s1:s+7.2,x0,x1});
+      const xc=(x0+x1)/2;for(let i=0;i<6;i++)coins.push({x:xc,s:s+12+i*2.6,got:false});}
     else {feats.push({t:'tilt',s0:s,s1:s+len+6,k:(R()<.5?-1:1)*(0.06+0.06*R()+0.05*lvl)});}
     if(R()<0.62){ // コインの列
       const x0=(R()*2-1)*(HW-2), dx=(R()*2-1)*0.35, m=5+Math.floor(R()*4), s0=s+R()*6;
@@ -346,7 +352,8 @@ function makeCourse(n,goalOv){
     const xl=x-cen(s);
     let h=base(s)+side(xl,s);
     for(const f of near(s)){
-      if(f.t==='tilt'){const w=sstep(f.s0,f.s0+6,s)*(1-sstep(f.s1-6,f.s1,s));h+=f.k*Math.max(-HW,Math.min(HW,xl))*w;}
+      if(f.t==='wave'&&s>f.s0&&s<f.s1){const w=sstep(f.s0,f.s0+5,s)*(1-sstep(f.s1-5,f.s1,s));h+=f.amp*(1-Math.cos(2*Math.PI*(s-f.s0)/f.lam))*0.5*w;}
+      else if(f.t==='tilt'){const w=sstep(f.s0,f.s0+6,s)*(1-sstep(f.s1-6,f.s1,s));h+=f.k*Math.max(-HW,Math.min(HW,xl))*w;}
       else if(f.t==='ramp'&&s>=f.s0&&s<=f.s1+0.6){const e=sstep(f.x0-.4,f.x0+.2,xl)*(1-sstep(f.x1-.2,f.x1+.4,xl));
         const up=s<=f.s1?(s-f.s0)/(f.s1-f.s0):1-(s-f.s1)/0.6;h+=f.h*up*e;}
       else if(f.t==='bridge'&&s>=f.s0-0.5&&s<=f.s1+0.5){
@@ -358,16 +365,19 @@ function makeCourse(n,goalOv){
     }
     return h;
   };
+  // カメラ用の高さ: 橋の上は床、それ以外は道の幅の中の地面（谷や山の斜面に引っぱられない）
+  const roadH=(x,s)=>{const f=bridgeAt(s);if(f)return deckH(f,s);const c=cen(s);return hs(c+Math.max(-HW,Math.min(HW,x-c)),s);};
+  const tunnelAt=s=>{for(const f of near(s))if(f.t==='tunnel'&&s>=f.s0&&s<=f.s1)return f;return null;};
   const gapAt=(x,s)=>{const f=bridgeAt(s);if(!f)return null;return Math.abs(x-cen(s))>f.hw+0.1&&s>f.s0+0.8&&s<f.s1-0.8?f:null;};
   // でこぼこの量 (0..amp)
   const rough=(x,s)=>{const xl=x-cen(s);let a=0;for(const f of near(s))if(f.t==='bump'&&s>f.s0&&s<f.s1){const e=sstep(f.x0-.6,f.x0+.6,xl)*(1-sstep(f.x1-.6,f.x1+.6,xl))*sstep(f.s0,f.s0+2,s)*(1-sstep(f.s1-2,f.s1,s));a=Math.max(a,f.amp*e);}return a;};
   const bumpH=(x,s)=>{const a=rough(x,s);return a?a*Math.sin(x*1.35)*Math.sin(s*0.95):0;};
   const hv=(x,s)=>hs(x,s)+bumpH(x,s);
-  const surf=(x,s)=>{const xl=x-cen(s);for(const f of near(s)){if(s<f.s0||s>f.s1||xl<f.x0||xl>f.x1)continue;if(f.t==='bridge')return 'bridge';if(f.t==='mud')return 'mud';if(f.t==='boost')return 'boost';if(f.t==='ramp')return 'ramp';}if(Math.abs(xl)>HW)return 'grass';return '';};
+  const surf=(x,s)=>{const xl=x-cen(s);for(const f of near(s)){if(s<f.s0||s>f.s1||xl<f.x0||xl>f.x1)continue;if(f.t==='bridge')return 'bridge';if(f.t==='mud')return 'mud';if(f.t==='boost')return 'boost';if(f.t==='ramp')return 'ramp';if(f.t==='tramp')return 'tramp';}if(Math.abs(xl)>HW)return 'grass';return '';};
   // コインと岩は絶対座標に直す
   for(const c of coins)c.x+=cen(c.s);
   for(const k of rocks)k.x+=cen(k.s);
-  return {n,info,th,goal,L,feats,coins,rocks,hs,hv,rough,surf,near,side,cen,base,bridgeAt,gapAt,deckH};
+  return {n,info,th,goal,L,feats,coins,rocks,hs,hv,rough,surf,near,side,cen,base,bridgeAt,gapAt,deckH,roadH,tunnelAt};
 }
 
 /* ================= 物理 ================= */
@@ -394,6 +404,7 @@ function step(R,C,st,dt){
     if(ro>0)a-=ro*st.bump*R.v;
     if(sf==='boost'){a+=18;if(!R.onBoost){R.onBoost=true;R.events.push('boost');}}else R.onBoost=false;
     if(sf==='mud'&&R.v>2&&Math.random()<dt*3)R.events.push('mud');
+    if(sf==='tramp'&&R.v>1){R.air=true;R.jumped=true;R.airT=0;R.vy=Math.max(R.vy,0)+(10.5+0.15*R.v)*Math.sqrt(g/9.8);R.y+=0.05;R.events.push('boing');}
     a-=st.drag*R.v*Math.abs(R.v);
     R.v+=a*dt;
     const tgt=R.steer*(st.steer+0.16*Math.max(0,R.v))*Math.min(1,Math.max(0,R.v)/4);
@@ -405,16 +416,18 @@ function step(R,C,st,dt){
     const tgt=R.steer*(st.steer+0.16*Math.max(0,R.v))*0.5;R.vx+=(tgt-R.vx)*Math.min(1,dt*1.5);
   }
   R.s+=R.v*dt; R.x+=R.vx*dt;
-  {const c=C.cen(R.s);if(Math.abs(R.x-c)>XMAX){R.x=c+Math.sign(R.x-c)*XMAX;R.vx=0;}}
+  {const c=C.cen(R.s);if(Math.abs(R.x-c)>XMAX){R.x=c+Math.sign(R.x-c)*XMAX;R.vx=0;}
+   if(C.tunnelAt(R.s)){const lim=HW-0.7;if(Math.abs(R.x-c)>lim){R.x=c+Math.sign(R.x-c)*lim;R.vx*=-0.2;if(!R.wallT||R.t-R.wallT>0.4){R.wallT=R.t;R.v*=0.97;R.events.push('wall');}}
+     const top=C.hs(R.x,R.s)+3.6;if(R.air&&R.y>top){R.y=top;R.vy=Math.min(R.vy,0);}}}
   const ny=C.hs(R.x,R.s);
   if(!R.air){
     const vyg=(ny-R.y)/dt;
     if(vyg < R.vy - g*dt*1.6 && R.v>4){R.air=true;R.airT=0;R.jumped=false;R.y+=R.vy*dt;}
-    else {R.vy=vyg;R.y=ny;}
+    else {R.vy=Math.min(vyg,0.6*Math.abs(R.v)+3);R.y=ny;}
   }else{
     R.y+=R.vy*dt;
     if(R.y<=ny){const sl=(C.hs(R.x,R.s+0.4)-C.hs(R.x,R.s-0.4))/0.8;const imp=Math.max(0,-(R.vy - sl*R.v));
-      R.v*=1-Math.min(0.35,imp*st.land);R.y=ny;R.vy=sl*R.v;R.air=false;R.events.push(imp>4?'land2':'land');
+      R.v*=1-Math.min(0.35,imp*st.land);R.y=ny;R.vy=Math.max(-1,Math.min(1,sl))*R.v;R.air=false;R.events.push(imp>4?'land2':'land');
       if(R.airT>0.9){R.airs++;R.events.push('nice');}R.airT=0;}
   }
   // 岩
@@ -424,7 +437,7 @@ function step(R,C,st,dt){
   for(const c of C.coins){if(c.got||Math.abs(c.s-R.s)>st.magnet+1)continue;const dx=R.x-c.x,ds=R.s-c.s;
     if(dx*dx+ds*ds<st.magnet*st.magnet && Math.abs(R.y+0.8-(C.hs(c.x,c.s)+1.1))<2.2){c.got=true;R.coins++;R.events.push('coin');}}
   if(R.v>R.maxV)R.maxV=R.v;
-  {const f=C.bridgeAt(R.s);if(f&&R.y<C.deckH(f,R.s)-3.5){R.done=true;R.fell=true;R.events.push('fall');return;}}
+  {const f=C.bridgeAt(R.s);if(f&&Math.abs(R.x-C.cen(R.s))>f.hw+0.15&&R.y<C.deckH(f,R.s)-0.4){R.done=true;R.fell=true;R.air=true;R.vy=Math.min(R.vy,0);R.events.push('fall');return;}}
   if(!R.cleared&&R.s>=C.goal){R.cleared=true;R.events.push('goal');}
   if(R.s>=C.L-8){R.s=C.L-8;R.v=0;}
   if(!R.air&&R.v<0.35){R.stopT+=dt;if(R.stopT>0.5||R.v<=0){R.done=true;R.v=Math.max(0,R.v);}}else R.stopT=0;
@@ -435,7 +448,7 @@ function autoSteer(R,C,skill=1,rnd=Math.random){
   const LA=Math.max(26,R.v*1.6);
   for(let xl=-HW-4;xl<=HW+4;xl+=0.5){
     let v=-Math.abs(xl-cx)*0.15-(Math.abs(xl)>HW-0.5?2.5:0);
-    for(let d=4;d<=LA;d+=LA/12){const s=R.s+d;const x=C.cen(s)+xl;const sf=C.surf(x,s);if(sf==='mud')v-=3;if(sf==='boost')v+=4;if(sf==='ramp')v+=0.5;v-=C.rough(x,s)*4;
+    for(let d=4;d<=LA;d+=LA/12){const s=R.s+d;const x=C.cen(s)+xl;const sf=C.surf(x,s);if(sf==='mud')v-=3;if(sf==='boost')v+=4;if(sf==='ramp')v+=0.5;if(sf==='tramp')v+=3;v-=C.rough(x,s)*4;
       if(C.gapAt(x,s))v-=40;
       for(const k of C.rocks)if(Math.abs(k.s-s)<1&&Math.abs(k.x-x)<k.r+1.2)v-=12;
       for(const c of C.coins)if(!c.got&&Math.abs(c.s-s)<1&&Math.abs(c.x-x)<1.2)v+=1.2;}
@@ -444,7 +457,7 @@ function autoSteer(R,C,skill=1,rnd=Math.random){
   }
   const ahead=R.s+Math.max(3,R.v*0.35);const tx=C.cen(ahead)+best;
   R.steer=Math.max(-1,Math.min(1,(tx-R.x)*0.5));
-  if(!R.air&&R.jumpT<=0&&!C.bridgeAt(R.s+R.v*0.3)){const d0=R.v*0.22,d1=R.v*0.4;let bad=false;
+  if(!R.air&&R.jumpT<=0&&!C.bridgeAt(R.s+R.v*0.3)&&!C.tunnelAt(R.s+R.v*0.3)){const d0=R.v*0.22,d1=R.v*0.4;let bad=false;
     for(let d=d0;d<=d1;d+=1){const s=R.s+d;const x=R.x+R.vx*d/Math.max(1,R.v);const sf=C.surf(x,s);if(sf==='mud'||C.rough(x,s)>0.2)bad=true;
       for(const k of C.rocks)if(!k.hit&&Math.abs(k.s-s)<1&&Math.abs(k.x-x)<k.r+1)bad=true;}
     if(bad)R.jumpReq=0.15;}
@@ -452,7 +465,7 @@ function autoSteer(R,C,skill=1,rnd=Math.random){
 
 // ゴール距離: 目安の強化レベルで自動運転したときの距離から決める
 const GOALS=[300,450,600,780,950,1150,1350,1600,1850,2100,2400,2750,3100];
-const SEEDV=[0,26,1,27,10,1,1,39,3,28,38,27,13];
+const SEEDV=[1,0,8,34,3,12,9,16,28,43,26,4,29];
 const lvTarget=n=>Math.min(25,Math.round(1.7*(n-1)));
 function calibrate(n){
   const lv=lvTarget(n),up={};UPS.forEach(u=>up[u.id]=lv);const st=stats(up);const ds=[];
@@ -593,6 +606,7 @@ function setGarageCar(f){if(gCar)gScene.remove(gCar);gCar=buildCar(f);gScene.add
 
 /* ---- コースの舞台 ---- */
 let tilt={p:0,r:0,y:0};
+let tramps=[];
 let cScene=null, course=null, carObj=null, coinInst=null, sling=null, dust=[], rockMeshes=[], boostArrows=[];
 const cSun=new THREE.DirectionalLight(0xffffff,2.3);cSun.castShadow=true;cSun.shadow.mapSize.set(1024,1024);
 Object.assign(cSun.shadow.camera,{left:-18,right:18,top:18,bottom:-18,near:1,far:120});
@@ -604,7 +618,7 @@ function buildCourseScene(C){
   // 道（中心は C.cen(s) にそって曲がる）
   const nx=40, ds=L>2400?1:0.6, ns=Math.ceil((L-sStart)/ds);
   const pos=new Float32Array((nx+1)*(ns+1)*3), col=new Float32Array((nx+1)*(ns+1)*3);
-  const cRoad=new THREE.Color(th.road), cMud=new THREE.Color(0x6b4a2b), cBoost=new THREE.Color(0x1550e0), cBoost2=new THREE.Color(0x1a78f0), cRamp=new THREE.Color(0xff8a3d), cEdge=new THREE.Color(0xffffff),cGround=new THREE.Color(th.ground), cGoal=new THREE.Color(0xffffff), cGoal2=new THREE.Color(0x222222), cWood=new THREE.Color(0xb07a45), cWood2=new THREE.Color(0x8a5a2b), cRock=new THREE.Color(0x7a6a5a), tmp=new THREE.Color();
+  const cRoad=new THREE.Color(th.road), cMud=new THREE.Color(0x6b4a2b), cBoost=new THREE.Color(0x1550e0), cBoost2=new THREE.Color(0x1a78f0), cRamp=new THREE.Color(0xff8a3d), cEdge=new THREE.Color(0xffffff),cGround=new THREE.Color(th.ground), cGoal=new THREE.Color(0xffffff), cGoal2=new THREE.Color(0x222222), cWood=new THREE.Color(0xb07a45), cTramp=new THREE.Color(0x2b3a8a), cWood2=new THREE.Color(0x8a5a2b), cRock=new THREE.Color(0x7a6a5a), tmp=new THREE.Color();
   let k=0;
   for(let j=0;j<=ns;j++){const s=sStart+j*ds;const c0=C.cen(s);for(let i=0;i<=nx;i++){const xl=-HW+i*(2*HW/nx),x=c0+xl;
     pos[k]=x;pos[k+1]=C.hv(x,s);pos[k+2]=-s;
@@ -614,6 +628,7 @@ function buildCourseScene(C){
     else if(Math.abs(s-C.goal)<1.5)tmp.copy(((Math.floor((xl+HW)/1.4)+Math.floor((s-C.goal+1.5)/1.5))%2)?cGoal:cGoal2);
     else if(sf==='mud')tmp.copy(cMud).multiplyScalar(.9+.2*Math.sin(x*3+s*2));
     else if(sf==='boost')tmp.copy((Math.floor(s/1.2)%2)?cBoost:cBoost2);
+    else if(sf==='tramp')tmp.copy(cTramp);
     else if(sf==='ramp')tmp.copy((Math.floor(s*1.2)%2)?cRamp:cEdge);
     else {const r=C.rough(x,s);tmp.copy(cRoad).multiplyScalar(r>0?0.85+0.18*Math.sin(x*1.35)*Math.sin(s*.95):0.97+0.03*Math.sin(s*.7+x));}
     if(!br&&Math.abs(xl)>HW-1.2&&Math.abs(s-C.goal)>=1.5)tmp.lerp(cGround,sstep(HW-1.2,HW,Math.abs(xl))*0.85);
@@ -622,7 +637,7 @@ function buildCourseScene(C){
   const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(pos,3));rg.setAttribute('color',new THREE.BufferAttribute(col,3));rg.setIndex(idx);rg.computeVertexNormals();
   const road=new THREE.Mesh(rg,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.9}));road.receiveShadow=true;sc.add(road);
   // 加速パネル: 平らな矢印が前へ流れるように光る
-  boostArrows=[];
+  boostArrows=[];tramps=[];
   const chev=new THREE.Shape();chev.moveTo(0,.75);chev.lineTo(1.1,-.05);chev.lineTo(1.1,-.6);chev.lineTo(0,.2);chev.lineTo(-1.1,-.6);chev.lineTo(-1.1,-.05);chev.closePath();
   const chevGeo=new THREE.ShapeGeometry(chev);
   for(const f of C.feats)if(f.t==='boost'){let i=0;for(let s=f.s0+1;s<f.s1-0.5;s+=1.6,i++){const xm=C.cen(s)+(f.x0+f.x1)/2;
@@ -634,6 +649,30 @@ function buildCourseScene(C){
     // 両わきの光る柱
     for(const xl of[f.x0-.2,f.x1+.2]){const x=C.cen(f.s0)+xl;const pl=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1.4,6),MB(0x8ae6ff));pl.position.set(x,C.hs(x,f.s0)+.7,-f.s0);sc.add(pl);
       const tp=new THREE.Mesh(new THREE.SphereGeometry(.2,8,8),MB(0xffffff));tp.position.set(x,C.hs(x,f.s0)+1.45,-f.s0);sc.add(tp);}}
+  // トランポリン
+  for(const f of C.feats)if(f.t==='tramp'){const sm=(f.s0+f.s1)/2,xm=C.cen(sm)+(f.x0+f.x1)/2,y=C.hs(xm,sm);const g=new THREE.Group();
+    const mat=new THREE.Mesh(new THREE.CylinderGeometry(1.45,1.45,.12,24),M(0xff5fa8,{roughness:.5}));mat.position.y=.12;g.add(mat);
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(1.55,.14,8,28),M(0x3b6cff));rim.rotation.x=Math.PI/2;rim.position.y=.16;g.add(rim);
+    const star=new THREE.Mesh(new THREE.CircleGeometry(.6,5),MB(0xffffff));star.rotation.x=-Math.PI/2;star.position.y=.19;g.add(star);
+    g.position.set(xm,y,-sm);g.userData={mat};sc.add(g);tramps.push(g);}
+  // トンネル: アーチの内側・入口の石わく・上の山
+  for(const f of C.feats)if(f.t==='tunnel'){const N=Math.ceil((f.s1-f.s0)/2),RAD=HW+0.8;
+    const inner=M(0x5a5560,{side:THREE.BackSide}),stone=M(0x8a8478),lamp=MB(0xffe08a);
+    for(let i=0;i<N;i++){const s0=f.s0+i*2,s1=Math.min(f.s1,s0+2.05),sm=(s0+s1)/2,c=C.cen(sm),y=C.hs(c,sm)-1;
+      const seg=new THREE.Mesh(new THREE.CylinderGeometry(RAD,RAD,s1-s0,20,1,true,-Math.PI/2,Math.PI),inner);
+      seg.rotation.order='YXZ';seg.rotation.x=-Math.PI/2;seg.rotation.y=-Math.atan((C.cen(s1)-C.cen(s0))/(s1-s0));
+      seg.position.set(c,y,-sm);sc.add(seg);
+      if(i%2===0)for(const sg of[-1,1]){const l=new THREE.Mesh(new THREE.BoxGeometry(.5,.18,.9),lamp);l.position.set(c+sg*3.2,y+RAD*0.93,-sm);sc.add(l);}}
+    for(const se of[f.s0,f.s1]){const c=C.cen(se),y=C.hs(c,se)-1;
+      const arch=new THREE.Mesh(new THREE.TorusGeometry(RAD+0.5,0.7,6,20,Math.PI),stone);arch.position.set(c,y,-se);arch.rotation.y=-Math.atan(C.cen(se+1)-C.cen(se-1))/2;sc.add(arch);
+      for(const sg of[-1,1]){const p=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6),stone);p.position.set(c+sg*(RAD+0.5),y+0.5,-se);sc.add(p);}}
+    // 上と両わきに山をかぶせる（トンネルの中には入りこまない形）
+    const sm=(f.s0+f.s1)/2,len=f.s1-f.s0,yaw=-Math.atan((C.cen(f.s1)-C.cen(f.s0))/len),gm=M(th.ground),cm=C.cen(sm),ym=C.hs(cm,sm)-1;
+    const roof=new THREE.Mesh(new THREE.SphereGeometry(1,16,8,0,Math.PI*2,0,Math.PI/2),gm);roof.scale.set(RAD+7,7,len/2+0.5);roof.position.set(cm,ym+RAD-0.3,-sm);roof.rotation.y=yaw;sc.add(roof);
+    for(const sg of[-1,1]){const m=new THREE.Mesh(new THREE.SphereGeometry(1,14,8,0,Math.PI*2,0,Math.PI/2),gm);m.scale.set(11,RAD+4,len/2+0.5);m.position.set(cm+sg*(RAD+10)*Math.cos(yaw),ym,-sm-sg*(RAD+10)*Math.sin(yaw));m.rotation.y=yaw;sc.add(m);}
+    // 外側のコンクリートの筒
+    for(let i=0;i<N;i++){const s0=f.s0+i*2,s1=Math.min(f.s1,s0+2.05),sm2=(s0+s1)/2,c=C.cen(sm2),y=C.hs(c,sm2)-1;
+      const o=new THREE.Mesh(new THREE.CylinderGeometry(RAD+0.6,RAD+0.6,s1-s0,20,1,true,-Math.PI/2,Math.PI),stone);o.rotation.order='YXZ';o.rotation.x=-Math.PI/2;o.rotation.y=-Math.atan((C.cen(s1)-C.cen(s0))/(s1-s0));o.position.set(c,y,-sm2);sc.add(o);}}
   // 両わきの野原（道の外も走れる）
   for(const sg of[-1,1]){const W=70,gx=44,gs=Math.ceil((L-sStart+40)/2);const g=new THREE.PlaneGeometry(W,(L-sStart+40),gx,gs);g.rotateX(-Math.PI/2);const p=g.attributes.position;
     for(let i=0;i<p.count;i++){const xl=p.getX(i)+sg*(HW+W/2-0.3),z=p.getZ(i)-(L+sStart+40)/2+20;const s=-z;const sc2=Math.max(sStart,Math.min(L+20,s));const x=C.cen(sc2)+xl;
@@ -931,7 +970,7 @@ function frame(now){
     }
     if(run){
       const R=run;
-      if(R.done&&R.fell){R.vy-=9.8*dt;R.y+=R.vy*dt;R.s+=R.v*dt*0.4;R.v*=Math.pow(.3,dt);}
+      if(R.done&&R.fell&&!R.splashed){R.vy-=9.8*dt;R.y+=R.vy*dt;R.s+=R.v*dt*0.4;R.x+=R.vx*dt*0.4;R.v*=Math.pow(.3,dt);const wy=course.base(R.s)-17;if(R.y<=wy){R.y=wy;R.splashed=true;const [x,y,z]=carPos(R);burst(x,y+.5,z,40,[0xffffff,0x9fe6ff,0x5ab8ff],9,1,.45);snd('land');}}
       // 4つのタイヤの位置の高さから、車体のピッチとロールを計算する
       const hd=Math.atan2(R.vx,Math.max(2,R.v)),fx_=Math.sin(hd),fs=Math.cos(hd),WB=1.2,TR=0.9;
       const h0=course.hv(R.x,R.s),hw_=(a,b)=>Math.max(h0-0.8,course.hv(R.x+fx_*a+fs*b,R.s+fs*a-fx_*b));
@@ -945,6 +984,7 @@ function frame(now){
       if(flipT<FLIP){flipT+=dt;}
       const fk=Math.min(1,flipT/FLIP),flip=fk<1?-Math.PI*2*(fk<.5?2*fk*fk:1-Math.pow(-2*fk+2,2)/2):0;
       placeCarAt(R.x,R.s,vis+(fk<1?Math.sin(fk*Math.PI)*0.4:0),tilt.p+flip,tilt.r,tilt.y);
+      for(const t of tramps)if(t.userData.k>0){t.userData.k=Math.max(0,t.userData.k-dt);const k=t.userData.k/0.5;t.userData.mat.scale.y=1+Math.sin(k*Math.PI*6)*k*3;t.userData.mat.position.y=.12-Math.sin(k*Math.PI*3)*k*.25;}
       // 加速パネルの矢印を前へ流れるように光らせる
       for(const a of boostArrows){if(Math.abs(-a.position.z-R.s)>140)continue;const ph=((a.userData.i*0.22-now/450)%1+1)%1;a.material.opacity=0.5+0.5*Math.pow(ph,3);a.material.color.setHSL(.5-.05*Math.pow(ph,3),1,.62+.38*Math.pow(ph,3));}
       const sq=squash>0?(squash-=dt,1-Math.sin(Math.min(1,squash/0.2)*Math.PI)*0.25):1;carObj.userData.inner.scale.set(1,sq,1);
@@ -954,9 +994,9 @@ function frame(now){
       if(!R.air&&R.v>3&&Math.random()<dt*9)puff(R,course.th.prop==='snowtree'?0xffffff:0xeadfcc);
       // カメラ
       const back=8.5+Math.min(2,R.v*0.04);
-      const ts=R.s-back, tx=course.cen(ts)+(R.x-course.cen(R.s))*0.92, ty=Math.max(R.y,course.hs(tx,ts))+4.2;
-      {const k5=Math.min(1,dt*5);camPos.x+=(tx-camPos.x)*k5;camPos.y+=(ty-camPos.y)*k5;camPos.z+=(-ts-camPos.z)*Math.min(1,dt*14);}
-      {const lx=R.x+(course.cen(R.s+12)-course.cen(R.s))*0.6;camLook.lerp(new THREE.Vector3(lx,(R.fell?R.y:course.hs(lx,R.s+12))+0.6,-(R.s+12)),Math.min(1,dt*6));}
+      const ts=R.s-back, tx=course.cen(ts)+(R.x-course.cen(R.s))*0.92, ty=(R.fell?Math.max(R.y+3,course.roadH(tx,ts)):Math.max(R.y,course.roadH(tx,ts)))+4.2;
+      if(!R.fell){const k5=Math.min(1,dt*5);camPos.x+=(tx-camPos.x)*k5;camPos.y+=(ty-camPos.y)*k5;camPos.z+=(-ts-camPos.z)*Math.min(1,dt*14);}
+      {const lx=R.x+(course.cen(R.s+12)-course.cen(R.s))*0.6;if(R.fell)camLook.lerp(new THREE.Vector3(R.x,R.y,-R.s),Math.min(1,dt*4));else camLook.lerp(new THREE.Vector3(lx,Math.max(course.roadH(lx,R.s+12),R.y-3)+0.6,-(R.s+12)),Math.min(1,dt*6));}
       const sp=R.v*3.6;
       if(R.onBoost){fovKick=Math.max(fovKick,14);if(Math.random()<dt*60)boostTrail(R);}
       if(R.v>25&&Math.random()<dt*R.v*0.6)windStreak(R);
@@ -1019,6 +1059,9 @@ function fxEvent(ev,R){const [x,y,z]=carPos(R);const dustC=course.th.prop==='sno
   else if(ev==='nice'){snd('goal');toast('ナイスジャンプ！');burst(x,y+1.5,z,18,[0xff8adf,0x5ff0ff,0xffe14d],6,.8,.35);}
   else if(ev==='goal'){snd('goal');toast('ゴール！');flash('#fff',.6);shake=Math.max(shake,.3);
     for(let i=0;i<80;i++)emit(x+(Math.random()-.5)*14,y+5+Math.random()*4,z-6-Math.random()*8,(Math.random()-.5)*4,2+Math.random()*4,R.v*0.4,[0xff3d6d,0xffe14d,0x5ff0ff,0x7cff6b,0xff8adf][i%5],2.2,.35,4);}
+  else if(ev==='boing'){snd('jump');toast('ボヨーン！');shake=Math.max(shake,.2);burst(x,y+.3,z,20,[0xff5fa8,0xffffff,0x3b6cff],7,.7,.35);flipT=R.v>10?0:9;squash=0;
+    const ears=carObj.userData.rabbit.userData.ears;ears.forEach(e=>e.rotation.z=1.6);for(const t of tramps)if(Math.abs(-t.position.z-R.s)<5)t.userData.k=0.5;}
+  else if(ev==='wall'){snd('rock');shake=Math.max(shake,.25);burst(x,y+.6,z-1,10,[0xffe14d,0xffffff],6,.4,.25);}
   else if(ev==='fall'){snd('rock');toast('落ちた！');shake=Math.max(shake,.5);burst(x,y-4,z-2,30,[0xffffff,0x9fe6ff,0x5ab8ff],8,.9,.4);}
   else if(ev==='mud'){puff(R,0x6b4a2b);emit(x+(Math.random()-.5)*1.6,y+.4,z+1.2,(Math.random()-.5)*3,3,1,0x5a3a20,.6,.4);}
 }
